@@ -1,8 +1,10 @@
 import { ObjectType, Field, ID, Float } from 'type-graphql';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMany, JoinTable, OneToOne, JoinColumn } from 'typeorm';
 import { Trip } from './Trip';
 import { MediaItem } from './MediaItem';
 import { Tag } from './Tag';
+import { GPXTrack } from './GPXTrack';
+import { BucketListItem } from './BucketListItem';
 
 @ObjectType({ description: "Represents a single memory or event within a trip" })
 @Entity()
@@ -50,4 +52,12 @@ export class Memory {
     @Field(() => ID)
     @Column()
     tripId!: string;
+
+    @Field(() => GPXTrack, { nullable: true })
+    @OneToOne(() => GPXTrack, gpxTrack => gpxTrack.memory, { cascade: true, nullable: true })
+    @JoinColumn()
+    gpxTrack?: GPXTrack;
+
+    @ManyToOne(() => BucketListItem, item => item.memories, { nullable: true })
+    bucketListItem?: BucketListItem;
 } 

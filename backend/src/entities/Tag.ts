@@ -1,9 +1,9 @@
 import { ObjectType, Field, ID, Int } from "type-graphql";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToMany, JoinTable, ManyToOne } from "typeorm";
-import { Memory } from "./Memory";
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, ManyToMany, JoinTable, CreateDateColumn, UpdateDateColumn } from "typeorm";
 import { TagCategory } from "./TagCategory";
+import { Memory } from "./Memory";
 
-@ObjectType({ description: "Represents a tag for categorizing memories" })
+@ObjectType({ description: "A tag to categorize memories" })
 @Entity()
 export class Tag {
     @Field(() => ID)
@@ -43,7 +43,7 @@ export class Tag {
     createdAt!: Date;
 
     @Field({ nullable: true })
-    @Column({ type: "timestamp", nullable: true })
+    @UpdateDateColumn({ nullable: true })
     lastUsedAt?: Date;
 
     @Field()
@@ -55,20 +55,18 @@ export class Tag {
     sortOrder!: number;
 
     @Field(() => TagCategory, { nullable: true })
-    @ManyToOne(() => TagCategory, category => category.tags, { nullable: true })
+    @ManyToOne(() => TagCategory, (category) => category.tags, { nullable: true })
     category?: TagCategory;
 
-    @Field(() => ID, { nullable: true })
-    @Column({ nullable: true })
-    categoryId?: string;
-
-    @Field(() => [Memory])
     @ManyToMany(() => Memory, memory => memory.tags)
     memories!: Memory[];
 
-    // Self-referencing relationship for related tags
-    @Field(() => [Tag])
+    @Field(() => [Tag], { nullable: true })
     @ManyToMany(() => Tag)
-    @JoinTable()
-    relatedTags!: Tag[];
+    @JoinTable({
+        name: "tag_related_tags",
+        joinColumn: { name: "tag_id", referencedColumnName: "id" },
+        inverseJoinColumn: { name: "related_tag_id", referencedColumnName: "id" }
+    })
+    relatedTags?: Tag[];
 } 

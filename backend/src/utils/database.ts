@@ -9,8 +9,10 @@ import { TagCategory } from "../entities/TagCategory";
 import { BucketListItem } from "../entities/BucketListItem";
 import { GPXTrack } from "../entities/GPXTrack";
 import { TrackSegment } from "../entities/TrackSegment";
+import { TrackMetadata } from "../entities/TrackMetadata";
 
 // Hardcode the connection string to bypass environment variable issues on Unraid
+// Use 'localhost' for local development/testing outside of Docker
 const connectionString = "postgresql://travelcompanion:travelcompanion@db:5432/journiary";
 
 export const AppDataSource = new DataSource({
@@ -18,7 +20,7 @@ export const AppDataSource = new DataSource({
     url: connectionString,
     synchronize: true, // DEV only: automatically creates the database schema on every application launch
     logging: true,
-    entities: [Trip, Memory, MediaItem, RoutePoint, Tag, TagCategory, BucketListItem, GPXTrack, TrackSegment],
+    entities: [Trip, Memory, MediaItem, RoutePoint, Tag, TagCategory, BucketListItem, GPXTrack, TrackSegment, TrackMetadata],
     subscribers: [],
     migrations: [],
 }); 

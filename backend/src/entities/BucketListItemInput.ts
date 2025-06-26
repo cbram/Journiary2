@@ -1,19 +1,32 @@
-import { Field, InputType, Float } from "type-graphql";
+import { InputType, Field, Float } from "type-graphql";
+import { BucketListItem } from "./BucketListItem";
 
-@InputType({ description: "Input data for creating a new Bucket List Item" })
-export class BucketListItemInput {
+@InputType()
+export class BucketListItemInput implements Partial<BucketListItem> {
     @Field()
-    title!: string;
+    name!: string;
 
     @Field({ nullable: true })
-    description?: string;
+    country?: string;
+
+    @Field({ nullable: true })
+    region?: string;
+
+    @Field({ nullable: true })
+    type?: string;
+
+    @Field(() => Float, { nullable: true })
+    latitude1?: number;
+
+    @Field(() => Float, { nullable: true })
+    longitude1?: number;
+
+    @Field(() => Float, { nullable: true })
+    latitude2?: number;
+
+    @Field(() => Float, { nullable: true })
+    longitude2?: number;
     
     @Field({ nullable: true })
-    targetDate?: Date;
-
-    @Field(() => Float, { nullable: true })
-    latitude?: number;
-
-    @Field(() => Float, { nullable: true })
-    longitude?: number;
+    isDone?: boolean;
 } 

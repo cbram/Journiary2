@@ -3,6 +3,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 import { Memory } from './Memory';
 import { RoutePoint } from './RoutePoint';
 import { GPXTrack } from './GPXTrack';
+import { TrackSegment } from './TrackSegment';
 
 @ObjectType({ description: "Represents a single journey or trip" })
 @Entity()
@@ -58,6 +59,10 @@ export class Trip {
     @Field(() => [GPXTrack])
     @OneToMany(() => GPXTrack, gpxTrack => gpxTrack.trip)
     gpxTracks!: GPXTrack[];
+
+    @Field(() => [TrackSegment])
+    @OneToMany(() => TrackSegment, segment => segment.trip)
+    trackSegments!: TrackSegment[];
 
     // We will add relationships to Memory, RoutePoint etc. later
 } 

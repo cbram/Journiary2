@@ -18,29 +18,45 @@ export class BucketListItemResolver {
         return await itemRepository.save(item);
     }
 
-    @Mutation(() => BucketListItem)
+    @Mutation(() => BucketListItem, { nullable: true })
+    async updateBucketListItem(
+        @Arg("id", () => ID) id: string,
+        @Arg("input") input: BucketListItemInput
+    ): Promise<BucketListItem | null> {
+        const itemRepository = AppDataSource.getRepository(BucketListItem);
+        await itemRepository.update(id, input);
+        return await itemRepository.findOneBy({ id });
+    }
+
+    @Mutation(() => BucketListItem, { nullable: true })
     async completeBucketListItem(
         @Arg("id", () => ID) id: string,
         @Arg("memoryId", () => ID) memoryId: string
-    ): Promise<BucketListItem> {
+    ): Promise<BucketListItem | null> {
         const itemRepository = AppDataSource.getRepository(BucketListItem);
         const memoryRepository = AppDataSource.getRepository(Memory);
 
         const item = await itemRepository.findOneBy({ id });
-        if (!item) {
-            throw new Error(`BucketListItem with ID ${id} not found.`);
-        }
+        if (!item) throw new Error("Bucket list item not found");
 
         const memory = await memoryRepository.findOneBy({ id: memoryId });
-        if (!memory) {
-            throw new Error(`Memory with ID ${memoryId} not found.`);
-        }
+        if (!memory) throw new Error("Memory not found");
 
-        item.isCompleted = true;
+        item.isDone = true;
         item.completedAt = new Date();
-        item.completionMemory = memory;
-        item.completionMemoryId = memory.id;
+        
+        // Associate the memory with the bucket list item
+        if (!item.memories) {
+            item.memories = [];
+        }
+        item.memories.push(memory);
 
         return await itemRepository.save(item);
+    }
+
+    @Mutation(() => Boolean)
+    async deleteBucketListItem(@Arg("id", () => ID) id: string): Promise<boolean> {
+        const result = await AppDataSource.getRepository(BucketListItem).delete(id);
+        return result.affected === 1;
     }
 } 
