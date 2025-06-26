@@ -37,6 +37,10 @@ export class Memory {
     @Column({ nullable: true })
     locationName?: string;
 
+    @Field({ nullable: true, description: "JSON string containing weather data" })
+    @Column("text", { nullable: true })
+    weatherJSON?: string;
+
     @Field(() => [MediaItem], { description: "A list of media items associated with this memory" })
     @OneToMany(() => MediaItem, (mediaItem: MediaItem) => mediaItem.memory)
     mediaItems!: MediaItem[];

@@ -23,6 +23,10 @@ export class GPXTrack {
     @Column({ nullable: true })
     originalFilename?: string;
 
+    @Field({ nullable: true, description: "The name of the GPX file object in the storage (e.g., MinIO)" })
+    @Column({ nullable: true })
+    gpxFileObjectName?: string;
+
     @Field(() => Float, { nullable: true })
     @Column("float", { nullable: true })
     totalDistance?: number;

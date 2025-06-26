@@ -33,6 +33,10 @@ export class MediaItem {
     @Column({ nullable: true })
     duration?: number;
 
+    @Field({ nullable: true, description: "The name of the thumbnail object in the storage (e.g., MinIO)" })
+    @Column({ nullable: true })
+    thumbnailObjectName?: string;
+
     @Field(() => Memory)
     @ManyToOne(() => Memory, (memory: Memory) => memory.mediaItems)
     memory!: Memory;

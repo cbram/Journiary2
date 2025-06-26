@@ -20,6 +20,10 @@ export class Trip {
     @Column({ nullable: true })
     tripDescription?: string;
 
+    @Field({ nullable: true, description: "The name of the cover image object in the storage (e.g., MinIO)" })
+    @Column({ nullable: true })
+    coverImageObjectName?: string;
+
     @Field({ nullable: true })
     @Column({ nullable: true })
     travelCompanions?: string;
