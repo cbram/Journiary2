@@ -11,6 +11,7 @@ services:
     environment:
       - DATABASE_URL=postgres://postgres:admin@db:5432/travelcompanion
       - MINIO_URL=minio
+      - MINIO_PORT=9000
     depends_on:
       db:
         condition: service_healthy

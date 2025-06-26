@@ -10,17 +10,34 @@ import { BucketListItem } from "../entities/BucketListItem";
 import { GPXTrack } from "../entities/GPXTrack";
 import { TrackSegment } from "../entities/TrackSegment";
 import { TrackMetadata } from "../entities/TrackMetadata";
+import { User } from "../entities/User";
+import { TripMembership } from "../entities/TripMembership";
 
-// Hardcode the connection string to bypass environment variable issues on Unraid
-// Use 'localhost' for local development/testing outside of Docker
-const connectionString = "postgresql://travelcompanion:travelcompanion@db:5432/journiary";
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+    throw new Error("DATABASE_URL environment variable is not set.");
+}
 
 export const AppDataSource = new DataSource({
     type: "postgres",
-    url: connectionString,
+    url: databaseUrl,
     synchronize: true, // DEV only: automatically creates the database schema on every application launch
     logging: true,
-    entities: [Trip, Memory, MediaItem, RoutePoint, Tag, TagCategory, BucketListItem, GPXTrack, TrackSegment, TrackMetadata],
+    entities: [
+        Trip, 
+        Memory, 
+        MediaItem, 
+        RoutePoint, 
+        Tag, 
+        TagCategory, 
+        BucketListItem, 
+        GPXTrack, 
+        TrackSegment, 
+        TrackMetadata,
+        User,
+        TripMembership
+    ],
     subscribers: [],
     migrations: [],
 }); 
