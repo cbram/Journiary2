@@ -13,6 +13,7 @@ import {
   ObjectType,
   Resolver,
   ID,
+  Query,
 } from "type-graphql";
 import { AppDataSource } from "../utils/database";
 import { BUCKET_NAME, getMinioClient } from "../utils/minio";
@@ -41,6 +42,32 @@ class PresignedGpxUploadResponse {
 
 @Resolver(GPXTrack)
 export class GPXResolver {
+  @Query(() => [GPXTrack], { description: "Get all GPX tracks for a specific trip." })
+  async gpxTracksByTrip(@Arg("tripId", () => ID) tripId: string): Promise<GPXTrack[]> {
+    try {
+      return await AppDataSource.getRepository(GPXTrack).find({
+        where: { tripId },
+        relations: ["segments"], // Optional: pre-load segments
+      });
+    } catch (error) {
+      console.error("Error fetching GPX tracks by trip:", error);
+      throw new Error("Could not fetch GPX tracks.");
+    }
+  }
+
+  @Query(() => GPXTrack, { nullable: true, description: "Get a single GPX track by its ID, including all its data." })
+  async gpxTrack(@Arg("id", () => ID) id: string): Promise<GPXTrack | null> {
+    try {
+      return await AppDataSource.getRepository(GPXTrack).findOne({
+        where: { id },
+        relations: ["segments", "segments.points"],
+      });
+    } catch (error) {
+      console.error("Error fetching single GPX track:", error);
+      throw new Error("Could not fetch the GPX track.");
+    }
+  }
+
   @Mutation(() => PresignedGpxUploadResponse, {
     description: "Generates a pre-signed URL to upload a GPX file to MinIO.",
   })
@@ -169,5 +196,27 @@ export class GPXResolver {
     
     // Save the track again to update its segments relation
     return await gpxTrackRepository.save(newGpxTrack);
+  }
+
+  @Mutation(() => Boolean, { description: "Deletes a GPX track and its associated data." })
+  async deleteGpxTrack(@Arg("id", () => ID) id: string): Promise<boolean> {
+    try {
+      // TypeORM's cascade functionality should handle deleting related segments and points
+      const result = await AppDataSource.getRepository(GPXTrack).delete(id);
+      
+      if (result.affected === 0) {
+        throw new Error(`GPX Track with ID ${id} not found.`);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Error deleting GPX track:", error);
+      // Re-throw with a more user-friendly message if it's a known error,
+      // otherwise, a generic failure message.
+      if (error instanceof Error && error.message.includes("not found")) {
+        throw error;
+      }
+      throw new Error("Could not delete the GPX track.");
+    }
   }
 } 
