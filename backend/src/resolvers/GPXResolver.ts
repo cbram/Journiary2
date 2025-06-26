@@ -23,6 +23,10 @@ import { TrackSegment } from "../entities/TrackSegment";
 import { RoutePoint } from "../entities/RoutePoint";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const GpxParser = require("gpxparser");
+import { GPXTrackInput } from "../entities/GPXTrackInput";
+import { PresignedUrlResponse } from "./types/PresignedUrlResponse";
+import { generatePresignedPutUrl } from "../utils/minio";
+import { Memory } from "../entities/Memory";
 
 interface GpxPoint {
   lat: number;
@@ -68,59 +72,58 @@ export class GPXResolver {
     }
   }
 
-  @Mutation(() => PresignedGpxUploadResponse, {
-    description: "Generates a pre-signed URL to upload a GPX file to MinIO.",
-  })
-  async createGpxUploadUrl(
-    @Arg("tripId", () => ID) tripId: string,
+  @Mutation(() => PresignedUrlResponse, { description: "Generates a pre-signed URL to upload a GPX file." })
+  async generateGpxUploadUrl(
     @Arg("filename") filename: string
-  ): Promise<PresignedGpxUploadResponse> {
+  ): Promise<PresignedUrlResponse> {
+    const fileExtension = filename.split('.').pop() || 'gpx';
+    const objectName = `gpx/${randomUUID()}.${fileExtension}`;
+    const contentType = 'application/gpx+xml';
     
-    // Verify trip exists
-    const trip = await AppDataSource.getRepository(Trip).findOneBy({ id: tripId });
-    if (!trip) {
-      throw new Error(`Trip with ID ${tripId} not found.`);
-    }
-
-    const objectName = `${randomUUID()}.gpx`;
-
-    const commandParams: PutObjectCommandInput = {
-      Bucket: BUCKET_NAME,
-      Key: objectName,
-      ContentType: "application/gpx+xml",
-    };
-
-    const command = new PutObjectCommand(commandParams);
-
     try {
-      const publicMinioUrl = process.env.MINIO_PUBLIC_URL;
-      if (!publicMinioUrl) {
-        throw new Error("MINIO_PUBLIC_URL environment variable is not set.");
-      }
-      
-      const signingClient = new S3Client({
-        endpoint: publicMinioUrl,
-        region: "us-east-1",
-        credentials: {
-          accessKeyId: "minioadmin",
-          secretAccessKey: "minioadmin",
-        },
-        forcePathStyle: true,
-      });
-
-      const presignedUrl = await getSignedUrl(
-        signingClient, 
-        command, 
-        {
-          expiresIn: 900, // 15 minutes
-        }
-      );
-
-      return { uploadUrl: presignedUrl, objectName };
+      const uploadUrl = await generatePresignedPutUrl(objectName, contentType);
+      return { uploadUrl, objectName };
     } catch (error) {
       console.error("Error creating presigned URL for GPX:", error);
       throw new Error("Could not create GPX upload URL.");
     }
+  }
+
+  @Mutation(() => GPXTrack, { description: "Creates a new GPX track record after the file has been uploaded." })
+  async createGpxTrack(
+    @Arg("input") input: GPXTrackInput
+  ): Promise<GPXTrack> {
+    const gpxTrackRepository = AppDataSource.getRepository(GPXTrack);
+
+    const trip = await AppDataSource.getRepository(Trip).findOneBy({ id: input.tripId });
+    if (!trip) {
+      throw new Error(`Trip with ID ${input.tripId} not found.`);
+    }
+
+    const newGpxTrack = gpxTrackRepository.create({
+      name: input.name,
+      gpxFileObjectName: input.gpxFileObjectName,
+      originalFilename: input.originalFilename,
+      creator: input.creator,
+      trackType: input.trackType,
+      trip: trip,
+    });
+
+    if (input.memoryId) {
+      const memory = await AppDataSource.getRepository(Memory).findOneBy({ id: input.memoryId });
+      if (memory) {
+        newGpxTrack.memory = memory;
+      } else {
+        console.warn(`Memory with ID ${input.memoryId} not found, but proceeding to create GPX track without it.`);
+      }
+    }
+    
+    // In a real-world scenario, you would probably have a background job
+    // that gets triggered here. This job would download the GPX file from Minio,
+    // parse it, and populate the detailed fields like totalDistance, duration, segments, etc.
+    // For now, we just save the basic track information.
+
+    return await gpxTrackRepository.save(newGpxTrack);
   }
 
   @Mutation(() => GPXTrack, { description: "Processes an uploaded GPX file and creates the track data." })

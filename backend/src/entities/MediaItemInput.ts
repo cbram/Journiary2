@@ -5,6 +5,9 @@ export class MediaItemInput {
     @Field({ description: "The name of the object in the storage (e.g., from createUploadUrl)" })
     objectName!: string;
 
+    @Field({ nullable: true, description: "The name of the thumbnail object in the storage" })
+    thumbnailObjectName?: string;
+
     @Field({ description: "The ID of the memory this media item belongs to" })
     memoryId!: string;
 

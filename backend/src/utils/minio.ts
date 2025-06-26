@@ -2,7 +2,9 @@ import {
   S3Client,
   CreateBucketCommand,
   HeadBucketCommand,
+  PutObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export const BUCKET_NAME = "journiary";
 
@@ -51,4 +53,38 @@ export async function ensureBucketExists() {
       );
     }
   }
+}
+
+export async function generatePresignedPutUrl(objectName: string, contentType: string, expiresIn: number = 3600): Promise<string> {
+    const command = new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: objectName,
+        ContentType: contentType,
+    });
+
+    try {
+        const publicMinioUrl = process.env.MINIO_PUBLIC_URL;
+        if (!publicMinioUrl) {
+            console.warn("MINIO_PUBLIC_URL environment variable is not set. Using internal endpoint for signing.");
+            const internalMinioClient = getMinioClient();
+            const url = await getSignedUrl(internalMinioClient, command, { expiresIn });
+            return url;
+        }
+
+        const signingClient = new S3Client({
+            endpoint: publicMinioUrl,
+            region: "us-east-1",
+            credentials: {
+                accessKeyId: "minioadmin",
+                secretAccessKey: "minioadmin",
+            },
+            forcePathStyle: true,
+        });
+        
+        const url = await getSignedUrl(signingClient, command, { expiresIn });
+        return url;
+    } catch (error) {
+        console.error("Error generating presigned URL", error);
+        throw new Error("Could not generate presigned URL for upload.");
+    }
 } 

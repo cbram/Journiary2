@@ -1,9 +1,12 @@
-import { Resolver, Query, Mutation, Arg, FieldResolver, Root, ID } from 'type-graphql';
+import { Resolver, Query, Mutation, Arg, FieldResolver, Root, ID, ObjectType, Field } from 'type-graphql';
 import { Trip } from '../entities/Trip';
 import { TripInput } from '../entities/TripInput';
 import { UpdateTripInput } from '../entities/UpdateTripInput';
 import { Memory } from '../entities/Memory';
 import { AppDataSource } from '../utils/database';
+import { generatePresignedPutUrl } from '../utils/minio';
+import { v4 as uuidv4 } from 'uuid';
+import { PresignedUrlResponse } from './types/PresignedUrlResponse';
 
 @Resolver(Trip)
 export class TripResolver {
@@ -50,6 +53,51 @@ export class TripResolver {
         }
     }
 
+    @Mutation(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to upload a trip cover image" })
+    async generateTripCoverImageUploadUrl(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("contentType") contentType: string
+    ): Promise<PresignedUrlResponse> {
+        try {
+            // Basic content type validation
+            const extension = contentType.split('/')[1];
+            if (!extension || !['jpeg', 'png', 'jpg', 'webp'].includes(extension)) {
+                throw new Error("Invalid content type. Only jpeg, jpg, png, and webp are allowed.");
+            }
+
+            const objectName = `trip-${tripId}/cover-${uuidv4()}.${extension}`;
+            const uploadUrl = await generatePresignedPutUrl(objectName, contentType);
+
+            return { uploadUrl, objectName };
+        } catch (error) {
+            console.error("Error generating upload URL:", error);
+            throw new Error("Could not generate upload URL.");
+        }
+    }
+
+    @Mutation(() => Trip, { description: "Assign a new cover image to a trip after upload" })
+    async assignCoverImageToTrip(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("objectName") objectName: string
+    ): Promise<Trip> {
+        const tripRepository = AppDataSource.getRepository(Trip);
+        try {
+            const trip = await tripRepository.findOneBy({ id: tripId });
+            if (!trip) {
+                throw new Error("Trip not found.");
+            }
+
+            // Optional: Check if the object actually exists in Minio before assigning
+
+            trip.coverImageObjectName = objectName;
+            await tripRepository.save(trip);
+            return trip;
+        } catch (error) {
+            console.error("Error assigning cover image:", error);
+            throw new Error("Could not assign cover image.");
+        }
+    }
+
     @Mutation(() => Boolean, { description: "Delete a trip" })
     async deleteTrip(@Arg("id", () => ID) id: string): Promise<boolean> {
         try {
@@ -71,4 +119,4 @@ export class TripResolver {
             throw new Error("Could not fetch memories for the trip.");
         }
     }
-}
+} 
