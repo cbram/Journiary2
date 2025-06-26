@@ -54,9 +54,13 @@ export class Tag {
     @Column({ default: 0 })
     sortOrder!: number;
 
+    @Field({ nullable: true })
+    @Column({ nullable: true })
+    tagDescription?: string;
+
+    @ManyToOne(() => TagCategory, category => category.tags, { nullable: true, onDelete: 'SET NULL' })
     @Field(() => TagCategory, { nullable: true })
-    @ManyToOne(() => TagCategory, (category) => category.tags, { nullable: true })
-    category?: TagCategory;
+    category?: TagCategory | null;
 
     @ManyToMany(() => Memory, memory => memory.tags)
     memories!: Memory[];

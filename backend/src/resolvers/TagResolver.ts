@@ -35,4 +35,49 @@ export class TagResolver {
 
         return await tagRepository.save(newTag);
     }
+
+    @Mutation(() => Tag, { nullable: true })
+    async updateTag(
+        @Arg("id") id: string,
+        @Arg("input") input: TagInput,
+        @Ctx() { userId }: MyContext
+    ): Promise<Tag | null> {
+        if (!userId) throw new AuthenticationError("You must be logged in to update a tag.");
+
+        const tagRepo = AppDataSource.getRepository(Tag);
+        const tag = await tagRepo.findOneBy({ id });
+
+        if (!tag) {
+            return null;
+        }
+
+        // Update properties from input
+        tag.name = input.name;
+        tag.tagDescription = input.tagDescription;
+
+        // Handle category change
+        if (input.categoryId) {
+            const category = await AppDataSource.getRepository(TagCategory).findOneBy({ id: input.categoryId });
+            if (!category) {
+                throw new Error(`Category with ID ${input.categoryId} not found.`);
+            }
+            tag.category = category;
+        } else {
+            tag.category = null; // Allow removing category
+        }
+
+        return await tagRepo.save(tag);
+    }
+
+    @Mutation(() => Boolean)
+    async deleteTag(
+        @Arg("id") id: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) throw new AuthenticationError("You must be logged in to delete a tag.");
+        
+        const deleteResult = await AppDataSource.getRepository(Tag).delete(id);
+        
+        return deleteResult.affected === 1;
+    }
 } 
