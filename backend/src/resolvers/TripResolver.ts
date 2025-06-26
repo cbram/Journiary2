@@ -9,8 +9,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlResponse } from './types/PresignedUrlResponse';
 import { MyContext } from '../index';
 import { User } from '../entities/User';
-import { AuthenticationError } from 'apollo-server-express';
+import { AuthenticationError, UserInputError } from 'apollo-server-express';
 import { TripMembership, TripRole } from '../entities/TripMembership';
+import { checkTripAccess } from '../utils/auth';
 
 @Resolver(Trip)
 export class TripResolver {
@@ -20,7 +21,7 @@ export class TripResolver {
         if (!userId) {
             return [];
         }
-        
+
         // Find all memberships for the user and return the associated trips
         const memberships = await AppDataSource.getRepository(TripMembership).find({
             where: { user: { id: userId } },
@@ -28,6 +29,22 @@ export class TripResolver {
         });
 
         return memberships.map(m => m.trip);
+    }
+
+    @Query(() => Trip, { nullable: true, description: "Get a single trip by ID." })
+    async trip(
+        @Arg("id", () => ID) id: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<Trip | null> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to view this trip.");
+        }
+        
+        const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
+        if (!trip) {
+            return null;
+        }
+        return trip;
     }
 
     @Mutation(() => Trip, { description: "Create a new trip" })
@@ -73,20 +90,24 @@ export class TripResolver {
     @Mutation(() => Trip, { description: "Update an existing trip" })
     async updateTrip(
         @Arg("id", () => ID) id: string,
-        @Arg("input") input: UpdateTripInput
+        @Arg("input") input: UpdateTripInput,
+        @Ctx() { userId }: MyContext
     ): Promise<Trip | null> {
-        try {
-            const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
-            if (!trip) {
-                return null;
-            }
-            Object.assign(trip, input);
-            await AppDataSource.getRepository(Trip).save(trip);
-            return trip;
-        } catch (error) {
-            console.error("Error updating trip:", error);
-            throw new Error("Could not update trip.");
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in.");
         }
+        if (!(await checkTripAccess(userId, id, TripRole.EDITOR))) {
+            throw new AuthenticationError("You don't have permission to edit this trip.");
+        }
+
+        const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
+        if (!trip) {
+            return null; // Or throw a NotFoundError
+        }
+
+        Object.assign(trip, input);
+        await AppDataSource.getRepository(Trip).save(trip);
+        return trip;
     }
 
     @Mutation(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to upload a trip cover image" })
@@ -135,14 +156,25 @@ export class TripResolver {
     }
 
     @Mutation(() => Boolean, { description: "Delete a trip" })
-    async deleteTrip(@Arg("id", () => ID) id: string): Promise<boolean> {
-        try {
-            const deleteResult = await AppDataSource.getRepository(Trip).delete(id);
-            return deleteResult.affected === 1;
-        } catch (error) {
-            console.error("Error deleting trip:", error);
-            throw new Error("Could not delete trip.");
+    async deleteTrip(
+        @Arg("id", () => ID) id: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in.");
         }
+        if (!(await checkTripAccess(userId, id, TripRole.OWNER))) {
+            throw new AuthenticationError("You must be an owner to delete this trip.");
+        }
+        
+        const deleteResult = await AppDataSource.getRepository(Trip).delete(id);
+        
+        if (deleteResult.affected === 0) {
+            // Consider throwing a NotFoundError if the trip didn't exist
+            return false;
+        }
+
+        return true;
     }
 
     @FieldResolver(() => [Memory])

@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node src/index.ts",
+    "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -13,11 +13,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@apollo/server": "^4.10.2",
     "@aws-sdk/client-s3": "^3.501.0",
     "@aws-sdk/s3-request-presigner": "^3.501.0",
     "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.6",
-    "@apollo/server": "^4.10.2",
     "apollo-server-express": "^3.13.0",
     "bcrypt": "^5.1.1",
     "class-validator": "^0.14.1",
