@@ -1,6 +1,7 @@
 import { ObjectType, Field, ID, Float } from "type-graphql";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, ManyToOne } from "typeorm";
 import { Memory } from "./Memory";
+import { User } from "./User";
 
 @ObjectType()
 @Entity()
@@ -48,6 +49,9 @@ export class BucketListItem {
     @Field()
     @CreateDateColumn()
     createdAt!: Date;
+
+    @ManyToOne(() => User, user => user.bucketListItems)
+    user!: User;
 
     @Field({ nullable: true })
     @Column({ type: "timestamp", nullable: true })

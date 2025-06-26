@@ -1,15 +1,16 @@
 services:
   backend:
+    image: travelcompanion-backend
     build:
       context: ./backend
-      dockerfile: Dockerfile
     ports:
       - "4001:4000"
-    environment:
-      - MINIO_PUBLIC_URL=https://minio.sky-lab.org
     volumes:
       - ./backend:/usr/src/app
       - /usr/src/app/node_modules
+    environment:
+      - DATABASE_URL=postgres://postgres:admin@db:5432/travelcompanion
+      - MINIO_URL=minio
     depends_on:
       db:
         condition: service_healthy

@@ -1,9 +1,12 @@
 import { ObjectType, Field, ID, Float, Int } from 'type-graphql';
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne } from 'typeorm';
 import { Memory } from './Memory';
 import { RoutePoint } from './RoutePoint';
 import { GPXTrack } from './GPXTrack';
 import { TrackSegment } from './TrackSegment';
+import { User } from './User';
+import { TripMembership } from './TripMembership';
+import { BucketListItem } from './BucketListItem';
 
 @ObjectType({ description: "Represents a single journey or trip" })
 @Entity()
@@ -23,6 +26,9 @@ export class Trip {
     @Field({ nullable: true, description: "The name of the cover image object in the storage (e.g., MinIO)" })
     @Column({ nullable: true })
     coverImageObjectName?: string;
+
+    @Field(() => String, { nullable: true, description: "A temporary URL to view the trip's cover image." })
+    coverImageUrl?: string;
 
     @Field({ nullable: true })
     @Column({ nullable: true })
@@ -52,8 +58,14 @@ export class Trip {
     @Column({ default: true })
     gpsTrackingEnabled!: boolean;
 
+    @ManyToOne(() => User, user => user.trips)
+    user!: User;
+
+    @OneToMany(() => TripMembership, membership => membership.trip)
+    members!: TripMembership[];
+
     @Field(() => [Memory])
-    @OneToMany(() => Memory, (memory: Memory) => memory.trip)
+    @OneToMany(() => Memory, memory => memory.trip, { cascade: true })
     memories!: Memory[];
 
     @Field(() => [RoutePoint])
@@ -61,7 +73,7 @@ export class Trip {
     routePoints!: RoutePoint[];
 
     @Field(() => [GPXTrack])
-    @OneToMany(() => GPXTrack, gpxTrack => gpxTrack.trip)
+    @OneToMany(() => GPXTrack, track => track.trip)
     gpxTracks!: GPXTrack[];
 
     @Field(() => [TrackSegment])

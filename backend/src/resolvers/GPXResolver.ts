@@ -14,6 +14,9 @@ import {
   Resolver,
   ID,
   Query,
+  Ctx,
+  FieldResolver,
+  Root,
 } from "type-graphql";
 import { AppDataSource } from "../utils/database";
 import { BUCKET_NAME, getMinioClient } from "../utils/minio";
@@ -25,8 +28,12 @@ import { RoutePoint } from "../entities/RoutePoint";
 const GpxParser = require("gpxparser");
 import { GPXTrackInput } from "../entities/GPXTrackInput";
 import { PresignedUrlResponse } from "./types/PresignedUrlResponse";
-import { generatePresignedPutUrl, getObjectContent } from "../utils/minio";
+import { generatePresignedPutUrl, getObjectContent, generatePresignedGetUrl } from "../utils/minio";
 import { Memory } from "../entities/Memory";
+import { MyContext } from "..";
+import { AuthenticationError, UserInputError } from "apollo-server-express";
+import { checkTripAccess } from '../utils/auth';
+import { TripRole } from '../entities/TripMembership';
 
 interface GpxPoint {
   lat: number;
@@ -46,36 +53,48 @@ class PresignedGpxUploadResponse {
 
 @Resolver(GPXTrack)
 export class GPXResolver {
-  @Query(() => [GPXTrack], { description: "Get all GPX tracks for a specific trip." })
-  async gpxTracksByTrip(@Arg("tripId", () => ID) tripId: string): Promise<GPXTrack[]> {
+  @FieldResolver(() => String, { nullable: true })
+  async downloadUrl(@Root() gpxTrack: GPXTrack): Promise<string | null> {
+    if (!gpxTrack.gpxFileObjectName) return null;
     try {
-      return await AppDataSource.getRepository(GPXTrack).find({
-        where: { tripId },
-        relations: ["segments"], // Optional: pre-load segments
-      });
+      return generatePresignedGetUrl(gpxTrack.gpxFileObjectName);
     } catch (error) {
-      console.error("Error fetching GPX tracks by trip:", error);
-      throw new Error("Could not fetch GPX tracks.");
+      console.error(`Failed to get download URL for ${gpxTrack.gpxFileObjectName}`, error);
+      return null;
     }
   }
 
+  @Query(() => [GPXTrack], { description: "Get all GPX tracks for a specific trip." })
+  async gpxTracksByTrip(
+    @Arg("tripId", () => ID) tripId: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<GPXTrack[]> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+    const hasAccess = await checkTripAccess(userId, tripId, TripRole.VIEWER);
+    if (!hasAccess) throw new UserInputError("Trip not found or you don't have access.");
+    return AppDataSource.getRepository(GPXTrack).find({ where: { tripId } });
+  }
+
   @Query(() => GPXTrack, { nullable: true, description: "Get a single GPX track by its ID, including all its data." })
-  async gpxTrack(@Arg("id", () => ID) id: string): Promise<GPXTrack | null> {
-    try {
-      return await AppDataSource.getRepository(GPXTrack).findOne({
-        where: { id },
-        relations: ["segments", "segments.points"],
-      });
-    } catch (error) {
-      console.error("Error fetching single GPX track:", error);
-      throw new Error("Could not fetch the GPX track.");
-    }
+  async gpxTrack(
+    @Arg("id", () => ID) id: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<GPXTrack | null> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+    const track = await AppDataSource.getRepository(GPXTrack).findOne({ where: { id }, relations: ["trip"] });
+    if (!track) return null;
+    const hasAccess = await checkTripAccess(userId, track.trip.id, TripRole.VIEWER);
+    if (!hasAccess) return null;
+    return track;
   }
 
   @Mutation(() => PresignedUrlResponse, { description: "Generates a pre-signed URL to upload a GPX file." })
   async generateGpxUploadUrl(
-    @Arg("filename") filename: string
+    @Arg("filename") filename: string,
+    @Ctx() { userId }: MyContext
   ): Promise<PresignedUrlResponse> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+    
     const fileExtension = filename.split('.').pop() || 'gpx';
     const objectName = `gpx/${randomUUID()}.${fileExtension}`;
     const contentType = 'application/gpx+xml';
@@ -91,19 +110,20 @@ export class GPXResolver {
 
   @Mutation(() => GPXTrack, { description: "Creates a new GPX track record and processes the uploaded file." })
   async createGpxTrack(
-    @Arg("input") input: GPXTrackInput
+    @Arg("input") input: GPXTrackInput,
+    @Ctx() { userId }: MyContext
   ): Promise<GPXTrack> {
-    const trip = await AppDataSource.getRepository(Trip).findOneBy({ id: input.tripId });
-    if (!trip) {
-      throw new Error(`Trip with ID ${input.tripId} not found.`);
-    }
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+    const hasAccess = await checkTripAccess(userId, input.tripId, TripRole.EDITOR);
+    if (!hasAccess) throw new UserInputError(`You don't have permission to add tracks to trip ${input.tripId}.`);
+
+    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: input.tripId, user: { id: userId } } });
+    if (!trip) throw new UserInputError(`Trip with ID ${input.tripId} not found or you don't have access.`);
 
     let memory: Memory | null = null;
     if (input.memoryId) {
-      memory = await AppDataSource.getRepository(Memory).findOneBy({ id: input.memoryId });
-      if (!memory) {
-        console.warn(`Memory with ID ${input.memoryId} not found, but proceeding.`);
-      }
+      memory = await AppDataSource.getRepository(Memory).findOne({ where: { id: input.memoryId, trip: { user: { id: userId } } } });
+      if (!memory) console.warn(`Memory with ID ${input.memoryId} not found or you don't have access.`);
     }
 
     const gpxTrackRepository = AppDataSource.getRepository(GPXTrack);
@@ -168,12 +188,12 @@ export class GPXResolver {
     @Arg("objectName") objectName: string,
     @Arg("tripId", () => ID) tripId: string,
     @Arg("trackName") trackName: string,
+    @Ctx() { userId }: MyContext
   ): Promise<GPXTrack> {
-    const tripRepository = AppDataSource.getRepository(Trip);
-    const trip = await tripRepository.findOneBy({ id: tripId });
-    if (!trip) {
-      throw new Error(`Trip with ID ${tripId} not found.`);
-    }
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+    
+    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: tripId, user: { id: userId } } });
+    if (!trip) throw new UserInputError(`Trip with ID ${tripId} not found or you don't have access.`);
 
     const minioClient = getMinioClient();
     let gpxContent: string;
@@ -239,24 +259,20 @@ export class GPXResolver {
   }
 
   @Mutation(() => Boolean, { description: "Deletes a GPX track and its associated data." })
-  async deleteGpxTrack(@Arg("id", () => ID) id: string): Promise<boolean> {
-    try {
-      // TypeORM's cascade functionality should handle deleting related segments and points
-      const result = await AppDataSource.getRepository(GPXTrack).delete(id);
-      
-      if (result.affected === 0) {
-        throw new Error(`GPX Track with ID ${id} not found.`);
-      }
+  async deleteGpxTrack(
+    @Arg("id", () => ID) id: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<boolean> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
 
-      return true;
-    } catch (error) {
-      console.error("Error deleting GPX track:", error);
-      // Re-throw with a more user-friendly message if it's a known error,
-      // otherwise, a generic failure message.
-      if (error instanceof Error && error.message.includes("not found")) {
-        throw error;
-      }
-      throw new Error("Could not delete the GPX track.");
-    }
+    const repo = AppDataSource.getRepository(GPXTrack);
+    const track = await repo.findOne({ where: { id }, relations: ["trip"] });
+    if (!track) return false;
+
+    const hasAccess = await checkTripAccess(userId, track.trip.id, TripRole.EDITOR);
+    if (!hasAccess) throw new UserInputError("You don't have permission to delete this track.");
+
+    const result = await repo.delete(id);
+    return result.affected === 1;
   }
 } 

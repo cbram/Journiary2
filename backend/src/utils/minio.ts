@@ -90,6 +90,22 @@ export async function generatePresignedPutUrl(objectName: string, contentType: s
     }
 }
 
+export async function generatePresignedGetUrl(objectName: string, expiresIn: number = 3600): Promise<string> {
+    const minioClient = getMinioClient();
+    const command = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: objectName,
+    });
+
+    try {
+        // Generate a pre-signed URL for the GET request, valid for the specified duration (default 1 hour)
+        return await getSignedUrl(minioClient, command, { expiresIn });
+    } catch (error) {
+        console.error(`Error generating presigned GET URL for object ${objectName}`, error);
+        throw new Error("Could not generate download URL.");
+    }
+}
+
 export async function getObjectContent(objectName: string): Promise<string> {
     const minioClient = getMinioClient();
     const command = new GetObjectCommand({

@@ -90,6 +90,9 @@ export class GPXTrack {
     @Column()
     tripId!: string;
 
+    @Field(() => String, { nullable: true, description: "A temporary URL to download the GPX file." })
+    downloadUrl?: string;
+
     @Field(() => [TrackSegment])
     @OneToMany(() => TrackSegment, segment => segment.gpxTrack, { cascade: true })
     segments!: TrackSegment[];

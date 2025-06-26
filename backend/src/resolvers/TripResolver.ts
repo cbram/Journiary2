@@ -1,35 +1,71 @@
-import { Resolver, Query, Mutation, Arg, FieldResolver, Root, ID, ObjectType, Field } from 'type-graphql';
+import { Resolver, Query, Mutation, Arg, FieldResolver, Root, ID, ObjectType, Field, Ctx } from 'type-graphql';
 import { Trip } from '../entities/Trip';
 import { TripInput } from '../entities/TripInput';
 import { UpdateTripInput } from '../entities/UpdateTripInput';
 import { Memory } from '../entities/Memory';
 import { AppDataSource } from '../utils/database';
-import { generatePresignedPutUrl } from '../utils/minio';
+import { generatePresignedPutUrl, generatePresignedGetUrl } from '../utils/minio';
 import { v4 as uuidv4 } from 'uuid';
 import { PresignedUrlResponse } from './types/PresignedUrlResponse';
+import { MyContext } from '../index';
+import { User } from '../entities/User';
+import { AuthenticationError } from 'apollo-server-express';
+import { TripMembership, TripRole } from '../entities/TripMembership';
 
 @Resolver(Trip)
 export class TripResolver {
 
-    @Query(() => [Trip], { description: "Get all trips" })
-    async trips(): Promise<Trip[]> {
-        try {
-            const result = await AppDataSource.getRepository(Trip).find();
-            return result;
-        } catch (error) {
-            console.error("Error fetching trips:", error);
-            throw new Error("Could not fetch trips.");
+    @Query(() => [Trip], { description: "Get all trips the logged-in user is a member of" })
+    async trips(@Ctx() { userId }: MyContext): Promise<Trip[]> {
+        if (!userId) {
+            return [];
         }
+        
+        // Find all memberships for the user and return the associated trips
+        const memberships = await AppDataSource.getRepository(TripMembership).find({
+            where: { user: { id: userId } },
+            relations: ["trip"],
+        });
+
+        return memberships.map(m => m.trip);
     }
 
     @Mutation(() => Trip, { description: "Create a new trip" })
-    async createTrip(@Arg("input") input: TripInput): Promise<Trip> {
-        const trip = AppDataSource.getRepository(Trip).create(input);
+    async createTrip(
+        @Arg("input") input: TripInput,
+        @Ctx() { userId }: MyContext
+    ): Promise<Trip> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to create a trip.");
+        }
+        
+        const user = await AppDataSource.getRepository(User).findOneBy({ id: userId });
+        if (!user) {
+            throw new AuthenticationError("User not found.");
+        }
+
+        const tripRepository = AppDataSource.getRepository(Trip);
+        const membershipRepository = AppDataSource.getRepository(TripMembership);
+
+        // Create a new trip instance
+        const trip = tripRepository.create(input);
+
+        // Create a new membership instance for the owner
+        const membership = membershipRepository.create({
+            user: user,
+            trip: trip,
+            role: TripRole.OWNER,
+        });
+
+        // Use a transaction to save both the trip and the membership
         try {
-            await AppDataSource.getRepository(Trip).save(trip);
+            await AppDataSource.transaction(async (transactionalEntityManager) => {
+                await transactionalEntityManager.save(trip);
+                await transactionalEntityManager.save(membership);
+            });
             return trip;
         } catch (error) {
-            console.error("Error creating trip:", error);
+            console.error("Error creating trip with membership:", error);
             throw new Error("Could not create trip.");
         }
     }
@@ -117,6 +153,17 @@ export class TripResolver {
         } catch (error) {
             console.error(`Error fetching memories for trip ${trip.id}:`, error);
             throw new Error("Could not fetch memories for the trip.");
+        }
+    }
+
+    @FieldResolver(() => String, { nullable: true })
+    async coverImageUrl(@Root() trip: Trip): Promise<string | null> {
+        if (!trip.coverImageObjectName) return null;
+        try {
+            return generatePresignedGetUrl(trip.coverImageObjectName, 1800); // 30 minutes expiry
+        } catch (error) {
+            console.error(`Failed to get cover image URL for ${trip.coverImageObjectName}`, error);
+            return null;
         }
     }
 } 

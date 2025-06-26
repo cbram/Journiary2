@@ -1,62 +1,78 @@
-import { Resolver, Query, Mutation, Arg, ID } from "type-graphql";
+import { Resolver, Query, Mutation, Arg, ID, Ctx } from "type-graphql";
 import { BucketListItem } from "../entities/BucketListItem";
 import { BucketListItemInput } from "../entities/BucketListItemInput";
 import { AppDataSource } from "../utils/database";
 import { Memory } from "../entities/Memory";
+import { MyContext } from "../index";
+import { User } from "../entities/User";
+import { AuthenticationError, UserInputError } from "apollo-server-express";
 
 @Resolver(BucketListItem)
 export class BucketListItemResolver {
     @Query(() => [BucketListItem])
-    async bucketListItems(): Promise<BucketListItem[]> {
-        return AppDataSource.getRepository(BucketListItem).find();
+    async bucketListItems(@Ctx() { userId }: MyContext): Promise<BucketListItem[]> {
+        if (!userId) return [];
+        return AppDataSource.getRepository(BucketListItem).find({ where: { user: { id: userId } } });
     }
 
     @Mutation(() => BucketListItem)
-    async createBucketListItem(@Arg("input") input: BucketListItemInput): Promise<BucketListItem> {
-        const itemRepository = AppDataSource.getRepository(BucketListItem);
-        const item = itemRepository.create(input);
-        return await itemRepository.save(item);
+    async createBucketListItem(
+        @Arg("input") input: BucketListItemInput,
+        @Ctx() { userId }: MyContext
+    ): Promise<BucketListItem> {
+        if (!userId) throw new AuthenticationError("You must be logged in.");
+        const user = await AppDataSource.getRepository(User).findOneBy({ id: userId });
+        if (!user) throw new AuthenticationError("User not found.");
+
+        const item = AppDataSource.getRepository(BucketListItem).create({ ...input, user });
+        return await AppDataSource.getRepository(BucketListItem).save(item);
     }
 
     @Mutation(() => BucketListItem, { nullable: true })
     async updateBucketListItem(
         @Arg("id", () => ID) id: string,
-        @Arg("input") input: BucketListItemInput
+        @Arg("input") input: BucketListItemInput,
+        @Ctx() { userId }: MyContext
     ): Promise<BucketListItem | null> {
-        const itemRepository = AppDataSource.getRepository(BucketListItem);
-        await itemRepository.update(id, input);
-        return await itemRepository.findOneBy({ id });
+        if (!userId) throw new AuthenticationError("You must be logged in.");
+        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, user: { id: userId } } });
+        if (!item) throw new UserInputError("Item not found or you don't have access.");
+
+        await AppDataSource.getRepository(BucketListItem).update(id, input);
+        return item; // Return the original item after update to avoid a second DB call
     }
 
     @Mutation(() => BucketListItem, { nullable: true })
     async completeBucketListItem(
         @Arg("id", () => ID) id: string,
-        @Arg("memoryId", () => ID) memoryId: string
+        @Arg("memoryId", () => ID) memoryId: string,
+        @Ctx() { userId }: MyContext
     ): Promise<BucketListItem | null> {
-        const itemRepository = AppDataSource.getRepository(BucketListItem);
-        const memoryRepository = AppDataSource.getRepository(Memory);
+        if (!userId) throw new AuthenticationError("You must be logged in.");
+        
+        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, user: { id: userId } } });
+        if (!item) throw new UserInputError("Bucket list item not found or you don't have access.");
 
-        const item = await itemRepository.findOneBy({ id });
-        if (!item) throw new Error("Bucket list item not found");
-
-        const memory = await memoryRepository.findOneBy({ id: memoryId });
-        if (!memory) throw new Error("Memory not found");
+        const hasAccessToMemory = await AppDataSource.getRepository(Memory).count({ where: { id: memoryId, trip: { members: { user: { id: userId } } } } });
+        if(hasAccessToMemory === 0) throw new UserInputError("Memory not found or you don't have access.");
+        
+        const memory = await AppDataSource.getRepository(Memory).findOneBy({ id: memoryId });
 
         item.isDone = true;
         item.completedAt = new Date();
-        
-        // Associate the memory with the bucket list item
-        if (!item.memories) {
-            item.memories = [];
-        }
-        item.memories.push(memory);
+        if (!item.memories) item.memories = [];
+        item.memories.push(memory!);
 
-        return await itemRepository.save(item);
+        return await AppDataSource.getRepository(BucketListItem).save(item);
     }
 
     @Mutation(() => Boolean)
-    async deleteBucketListItem(@Arg("id", () => ID) id: string): Promise<boolean> {
-        const result = await AppDataSource.getRepository(BucketListItem).delete(id);
+    async deleteBucketListItem(
+        @Arg("id", () => ID) id: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) throw new AuthenticationError("You must be logged in.");
+        const result = await AppDataSource.getRepository(BucketListItem).delete({ id, user: { id: userId } });
         return result.affected === 1;
     }
 } 

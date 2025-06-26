@@ -1,8 +1,10 @@
-import { Resolver, Mutation, Arg, Query } from "type-graphql";
+import { Resolver, Mutation, Arg, Query, Ctx } from "type-graphql";
 import { Tag } from "../entities/Tag";
 import { TagInput } from "../entities/TagInput";
 import { AppDataSource } from "../utils/database";
 import { TagCategory } from "../entities/TagCategory";
+import { MyContext } from "..";
+import { AuthenticationError } from "apollo-server-express";
 
 @Resolver(Tag)
 export class TagResolver {
@@ -13,7 +15,12 @@ export class TagResolver {
     }
 
     @Mutation(() => Tag)
-    async createTag(@Arg("input") input: TagInput): Promise<Tag> {
+    async createTag(
+        @Arg("input") input: TagInput,
+        @Ctx() { userId }: MyContext
+    ): Promise<Tag> {
+        if (!userId) throw new AuthenticationError("You must be logged in to create a tag.");
+
         const tagRepository = AppDataSource.getRepository(Tag);
         
         const newTag = tagRepository.create(input);
