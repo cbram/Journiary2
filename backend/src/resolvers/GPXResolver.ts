@@ -25,14 +25,14 @@ import { RoutePoint } from "../entities/RoutePoint";
 const GpxParser = require("gpxparser");
 import { GPXTrackInput } from "../entities/GPXTrackInput";
 import { PresignedUrlResponse } from "./types/PresignedUrlResponse";
-import { generatePresignedPutUrl } from "../utils/minio";
+import { generatePresignedPutUrl, getObjectContent } from "../utils/minio";
 import { Memory } from "../entities/Memory";
 
 interface GpxPoint {
   lat: number;
   lon: number;
   ele: number;
-  time: string | Date;
+  time: Date;
 }
 
 @ObjectType()
@@ -89,41 +89,78 @@ export class GPXResolver {
     }
   }
 
-  @Mutation(() => GPXTrack, { description: "Creates a new GPX track record after the file has been uploaded." })
+  @Mutation(() => GPXTrack, { description: "Creates a new GPX track record and processes the uploaded file." })
   async createGpxTrack(
     @Arg("input") input: GPXTrackInput
   ): Promise<GPXTrack> {
-    const gpxTrackRepository = AppDataSource.getRepository(GPXTrack);
-
     const trip = await AppDataSource.getRepository(Trip).findOneBy({ id: input.tripId });
     if (!trip) {
       throw new Error(`Trip with ID ${input.tripId} not found.`);
     }
 
+    let memory: Memory | null = null;
+    if (input.memoryId) {
+      memory = await AppDataSource.getRepository(Memory).findOneBy({ id: input.memoryId });
+      if (!memory) {
+        console.warn(`Memory with ID ${input.memoryId} not found, but proceeding.`);
+      }
+    }
+
+    const gpxTrackRepository = AppDataSource.getRepository(GPXTrack);
     const newGpxTrack = gpxTrackRepository.create({
       name: input.name,
-      gpxFileObjectName: input.gpxFileObjectName,
       originalFilename: input.originalFilename,
+      gpxFileObjectName: input.gpxFileObjectName,
       creator: input.creator,
       trackType: input.trackType,
       trip: trip,
+      memory: memory || undefined,
     });
 
-    if (input.memoryId) {
-      const memory = await AppDataSource.getRepository(Memory).findOneBy({ id: input.memoryId });
-      if (memory) {
-        newGpxTrack.memory = memory;
-      } else {
-        console.warn(`Memory with ID ${input.memoryId} not found, but proceeding to create GPX track without it.`);
-      }
-    }
-    
-    // In a real-world scenario, you would probably have a background job
-    // that gets triggered here. This job would download the GPX file from Minio,
-    // parse it, and populate the detailed fields like totalDistance, duration, segments, etc.
-    // For now, we just save the basic track information.
+    // If a file was uploaded, process it now
+    if (input.gpxFileObjectName) {
+      const gpxContent = await getObjectContent(input.gpxFileObjectName);
+      const gpx = new GpxParser();
+      gpx.parse(gpxContent);
 
-    return await gpxTrackRepository.save(newGpxTrack);
+      // Check if the GPX file contains at least one track
+      if (!gpx.tracks || gpx.tracks.length === 0) {
+        // If not, we still save the metadata but don't process track data
+        console.warn(`GPX file ${input.originalFilename} is valid but contains no tracks. Saving metadata only.`);
+        return await gpxTrackRepository.save(newGpxTrack);
+      }
+
+      // For simplicity, we aggregate data from the first track.
+      // A more complex implementation could handle multiple tracks.
+      const firstTrack = gpx.tracks[0];
+      newGpxTrack.totalDistance = firstTrack?.distance.total;
+      newGpxTrack.elevationGain = firstTrack?.elevation.pos;
+      newGpxTrack.elevationLoss = firstTrack?.elevation.neg;
+      newGpxTrack.minElevation = firstTrack?.elevation.min;
+      newGpxTrack.maxElevation = firstTrack?.elevation.max;
+
+      const segments: TrackSegment[] = [];
+      for (const track of gpx.tracks) {
+        // Create a new segment for each track in the GPX file
+        const segment = new TrackSegment();
+        segment.distance = track.distance.total;
+
+        const points: RoutePoint[] = track.points.map((p: GpxPoint) => {
+          const routePoint = new RoutePoint();
+          routePoint.latitude = p.lat;
+          routePoint.longitude = p.lon;
+          routePoint.altitude = p.ele;
+          routePoint.timestamp = p.time;
+          return routePoint;
+        });
+        segment.points = points;
+        segments.push(segment);
+      }
+      newGpxTrack.segments = segments;
+    }
+
+    // Use the entity manager to save the track and all its cascaded segments and points
+    return await AppDataSource.manager.save(newGpxTrack);
   }
 
   @Mutation(() => GPXTrack, { description: "Processes an uploaded GPX file and creates the track data." })

@@ -3,6 +3,7 @@ import {
   CreateBucketCommand,
   HeadBucketCommand,
   PutObjectCommand,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -87,4 +88,23 @@ export async function generatePresignedPutUrl(objectName: string, contentType: s
         console.error("Error generating presigned URL", error);
         throw new Error("Could not generate presigned URL for upload.");
     }
-} 
+}
+
+export async function getObjectContent(objectName: string): Promise<string> {
+    const minioClient = getMinioClient();
+    const command = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: objectName,
+    });
+
+    try {
+        const response = await minioClient.send(command);
+        if (!response.Body) {
+            throw new Error(`No body in response for object ${objectName}`);
+        }
+        return response.Body.transformToString("utf-8");
+    } catch (error) {
+        console.error(`Error fetching object ${objectName} from Minio`, error);
+        throw new Error(`Could not fetch object ${objectName}.`);
+    }
+}
