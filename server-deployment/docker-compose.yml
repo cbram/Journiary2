@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: journiary-backend
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      - ../backend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - DATABASE_URL=postgresql://travelcompanion:journiarypassword@database:5432/travelcompanion
+      - MINIO_PUBLIC_HOST=localhost
+      - MINIO_PUBLIC_PORT=9000
+      - MINIO_PUBLIC_SSL=false
+    networks:
+      - journiary-network
+    depends_on:
+      database:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    extra_hosts:
+      - "minio:host-gateway" # Ermöglicht Zugriff auf minio über den Hostnamen
+
+  database:
+    image: postgres:15-alpine
+    container_name: journiary-db
+    restart: unless-stopped
+    volumes:
+      - journiary-db-data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    networks:
+      - journiary-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U travelcompanion -d travelcompanion"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: journiary-minio
+    hostname: minio # Setzt den Hostnamen explizit
+    restart: unless-stopped
+    ports:
+      - "9000:9000" # API Port
+      - "9001:9001" # Web UI Port
+    volumes:
+      - ./minio/data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server /data --console-address ":9001"
+    networks:
+      - journiary-network
+
+volumes:
+  journiary-db-data:
+  journiary-minio-data:
+
+networks:
+  journiary-network:
+    driver: bridge 
