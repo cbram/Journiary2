@@ -58,9 +58,6 @@ export class Trip {
     @Column({ default: true })
     gpsTrackingEnabled!: boolean;
 
-    @ManyToOne(() => User, user => user.trips)
-    user!: User;
-
     @OneToMany(() => TripMembership, membership => membership.trip)
     members!: TripMembership[];
 

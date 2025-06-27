@@ -6,10 +6,9 @@ services:
     ports:
       - "4001:4000"
     volumes:
-      - ./backend:/usr/src/app
       - /usr/src/app/node_modules
     environment:
-      - DATABASE_URL=postgres://postgres:admin@db:5432/travelcompanion
+      - DATABASE_URL=postgres://travelcompanion:travelcompanion@db:5432/journiary
       - MINIO_URL=minio
       - MINIO_PORT=9000
     depends_on:
@@ -50,6 +49,4 @@ services:
       - journiary-network
 
 networks:
-  journiary-network:
-    name: travelcompanion_network
-    external: true 
+  journiary-network: 

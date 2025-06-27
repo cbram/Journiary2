@@ -142,6 +142,7 @@ class APIClient {
             token
             user {
               id
+              username
               email
               createdAt
               updatedAt
@@ -181,6 +182,7 @@ class APIClient {
         mutation Register($email: String!, $password: String!) {
           register(input: { email: $email, password: $password }) {
             id
+            username
             email
             createdAt
             updatedAt
@@ -267,6 +269,34 @@ class APIClient {
         
         return url
     }
+    
+    /// Ruft den aktuell angemeldeten Benutzer ab
+    /// - Returns: Der aktuell angemeldete Benutzer
+    func me() async throws -> User {
+        let query = """
+        query Me {
+          me {
+            id
+            username
+            email
+            createdAt
+            updatedAt
+          }
+        }
+        """
+        
+        let response: GraphQLResponse<MeData> = try await performRequest(query: query)
+        
+        if let errors = response.errors, !errors.isEmpty {
+            throw APIError.serverError(400)
+        }
+        
+        guard let user = response.data?.me else {
+            throw APIError.noData
+        }
+        
+        return user
+    }
 }
 
 // MARK: - Response Models
@@ -304,6 +334,7 @@ struct RegisterData: Decodable {
 
 struct User: Decodable {
     let id: String
+    let username: String
     let email: String
     let createdAt: Date
     let updatedAt: Date
@@ -321,4 +352,8 @@ struct PresignedUrlResponse: Decodable {
 
 struct DownloadUrlData: Decodable {
     let getPresignedDownloadUrl: String
+}
+
+struct MeData: Decodable {
+    let me: User
 } 

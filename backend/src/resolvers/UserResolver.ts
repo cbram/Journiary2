@@ -1,7 +1,7 @@
 import { Resolver, Query, Mutation, Arg, Ctx, ObjectType, Field } from 'type-graphql';
 import { User } from '../entities/User';
 import { AppDataSource } from '../utils/database';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { UserInputError } from 'apollo-server-express';
 import { UserInput } from '../entities/UserInput'; // We'll create this next

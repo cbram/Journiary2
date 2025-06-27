@@ -117,12 +117,12 @@ export class GPXResolver {
     const hasAccess = await checkTripAccess(userId, input.tripId, TripRole.EDITOR);
     if (!hasAccess) throw new UserInputError(`You don't have permission to add tracks to trip ${input.tripId}.`);
 
-    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: input.tripId, user: { id: userId } } });
-    if (!trip) throw new UserInputError(`Trip with ID ${input.tripId} not found or you don't have access.`);
+    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: input.tripId } });
+    if (!trip) throw new UserInputError(`Trip with ID ${input.tripId} not found.`);
 
     let memory: Memory | null = null;
     if (input.memoryId) {
-      memory = await AppDataSource.getRepository(Memory).findOne({ where: { id: input.memoryId, trip: { user: { id: userId } } } });
+      memory = await AppDataSource.getRepository(Memory).findOne({ where: { id: input.memoryId, trip: { id: input.tripId } } });
       if (!memory) console.warn(`Memory with ID ${input.memoryId} not found or you don't have access.`);
     }
 
@@ -192,8 +192,13 @@ export class GPXResolver {
   ): Promise<GPXTrack> {
     if (!userId) throw new AuthenticationError("You must be logged in.");
     
-    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: tripId, user: { id: userId } } });
-    if (!trip) throw new UserInputError(`Trip with ID ${tripId} not found or you don't have access.`);
+    const hasAccess = await checkTripAccess(userId, tripId, TripRole.EDITOR);
+    if (!hasAccess) {
+      throw new UserInputError(`Trip with ID ${tripId} not found or you don't have access.`);
+    }
+    
+    const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id: tripId } });
+    if (!trip) throw new UserInputError(`Trip with ID ${tripId} not found.`);
 
     const minioClient = getMinioClient();
     let gpxContent: string;

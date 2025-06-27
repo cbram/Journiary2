@@ -16,6 +16,14 @@ import { TagResolver } from "./resolvers/TagResolver";
 import { TagCategoryResolver } from "./resolvers/TagCategoryResolver";
 import { BucketListItemResolver } from "./resolvers/BucketListItemResolver";
 import { GPXResolver } from "./resolvers/GPXResolver";
+import jwt from 'jsonwebtoken';
+import { UserResolver } from "./resolvers/UserResolver";
+
+export interface MyContext {
+    req: any;
+    res: any;
+    userId?: string;
+}
 
 async function startServer() {
     try {
@@ -43,11 +51,27 @@ async function startServer() {
                 TagResolver,
                 TagCategoryResolver,
                 BucketListItemResolver,
-                GPXResolver
+                GPXResolver,
+                UserResolver
             ],
             validate: false,
         }),
-        context: ({ req, res }) => ({ req, res }),
+        context: ({ req, res }): MyContext => {
+            const context: MyContext = { req, res };
+            const authHeader = req.headers.authorization;
+            if (authHeader) {
+                const token = authHeader.split(' ')[1];
+                if (token) {
+                    try {
+                        const decoded = jwt.verify(token, "your-super-secret-key") as { userId: string };
+                        context.userId = decoded.userId;
+                    } catch (err) {
+                        // Token is invalid
+                    }
+                }
+            }
+            return context;
+        },
     });
 
     await apolloServer.start();

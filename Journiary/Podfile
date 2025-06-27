@@ -1,0 +1,20 @@
+# Uncomment the next line to define a global platform for your project
+platform :ios, '16.0'
+
+target 'Journiary' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # Pods for Journiary
+  pod 'KeychainAccess', '~> 4.2.2'  # Sichere Speicherung von Credentials
+
+  target 'JourniaryTests' do
+    inherit! :search_paths
+    # Pods for testing
+  end
+
+  target 'JourniaryUITests' do
+    # Pods for testing
+  end
+
+end 
