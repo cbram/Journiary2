@@ -13,8 +13,10 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
     @StateObject private var mapCache = MapCacheManager.shared
+    @StateObject private var appSettings = AppSettings.shared
     
     @State private var showingDeleteAlert = false
+    @State private var showingBackendSettings = false
     @State private var showingOfflineMapSettings = false
     @State private var showingGPXDebugTest = false
     @State private var showingTracesTrackSettings = false
@@ -39,6 +41,9 @@ struct SettingsView: View {
                     
                     // Tags Verwaltung
                     tagManagementSection
+                    
+                    // Backend & Sync Einstellungen
+                    backendSyncSection
                     
                     // CloudKit Sync
                     cloudKitSection
@@ -79,6 +84,9 @@ struct SettingsView: View {
         .sheet(isPresented: $showingGPSDebugView) {
             GPSDebugView()
                 .environmentObject(locationManager)
+        }
+        .sheet(isPresented: $showingBackendSettings) {
+            BackendSettingsView()
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
@@ -216,16 +224,40 @@ struct SettingsView: View {
         }
     }
     
+    private var backendSyncSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Backend & Synchronisation")
+                .font(.headline)
+            
+            VStack(spacing: 8) {
+                Button {
+                    showingBackendSettings = true
+                } label: {
+                    SettingsRowNavigable(
+                        title: "Backend-Einstellungen",
+                        icon: appSettings.storageMode.iconName,
+                        status: backendStatusText
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+    }
+    
     private var cloudKitSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Cloud Sync")
+            Text("CloudKit Sync")
                 .font(.headline)
             
             VStack(spacing: 8) {
                 SettingsRow(
                     title: "CloudKit Sync",
                     icon: "icloud.fill",
-                    status: "Aktiv"
+                    status: appSettings.shouldUseCloudKit ? "Aktiv" : "Inaktiv"
                 )
             }
             .padding()
@@ -321,6 +353,19 @@ struct SettingsView: View {
             try context.save()
         } catch {
             print("Fehler beim Speichern: \(error)")
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var backendStatusText: String {
+        switch appSettings.storageMode {
+        case .cloudKit:
+            return "CloudKit"
+        case .backend:
+            return appSettings.isBackendConfigured ? "Backend konfiguriert" : "Nicht konfiguriert"
+        case .hybrid:
+            return appSettings.isBackendConfigured ? "Hybrid-Modus" : "Backend fehlt"
         }
     }
 }
