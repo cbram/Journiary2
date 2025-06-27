@@ -23,25 +23,25 @@ Diese Issues dokumentieren die schrittweise Migration der iOS Travel Companion A
 
 | Issue | Titel | Abhängigkeiten | Zeitaufwand |
 |-------|-------|----------------|-------------|
-| #4 | Multi-User Core Data Schema | #2 | 2-3 Tage |
-| #5 | [Sharing & Permissions System](./step-05-sharing-permissions.md) | #2, #4 | 4-5 Tage |
-| #6 | CloudKit Schema-Update | #4, #5 | 2-3 Tage |
+| #6 | [Multi-User Core Data Schema](./step-04-multi-user-core-data.md) | #2 | 2-3 Tage |
+| #4 | [Sharing & Permissions System](./step-05-sharing-permissions.md) | #2, #6 | 4-5 Tage |
+| #7 | [CloudKit Schema-Update](./step-06-cloudkit-schema-update.md) | #6, #4 | 2-3 Tage |
 
 ### Phase 3: Synchronisation
 
 | Issue | Titel | Abhängigkeiten | Zeitaufwand |
 |-------|-------|----------------|-------------|
-| #7 | [Offline-Queue System](./step-07-offline-queue.md) | #3, #4 | 5-6 Tage |
-| #8 | Bidirektionale Sync Engine | #3, #7 | 6-7 Tage |
-| #9 | CloudKit + Backend Hybrid-Sync | #6, #8 | 4-5 Tage |
+| #5 | [Offline-Queue System](./step-07-offline-queue.md) | #3, #6 | 5-6 Tage |
+| #8 | [Bidirektionale Sync Engine](./step-08-bidirectional-sync.md) | #3, #5 | 6-7 Tage |
+| #9 | [CloudKit + Backend Hybrid-Sync](./step-09-hybrid-sync.md) | #7, #8 | 4-5 Tage |
 
 ### Phase 4: Media & Advanced Features
 
 | Issue | Titel | Abhängigkeiten | Zeitaufwand |
 |-------|-------|----------------|-------------|
-| #10 | Media-Synchronisation | #8 | 3-4 Tage |
-| #11 | Conflict Resolution UI | #8 | 3-4 Tage |
-| #12 | Advanced Sync Features | #9, #10, #11 | 4-5 Tage |
+| #10 | [Media-Synchronisation](./step-10-media-synchronisation.md) | #8, #9 | 3-4 Tage |
+| #11 | [Conflict Resolution UI](./step-11-conflict-resolution-ui.md) | #8, #9 | 3-4 Tage |
+| #12 | [Advanced Sync Features](./step-12-advanced-sync-features.md) | #9, #10, #11 | 4-5 Tage |
 
 ## 🎯 Meilensteine
 
