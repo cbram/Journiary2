@@ -7,13 +7,12 @@
 
 import Foundation
 import SwiftUI
-import KeychainAccess
 
 /// Zentrale Klasse zur Verwaltung der App-Einstellungen
 class AppSettings: ObservableObject {
     static let shared = AppSettings()
     
-    private let keychain = KeychainAccess.Keychain(service: "com.journiary.app")
+    private let keychain = UserDefaults.standard
     
     // MARK: - Allgemeine Einstellungen
     @Published var isDarkMode: Bool {
@@ -91,6 +90,31 @@ class AppSettings: ObservableObject {
         }
     }
     
+    // MARK: - Media-Synchronisierungseinstellungen
+    @Published var autoUploadMedia: Bool {
+        didSet {
+            UserDefaults.standard.set(autoUploadMedia, forKey: "autoUploadMedia")
+        }
+    }
+    
+    @Published var uploadMediaOnWifiOnly: Bool {
+        didSet {
+            UserDefaults.standard.set(uploadMediaOnWifiOnly, forKey: "uploadMediaOnWifiOnly")
+        }
+    }
+    
+    @Published var downloadMediaOnWifiOnly: Bool {
+        didSet {
+            UserDefaults.standard.set(downloadMediaOnWifiOnly, forKey: "downloadMediaOnWifiOnly")
+        }
+    }
+    
+    @Published var deleteLocalMediaAfterUpload: Bool {
+        didSet {
+            UserDefaults.standard.set(deleteLocalMediaAfterUpload, forKey: "deleteLocalMediaAfterUpload")
+        }
+    }
+    
     // MARK: - Offline-Modus-Einstellungen
     @Published var offlineModeEnabled: Bool {
         didSet {
@@ -134,13 +158,13 @@ class AppSettings: ObservableObject {
     
     var authToken: String? {
         get {
-            try? keychain.getString("auth_token")
+            UserDefaults.standard.string(forKey: "auth_token")
         }
         set {
             if let token = newValue {
-                try? keychain.set(token, key: "auth_token")
+                UserDefaults.standard.set(token, forKey: "auth_token")
             } else {
-                try? keychain.remove("auth_token")
+                UserDefaults.standard.removeObject(forKey: "auth_token")
             }
         }
     }
@@ -189,6 +213,12 @@ class AppSettings: ObservableObject {
         self.syncOnlyWhenCharging = UserDefaults.standard.bool(forKey: "syncOnlyWhenCharging")
         self.avoidExpensiveConnections = UserDefaults.standard.bool(forKey: "avoidExpensiveConnections")
         
+        // Media-Synchronisierungseinstellungen
+        self.autoUploadMedia = UserDefaults.standard.bool(forKey: "autoUploadMedia")
+        self.uploadMediaOnWifiOnly = UserDefaults.standard.bool(forKey: "uploadMediaOnWifiOnly")
+        self.downloadMediaOnWifiOnly = UserDefaults.standard.bool(forKey: "downloadMediaOnWifiOnly")
+        self.deleteLocalMediaAfterUpload = UserDefaults.standard.bool(forKey: "deleteLocalMediaAfterUpload")
+        
         // Offline-Modus-Einstellungen
         self.offlineModeEnabled = UserDefaults.standard.bool(forKey: "offlineModeEnabled")
         self.autoDownloadMedia = UserDefaults.standard.bool(forKey: "autoDownloadMedia")
@@ -228,6 +258,12 @@ class AppSettings: ObservableObject {
         syncOnlyOnWifi = true
         syncOnlyWhenCharging = false
         avoidExpensiveConnections = true
+        
+        // Media-Synchronisierungseinstellungen
+        autoUploadMedia = true
+        uploadMediaOnWifiOnly = true
+        downloadMediaOnWifiOnly = true
+        deleteLocalMediaAfterUpload = false
         
         // Offline-Modus-Einstellungen
         offlineModeEnabled = true
