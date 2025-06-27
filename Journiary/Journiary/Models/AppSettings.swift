@@ -7,13 +7,13 @@
 
 import Foundation
 import SwiftUI
-import KeychainAccess
+import UserDefaults
 
 /// Zentrale Klasse zur Verwaltung der App-Einstellungen
 class AppSettings: ObservableObject {
     static let shared = AppSettings()
     
-    private let keychain = KeychainAccess.Keychain(service: "com.journiary.app")
+    private let keychain = UserDefaults.standard
     
     // MARK: - Allgemeine Einstellungen
     @Published var isDarkMode: Bool {
@@ -134,13 +134,13 @@ class AppSettings: ObservableObject {
     
     var authToken: String? {
         get {
-            try? keychain.getString("auth_token")
+            UserDefaults.standard.string(forKey: "auth_token")
         }
         set {
             if let token = newValue {
-                try? keychain.set(token, key: "auth_token")
+                UserDefaults.standard.set(token, forKey: "auth_token")
             } else {
-                try? keychain.remove("auth_token")
+                UserDefaults.standard.removeObject(forKey: "auth_token")
             }
         }
     }
@@ -267,5 +267,4 @@ class AppSettings: ObservableObject {
             return "\(minutes) Minuten"
         }
     }
-} 
-} 
+}
