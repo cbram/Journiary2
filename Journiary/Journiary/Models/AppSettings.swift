@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import UserDefaults
 
 /// Zentrale Klasse zur Verwaltung der App-Einstellungen
 class AppSettings: ObservableObject {
