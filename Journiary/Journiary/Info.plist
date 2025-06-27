@@ -2,55 +2,40 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-		<string>location</string>
-		<string>background-processing</string>
-	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.journiary.background-location</string>
-		<string>com.journiary.trackcompression</string>
+		<string>com.CHJB.Journiary.backgroundSync</string>
 	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Diese App benötigt Zugriff auf Ihren Standort, um Ihre Reiserouten zu verfolgen und auf der Karte anzuzeigen.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Diese App benötigt kontinuierlichen Zugriff auf Ihren Standort, um Ihre Reiserouten auch im Hintergrund zu verfolgen und vollständige GPS-Tracks zu erstellen.</string>
-	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Diese App benötigt kontinuierlichen Zugriff auf Ihren Standort, um Ihre Reiserouten auch im Hintergrund zu verfolgen und vollständige GPS-Tracks zu erstellen.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Diese App benötigt Zugriff auf die Kamera, um Fotos zu Ihren Reiseerinnerungen hinzuzufügen.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Diese App benötigt Zugriff auf Ihre Fotobibliothek, um Fotos zu Ihren Reiseerinnerungen hinzuzufügen.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Diese App möchte aufgenommene Fotos und Videos automatisch in Ihrer Galerie speichern.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Diese App benötigt Zugriff auf das Mikrofon für Video-Aufnahmen mit Ton.</string>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
-	<key>CFBundleDocumentTypes</key>
+	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
-			<key>CFBundleTypeName</key>
-			<string>GPX File</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
-			<key>LSItemContentTypes</key>
+			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>public.gpx</string>
+				<string>journiary</string>
 			</array>
 		</dict>
 	</array>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Wir benötigen Ihren Standort, um Ihre Position auf der Karte anzuzeigen und Reiserouten aufzuzeichnen.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Wir benötigen Ihren Standort, um Ihre Position auf der Karte anzuzeigen und Reiserouten aufzuzeichnen, auch wenn die App im Hintergrund läuft.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Wir benötigen Zugriff auf Ihre Fotobibliothek, um Bilder für Ihre Reiseerinnerungen auszuwählen.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Wir benötigen Zugriff auf Ihre Kamera, um Fotos für Ihre Reiseerinnerungen aufzunehmen.</string>
 </dict>
 </plist>
