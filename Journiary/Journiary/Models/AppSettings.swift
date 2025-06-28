@@ -76,7 +76,7 @@ class AppSettings: ObservableObject {
         // Development: Verwende lokalen Server oder Demo-Mode
         let defaultURL: String
         #if DEBUG
-        defaultURL = "http://localhost:4000" // Lokaler Development Server
+        defaultURL = "http://localhost:4001" // Lokaler Development Server (Docker Port-Mapping)
         #else
         defaultURL = "https://api.journiary.com"
         #endif

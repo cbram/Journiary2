@@ -1,0 +1,33 @@
+{
+  "schemaNamespace": "JourniaryAPI",
+  "input": {
+    "operationSearchPaths": [
+      "GraphQL/Operations/**/*.graphql"
+    ],
+    "schemaPath": "schema.graphqls"
+  },
+  "output": {
+    "testMocks": {
+      "none": {}
+    },
+    "schemaTypes": {
+      "path": "Journiary/GraphQL/Generated",
+      "moduleType": {
+        "swiftPackageManager": {}
+      }
+    },
+    "operations": {
+      "inSchemaModule": {}
+    }
+  },
+  "options": {
+    "additionalInflectionRules": [
+      {
+        "pluralization": {
+          "singular": "Memory",
+          "plural": "Memories"
+        }
+      }
+    ]
+  }
+} 

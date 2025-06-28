@@ -279,7 +279,9 @@ struct RegisterView: View {
                 
                 SecureField("Mindestens 8 Zeichen", text: $password)
                     .textFieldStyle(CustomTextFieldStyle(isValid: password.isEmpty || isValidPassword))
-                    .textContentType(.newPassword)
+                    .textContentType(nil)  // Deaktiviert iOS Autofill für bessere Eingabe
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
                     .focused($focusedField, equals: .password)
                     .onSubmit { focusedField = .confirmPassword }
                 
@@ -315,6 +317,8 @@ struct RegisterView: View {
                 SecureField("Passwort wiederholen", text: $confirmPassword)
                     .textFieldStyle(CustomTextFieldStyle(isValid: confirmPassword.isEmpty || passwordsMatch))
                     .textContentType(.newPassword)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
                     .focused($focusedField, equals: .confirmPassword)
                     .onSubmit {
                         if isValidRegistrationData {

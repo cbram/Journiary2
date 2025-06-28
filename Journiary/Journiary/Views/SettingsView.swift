@@ -23,6 +23,7 @@ struct SettingsView: View {
     @State private var showingTracesTrackSettings = false
     @State private var showingGPSDebugView = false
     @State private var showingUserProfile = false
+    @State private var showingGraphQLTest = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -98,6 +99,10 @@ struct SettingsView: View {
         .sheet(isPresented: $showingUserProfile) {
             UserProfileView()
                 .environmentObject(authManager)
+                .environmentObject(appSettings)
+        }
+        .sheet(isPresented: $showingGraphQLTest) {
+            GraphQLTestView()
                 .environmentObject(appSettings)
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
@@ -348,6 +353,17 @@ struct SettingsView: View {
                         status: "Details"
                     )
                 }
+                
+                Button(action: {
+                    showingGraphQLTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "GraphQL Connectivity Test",
+                        icon: "network",
+                        status: "Backend testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding()
             .background(Color(.systemBackground))

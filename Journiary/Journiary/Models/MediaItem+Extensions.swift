@@ -127,9 +127,8 @@ extension MediaItem {
         mediaItem.filesize = Int64(imageData.count)
         
         // Erstelle Thumbnail
-        if let thumbnailImage = image.resized(to: CGSize(width: 150, height: 150)) {
-            mediaItem.thumbnailData = thumbnailImage.jpegData(compressionQuality: 0.7)
-        }
+        let thumbnailImage = image.resized(to: CGSize(width: 150, height: 150))
+        mediaItem.thumbnailData = thumbnailImage.jpegData(compressionQuality: 0.7)
         
         return mediaItem
     }
@@ -413,39 +412,7 @@ extension MediaItem {
     }
 }
 
-// MARK: - UIImage Extensions
 
-extension UIImage {
-    func resized(to size: CGSize) -> UIImage? {
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
-        defer { UIGraphicsEndImageContext() }
-        
-        draw(in: CGRect(origin: .zero, size: size))
-        return UIGraphicsGetImageFromCurrentImageContext()
-    }
-    
-    func rotate(radians: Float) -> UIImage {
-        let rotatedSize = CGRect(origin: .zero, size: size)
-            .applying(CGAffineTransform(rotationAngle: CGFloat(radians)))
-            .integral.size
-        
-        UIGraphicsBeginImageContextWithOptions(rotatedSize, false, scale)
-        
-        if let context = UIGraphicsGetCurrentContext() {
-            let origin = CGPoint(x: rotatedSize.width / 2, y: rotatedSize.height / 2)
-            context.translateBy(x: origin.x, y: origin.y)
-            context.rotate(by: CGFloat(radians))
-            draw(in: CGRect(x: -size.width / 2, y: -size.height / 2, width: size.width, height: size.height))
-        }
-        
-        let rotatedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        
-        return rotatedImage ?? self
-    }
-    
-
-}
 
 // MARK: - Memory Extensions for Media
 

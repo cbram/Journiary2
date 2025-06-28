@@ -1,0 +1,56 @@
+# Sync & Bulk Operations
+
+query GetSyncData($lastSyncTimestamp: DateTime) {
+  syncData(lastSyncTimestamp: $lastSyncTimestamp) {
+    trips {
+      ...TripFragment
+    }
+    memories {
+      ...MemoryFragment
+    }
+    tags {
+      ...TagFragment
+    }
+    tagCategories {
+      ...TagCategoryFragment
+    }
+    lastSyncTimestamp
+  }
+}
+
+mutation BulkCreateTrips($trips: [TripInput!]!) {
+  bulkCreateTrips(trips: $trips) {
+    ...TripFragment
+  }
+}
+
+mutation BulkCreateMemories($memories: [MemoryInput!]!) {
+  bulkCreateMemories(memories: $memories) {
+    ...MemoryFragment
+  }
+}
+
+mutation BulkUpdateTrips($updates: [BulkTripUpdate!]!) {
+  bulkUpdateTrips(updates: $updates) {
+    ...TripFragment
+  }
+}
+
+mutation BulkUpdateMemories($updates: [BulkMemoryUpdate!]!) {
+  bulkUpdateMemories(updates: $updates) {
+    ...MemoryFragment
+  }
+}
+
+# Real-time Subscriptions
+subscription OnTripUpdated($tripId: ID!) {
+  tripUpdated(tripId: $tripId) {
+    ...TripFragment
+  }
+}
+
+subscription OnMemoryUpdated($tripId: ID!) {
+  memoryUpdated(tripId: $tripId) {
+    ...MemoryFragment
+  }
+} 

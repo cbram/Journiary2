@@ -1,0 +1,67 @@
+# User Authentication Operations
+
+mutation Login($email: String!, $password: String!) {
+  login(email: $email, password: $password) {
+    token
+    refreshToken
+    user {
+      id
+      email
+      username
+      firstName
+      lastName
+      createdAt
+      updatedAt
+    }
+  }
+}
+
+mutation Register($input: UserInput!) {
+  register(input: $input) {
+    token
+    refreshToken
+    user {
+      id
+      email
+      username
+      firstName
+      lastName
+      createdAt
+      updatedAt
+    }
+  }
+}
+
+query GetCurrentUser {
+  me {
+    id
+    email
+    username
+    firstName
+    lastName
+    createdAt
+    updatedAt
+  }
+}
+
+mutation UpdateUser($input: UpdateUserInput!) {
+  updateUser(input: $input) {
+    id
+    email
+    username
+    firstName
+    lastName
+    updatedAt
+  }
+}
+
+mutation RefreshToken($refreshToken: String!) {
+  refreshToken(refreshToken: $refreshToken) {
+    token
+    refreshToken
+  }
+}
+
+query Hello {
+  hello
+} 
