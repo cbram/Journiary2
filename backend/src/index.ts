@@ -59,17 +59,26 @@ async function startServer() {
         context: ({ req, res }): MyContext => {
             const context: MyContext = { req, res };
             const authHeader = req.headers.authorization;
+            
+            // 🐛 DEBUG: Log authentication attempts
+            console.log('🔐 Auth Header:', authHeader ? 'Present' : 'Missing');
+            
             if (authHeader) {
                 const token = authHeader.split(' ')[1];
+                console.log('🔑 Token extracted:', token ? `${token.substring(0, 20)}...` : 'Empty');
+                
                 if (token) {
                     try {
                         const decoded = jwt.verify(token, "your-super-secret-key") as { userId: string };
                         context.userId = decoded.userId;
-                    } catch (err) {
-                        // Token is invalid
+                        console.log('✅ JWT Verified, userId:', decoded.userId);
+                    } catch (err: any) {
+                        console.log('❌ JWT Verification failed:', err.message);
                     }
                 }
             }
+            
+            console.log('📝 Context userId:', context.userId || 'undefined');
             return context;
         },
     });

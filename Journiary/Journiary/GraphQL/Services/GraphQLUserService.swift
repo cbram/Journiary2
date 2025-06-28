@@ -74,11 +74,17 @@ class GraphQLUserService: ObservableObject {
             .tryMap { json -> UserDTO in
                 guard let data = json["data"] as? [String: Any],
                       let login = data["login"] as? [String: Any],
+                      let token = login["token"] as? String,
                       let user = login["user"] as? [String: Any],
                       let id = user["id"] as? String,
                       let email = user["email"] as? String else {
                     throw GraphQLError.invalidInput("Ungültige Login-Antwort")
                 }
+                
+                // 🔐 KRITISCH: JWT Token vom Backend speichern!
+                AuthManager.shared.setJWTToken(token)
+                
+                print("✅ JWT Token vom Backend erhalten und gespeichert: \(String(token.prefix(20)))...")
                 
                 // Backend User hat kein username - verwende email als username
                 return UserDTO(
