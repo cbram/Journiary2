@@ -230,7 +230,7 @@ class GraphQLUserService: ObservableObject {
             .eraseToAnyPublisher()
     }
     
-    /// Hello World Test
+    /// Hello World Test (verwendet Apollo Client Cache)
     /// - Returns: Publisher mit String
     func hello() -> AnyPublisher<String, GraphQLError> {
         
@@ -241,15 +241,10 @@ class GraphQLUserService: ObservableObject {
                 .eraseToAnyPublisher()
         }
         
-        // Echte GraphQL Hello Query
-        return performGraphQLQuery(query: "{ hello }")
-            .map { json -> String in
-                if let data = json["data"] as? [String: Any],
-                   let hello = data["hello"] as? String {
-                    return hello
-                } else {
-                    return "Hello World empfangen!"
-                }
+        // 🚀 Verwendet Apollo Client mit Cache für bessere Performance
+        return ApolloClientManager.shared.fetch(query: HelloQuery.self, cachePolicy: .cacheFirst)
+            .map { response -> String in
+                return response.hello
             }
             .eraseToAnyPublisher()
     }

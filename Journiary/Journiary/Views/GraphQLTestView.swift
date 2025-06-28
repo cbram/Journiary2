@@ -146,7 +146,17 @@ struct GraphQLTestView: View {
                         }
                         
                         TestButton(
-                            title: "6. Full Integration Test",
+                            title: "6. Performance Benchmark",
+                            subtitle: "Sub-5ms Cache-Performance testen",
+                            icon: "timer",
+                            color: .mint,
+                            isDisabled: isLoading
+                        ) {
+                            performCachePerformanceTest()
+                        }
+                        
+                        TestButton(
+                            title: "7. Full Integration Test",
                             subtitle: "Alle Tests durchführen",
                             icon: "checkmark.seal",
                             color: .purple,
@@ -595,6 +605,110 @@ struct GraphQLTestView: View {
                             duration: duration
                         ))
                     }
+                },
+                receiveValue: { _ in }
+            )
+            .store(in: &cancellables)
+    }
+    
+    private func performCachePerformanceTest() {
+        isLoading = true
+        
+        // 1. Cache leeren für sauberen Test
+        apolloClient.clearAllCaches()
+        
+        // 2. Erst einen Hello World Query machen (wird gecacht)
+        let startTime = Date()
+        
+        userService.hello()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    switch completion {
+                    case .finished:
+                        // 3. Sofort nochmal den gleichen Query (sollte aus Cache kommen)
+                        self.performSecondQueryForCacheTest(firstQueryTime: Date().timeIntervalSince(startTime))
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Cache Performance - Setup",
+                            success: false,
+                            message: "Setup fehlgeschlagen: \(error.localizedDescription)",
+                            duration: Date().timeIntervalSince(startTime)
+                        ))
+                        isLoading = false
+                    }
+                },
+                receiveValue: { _ in }
+            )
+            .store(in: &cancellables)
+    }
+    
+    private func performSecondQueryForCacheTest(firstQueryTime: TimeInterval) {
+        let startTime = Date()
+        
+        userService.hello()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    switch completion {
+                    case .finished:
+                        let durationMs = duration * 1000
+                        let isSubFiveMs = durationMs < 5.0
+                        
+                        addTestResult(.init(
+                            name: "Cache Performance Test",
+                            success: isSubFiveMs,
+                            message: isSubFiveMs 
+                                ? String(format: "🎯 ZIEL ERREICHT! Cache-Zugriff: %.2fms (< 5ms)", durationMs)
+                                : String(format: "❌ Zu langsam: %.2fms (Ziel: < 5ms)", durationMs),
+                            duration: duration
+                        ))
+                        
+                        // Zusätzliche Performance-Details
+                        addTestResult(.init(
+                            name: "Cache Performance Details",
+                            success: true,
+                            message: String(format: "Erster Query: %.0fms, Zweiter Query (Cache): %.2fms", 
+                                           firstQueryTime * 1000, durationMs),
+                            duration: firstQueryTime + duration
+                        ))
+                        
+                        // Cache Analytics abrufen
+                        apolloClient.graphQLCache.getCacheAnalytics()
+                            .receive(on: DispatchQueue.main)
+                            .sink { analytics in
+                                // Overall Cache Performance
+                                addTestResult(.init(
+                                    name: "Cache Analytics",
+                                    success: analytics.isPerformant,
+                                    message: String(format: "Hit Rate: %.1f%%, Letzte Zugriff: %.2fms, SQLite Einträge: %d", 
+                                                   analytics.hitRate * 100, analytics.lastAccessTime, analytics.totalEntries),
+                                    duration: 0
+                                ))
+                                
+                                // Memory Cache Specific Analytics
+                                addTestResult(.init(
+                                    name: "Memory Cache Analytics",
+                                    success: analytics.isUltraPerformant,
+                                    message: String(format: "Memory Hit Rate: %.1f%%, Memory Einträge: %d, Ultra-Performance: %@", 
+                                                   analytics.memoryHitRate * 100, analytics.memoryEntries, analytics.isUltraPerformant ? "✅" : "❌"),
+                                    duration: 0
+                                ))
+                            }
+                            .store(in: &cancellables)
+                        
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Cache Performance Test",
+                            success: false,
+                            message: "Cache-Test fehlgeschlagen: \(error.localizedDescription)",
+                            duration: duration
+                        ))
+                    }
+                    
+                    isLoading = false
                 },
                 receiveValue: { _ in }
             )
