@@ -1057,6 +1057,146 @@ struct GraphQLTestView: View {
             return
         }
         
+        // 🔍 DIRECT HTTP DEBUG: Teste genau denselben Request
+        performDirectHTTPDebugTest(token: token!)
+    }
+    
+    private func performDirectHTTPDebugTest(token: String) {
+        addTestResult(.init(
+            name: "🔍 HTTP Request Debug",
+            success: true,
+            message: "Teste direkten HTTP Request mit JWT Token...",
+            duration: 0
+        ))
+        
+        guard let url = URL(string: "\(AppSettings.shared.backendURL)/graphql") else {
+            addTestResult(.init(
+                name: "HTTP Debug",
+                success: false,
+                message: "❌ Ungültige Backend URL",
+                duration: 0
+            ))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let createTripMutation = """
+        mutation CreateTrip($input: TripInput!) {
+            createTrip(input: $input) {
+                id
+                name
+                isActive
+            }
+        }
+        """
+        
+        let variables: [String: Any] = [
+            "input": [
+                "name": "HTTP Debug Test Trip",
+                "tripDescription": "Direct HTTP test",
+                "isActive": true
+            ]
+        ]
+        
+        let body: [String: Any] = [
+            "query": createTripMutation,
+            "variables": variables
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            addTestResult(.init(
+                name: "HTTP Debug",
+                success: false,
+                message: "❌ JSON Serialization Error: \(error)",
+                duration: 0
+            ))
+            return
+        }
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    // Capture self strongly for closure
+                    let strongSelf = self
+                    strongSelf.addTestResult(.init(
+                        name: "HTTP Debug Response",
+                        success: false,
+                        message: "❌ Network Error: \(error.localizedDescription)",
+                        duration: 0
+                    ))
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    // Capture self strongly for closure
+                    let strongSelf = self
+                    strongSelf.addTestResult(.init(
+                        name: "HTTP Status",
+                        success: httpResponse.statusCode == 200,
+                        message: "📊 Status: \(httpResponse.statusCode)",
+                        duration: 0
+                    ))
+                }
+                
+                if let data = data,
+                   let responseString = String(data: data, encoding: .utf8) {
+                    
+                    // Parse JSON Response
+                    do {
+                        let strongSelf = self
+                        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            if let errors = json["errors"] as? [[String: Any]] {
+                                let errorMsg = errors.first?["message"] as? String ?? "Unknown error"
+                                strongSelf.addTestResult(.init(
+                                    name: "GraphQL Error",
+                                    success: false,
+                                    message: "❌ Backend Error: \(errorMsg)",
+                                    duration: 0
+                                ))
+                            } else if let data = json["data"] as? [String: Any] {
+                                strongSelf.addTestResult(.init(
+                                    name: "GraphQL Success",
+                                    success: true,
+                                    message: "✅ Backend Response: \(data)",
+                                    duration: 0
+                                ))
+                            } else {
+                                strongSelf.addTestResult(.init(
+                                    name: "GraphQL Response",
+                                    success: false,
+                                    message: "❓ Unexpected Response: \(responseString.prefix(200))...",
+                                    duration: 0
+                                ))
+                            }
+                        }
+                    } catch {
+                        let strongSelf = self
+                        strongSelf.addTestResult(.init(
+                            name: "Response Parse",
+                            success: false,
+                            message: "❌ Parse Error: \(error)",
+                            duration: 0
+                        ))
+                    }
+                }
+                
+                // Nach HTTP Debug, fahre mit normalem Trip Create fort
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let strongSelf = self
+                    strongSelf.continueWithTripCreate()
+                }
+            }
+        }.resume()
+    }
+    
+    private func continueWithTripCreate() {
+        let startTime = Date()
         let testTripName = "GraphQL Test Trip \(Int.random(in: 1000...9999))"
         
         tripService.createTrip(
