@@ -20,99 +20,147 @@ struct GraphQLTestView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "network")
-                        .font(.system(size: 40))
-                        .foregroundColor(.blue)
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Image(systemName: "network")
+                            .font(.system(size: 40))
+                            .foregroundColor(.blue)
+                        
+                        Text("GraphQL Connectivity Test")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.top)
                     
-                    Text("GraphQL Connectivity Test")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                }
-                .padding(.top)
-                
-                // Backend Info
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Backend Konfiguration")
-                        .font(.headline)
-                    
-                    HStack {
-                        Text("URL:")
-                            .fontWeight(.medium)
-                        Text(appSettings.backendURL)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                    // Test Results Button (oben platziert für bessere Erreichbarkeit)
+                    if !testResults.isEmpty {
+                        Button {
+                            showingResults = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                Text("Testergebnisse anzeigen (\(testResults.count))")
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                            }
+                            .padding()
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
                     
-                    HStack {
-                        Text("Storage Mode:")
-                            .fontWeight(.medium)
-                        Text(appSettings.storageMode.rawValue)
-                            .foregroundColor(.secondary)
-                        Spacer()
+                    // Loading Indicator
+                    if isLoading {
+                        HStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            Text("Tests laufen...")
+                                .foregroundColor(.blue)
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
                     }
+                    
+                    // Backend Info
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Backend Konfiguration")
+                            .font(.headline)
+                        
+                        HStack {
+                            Text("URL:")
+                                .fontWeight(.medium)
+                            Text(appSettings.backendURL)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            Text("Storage Mode:")
+                                .fontWeight(.medium)
+                            Text(appSettings.storageMode.rawValue)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    
+                    // Test Buttons
+                    VStack(spacing: 12) {
+                        TestButton(
+                            title: "1. Backend Erreichbarkeit",
+                            subtitle: "Teste HTTP-Verbindung",
+                            icon: "wifi",
+                            color: .blue,
+                            isDisabled: isLoading
+                        ) {
+                            performConnectivityTest()
+                        }
+                        
+                        TestButton(
+                            title: "2. Hello World Query",
+                            subtitle: "GraphQL Schema laden",
+                            icon: "bubble.left.and.bubble.right",
+                            color: .green,
+                            isDisabled: isLoading
+                        ) {
+                            performHelloWorldTest()
+                        }
+                        
+                        TestButton(
+                            title: "3. Authentication Test",
+                            subtitle: "Login/Token-Validierung",
+                            icon: "person.badge.key",
+                            color: .orange,
+                            isDisabled: isLoading
+                        ) {
+                            performAuthTest()
+                        }
+                        
+                        TestButton(
+                            title: "4. Performance Tests",
+                            subtitle: "Latenz & Throughput messen",
+                            icon: "speedometer",
+                            color: .red,
+                            isDisabled: isLoading
+                        ) {
+                            performPerformanceTests()
+                        }
+                        
+                        TestButton(
+                            title: "5. Cache Tests",
+                            subtitle: "Apollo Cache verhalten",
+                            icon: "externaldrive.connected.to.line.below",
+                            color: .teal,
+                            isDisabled: isLoading
+                        ) {
+                            performCacheTests()
+                        }
+                        
+                        TestButton(
+                            title: "6. Full Integration Test",
+                            subtitle: "Alle Tests durchführen",
+                            icon: "checkmark.seal",
+                            color: .purple,
+                            isDisabled: isLoading
+                        ) {
+                            performFullTest()
+                        }
+                    }
+                    
+                    // Spacer für besseren Abstand unten
+                    Spacer(minLength: 100)
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .cornerRadius(12)
-                
-                // Test Buttons
-                VStack(spacing: 12) {
-                    TestButton(
-                        title: "1. Backend Erreichbarkeit",
-                        subtitle: "Teste HTTP-Verbindung",
-                        icon: "wifi",
-                        color: .blue
-                    ) {
-                        performConnectivityTest()
-                    }
-                    
-                    TestButton(
-                        title: "2. Hello World Query",
-                        subtitle: "GraphQL Schema laden",
-                        icon: "bubble.left.and.bubble.right",
-                        color: .green
-                    ) {
-                        performHelloWorldTest()
-                    }
-                    
-                    TestButton(
-                        title: "3. Authentication Test",
-                        subtitle: "Login/Token-Validierung",
-                        icon: "person.badge.key",
-                        color: .orange
-                    ) {
-                        performAuthTest()
-                    }
-                    
-                    TestButton(
-                        title: "4. Full Integration Test",
-                        subtitle: "Alle Tests durchführen",
-                        icon: "checkmark.seal",
-                        color: .purple
-                    ) {
-                        performFullTest()
-                    }
-                }
-                
-                Spacer()
-                
-                // Results
-                if !testResults.isEmpty {
-                    Button("Testergebnisse anzeigen") {
-                        showingResults = true
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                
-                if isLoading {
-                    ProgressView("Tests laufen...")
-                        .progressViewStyle(CircularProgressViewStyle())
-                }
             }
-            .padding()
             .navigationTitle("GraphQL Tests")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingResults) {
@@ -277,6 +325,282 @@ struct GraphQLTestView: View {
             .store(in: &cancellables)
     }
     
+    // MARK: - Performance Tests
+    
+    private func performPerformanceTests() {
+        isLoading = true
+        testResults.removeAll()
+        
+        addTestResult(.init(
+            name: "Performance Tests",
+            success: true,
+            message: "🚀 Performance-Messungen gestartet...",
+            duration: 0
+        ))
+        
+        // Test 1: Latenz-Messung (Einzelner Request)
+        performLatencyTest()
+        
+        // Test 2: Throughput-Test (Multiple parallele Requests)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            self.performThroughputTest()
+        }
+        
+        // Test 3: Payload-Größen testen
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+            self.performPayloadSizeTest()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+            self.isLoading = false
+        }
+    }
+    
+    private func performLatencyTest() {
+        let iterations = 5
+        var results: [TimeInterval] = []
+        
+        func runIteration(_ index: Int) {
+            let startTime = Date()
+            
+            userService.hello()
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        let latency = Date().timeIntervalSince(startTime)
+                        results.append(latency)
+                        
+                        if index == iterations - 1 {
+                            // Alle Tests abgeschlossen - Statistiken berechnen
+                            let avgLatency = results.reduce(0, +) / Double(results.count)
+                            let minLatency = results.min() ?? 0
+                            let maxLatency = results.max() ?? 0
+                            
+                            addTestResult(.init(
+                                name: "Latenz-Test (\(iterations)x)",
+                                success: true,
+                                message: String(format: "Ø %.0fms | Min: %.0fms | Max: %.0fms", 
+                                               avgLatency * 1000, minLatency * 1000, maxLatency * 1000),
+                                duration: avgLatency
+                            ))
+                        } else if index < iterations - 1 {
+                            // Nächste Iteration
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                runIteration(index + 1)
+                            }
+                        }
+                    },
+                    receiveValue: { _ in }
+                )
+                .store(in: &cancellables)
+        }
+        
+        runIteration(0)
+    }
+    
+    private func performThroughputTest() {
+        let concurrentRequests = 10
+        let startTime = Date()
+        var completedRequests = 0
+        var successfulRequests = 0
+        
+        addTestResult(.init(
+            name: "Throughput-Test",
+            success: true,
+            message: "⏱️ \(concurrentRequests) parallele Requests starten...",
+            duration: 0
+        ))
+        
+        for _ in 0..<concurrentRequests {
+            userService.hello()
+                .receive(on: DispatchQueue.main)
+                .sink(
+                    receiveCompletion: { completion in
+                        completedRequests += 1
+                        
+                        switch completion {
+                        case .finished:
+                            break
+                        case .failure:
+                            break
+                        }
+                        
+                        if completedRequests == concurrentRequests {
+                            let totalDuration = Date().timeIntervalSince(startTime)
+                            let requestsPerSecond = Double(concurrentRequests) / totalDuration
+                            
+                            addTestResult(.init(
+                                name: "Throughput-Test (Parallel)",
+                                success: successfulRequests > concurrentRequests / 2,
+                                message: String(format: "%d/%d erfolgreich | %.1f req/s | %.0fs total", 
+                                               successfulRequests, concurrentRequests, requestsPerSecond, totalDuration),
+                                duration: totalDuration
+                            ))
+                        }
+                    },
+                    receiveValue: { _ in
+                        successfulRequests += 1
+                    }
+                )
+                .store(in: &cancellables)
+        }
+    }
+    
+    private func performPayloadSizeTest() {
+        let startTime = Date()
+        
+        // Teste verschiedene Query-Komplexitäten
+        let simpleQuery = """
+        {"query": "{ hello }"}
+        """
+        
+        let complexQuery = """
+        {"query": "query IntrospectionQuery { __schema { queryType { name fields { name type { name kind } } } } }"}
+        """
+        
+        addTestResult(.init(
+            name: "Payload-Größen Test",
+            success: true,
+            message: String(format: "Simple Query: %d Bytes | Complex Query: %d Bytes", 
+                           simpleQuery.data(using: .utf8)?.count ?? 0,
+                           complexQuery.data(using: .utf8)?.count ?? 0),
+            duration: Date().timeIntervalSince(startTime)
+        ))
+    }
+    
+    // MARK: - Cache Tests
+    
+    private func performCacheTests() {
+        isLoading = true
+        testResults.removeAll()
+        
+        addTestResult(.init(
+            name: "Cache Tests",
+            success: true,
+            message: "💾 Apollo Cache-Verhalten wird getestet...",
+            duration: 0
+        ))
+        
+        // Test 1: Cache-Population (erste Abfrage)
+        performCachePopulationTest()
+        
+        // Test 2: Cache-Hit Test (zweite Abfrage)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            self.performCacheHitTest()
+        }
+        
+        // Test 3: Cache-Invalidation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+            self.performCacheInvalidationTest()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 9) {
+            self.isLoading = false
+        }
+    }
+    
+    private func performCachePopulationTest() {
+        let startTime = Date()
+        
+        // Erste Abfrage - sollte das Cache füllen
+        userService.hello()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    switch completion {
+                    case .finished:
+                        addTestResult(.init(
+                            name: "Cache Population",
+                            success: true,
+                            message: String(format: "Cache gefüllt (Network Request: %.0fms)", duration * 1000),
+                            duration: duration
+                        ))
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Cache Population",
+                            success: false,
+                            message: "Fehler: \(error.localizedDescription)",
+                            duration: duration
+                        ))
+                    }
+                },
+                receiveValue: { _ in }
+            )
+            .store(in: &cancellables)
+    }
+    
+    private func performCacheHitTest() {
+        let startTime = Date()
+        
+        // Zweite Abfrage - sollte aus Cache kommen (viel schneller)
+        userService.hello()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    switch completion {
+                    case .finished:
+                        let isCacheHit = duration < 0.1 // Unter 100ms = wahrscheinlich Cache Hit
+                        let cacheStatus = isCacheHit ? "✅ Cache Hit" : "🌐 Network Request"
+                        let comment = isCacheHit ? "- Sehr schnell!" : "- Cache funktioniert möglicherweise nicht"
+                        
+                        addTestResult(.init(
+                            name: "Cache Hit Test",
+                            success: true,
+                            message: "\(cacheStatus) (\(String(format: "%.0f", duration * 1000))ms) \(comment)",
+                            duration: duration
+                        ))
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Cache Hit Test",
+                            success: false,
+                            message: "Fehler: \(error.localizedDescription)",
+                            duration: duration
+                        ))
+                    }
+                },
+                receiveValue: { _ in }
+            )
+            .store(in: &cancellables)
+    }
+    
+    private func performCacheInvalidationTest() {
+        // Cache löschen und Performance vergleichen
+        apolloClient.clearCache()
+        
+        let startTime = Date()
+        
+        userService.hello()
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    switch completion {
+                    case .finished:
+                        addTestResult(.init(
+                            name: "Cache Invalidation",
+                            success: true,
+                            message: String(format: "Cache geleert → Network Request (%.0fms)", duration * 1000),
+                            duration: duration
+                        ))
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Cache Invalidation",
+                            success: false,
+                            message: "Fehler: \(error.localizedDescription)",
+                            duration: duration
+                        ))
+                    }
+                },
+                receiveValue: { _ in }
+            )
+            .store(in: &cancellables)
+    }
+    
     private func performFullTest() {
         testResults.removeAll()
         
@@ -289,6 +613,14 @@ struct GraphQLTestView: View {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
             performAuthTest()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6) {
+            performPerformanceTests()
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 18) {
+            performCacheTests()
         }
     }
     
@@ -306,36 +638,48 @@ struct TestButton: View {
     let subtitle: String
     let icon: String
     let color: Color
+    let isDisabled: Bool
     let action: () -> Void
+    
+    init(title: String, subtitle: String, icon: String, color: Color, isDisabled: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        self.color = color
+        self.isDisabled = isDisabled
+        self.action = action
+    }
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.title2)
-                    .foregroundColor(color)
+                    .foregroundColor(isDisabled ? .gray : color)
                     .frame(width: 30)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.headline)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDisabled ? .gray : .primary)
                     
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDisabled ? .gray : .secondary)
                 }
                 
                 Spacer()
                 
-                Image(systemName: "play.circle")
-                    .foregroundColor(color)
+                Image(systemName: isDisabled ? "pause.circle" : "play.circle")
+                    .foregroundColor(isDisabled ? .gray : color)
             }
             .padding()
             .background(Color(.systemGray6))
             .cornerRadius(12)
+            .opacity(isDisabled ? 0.6 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(isDisabled)
     }
 }
 

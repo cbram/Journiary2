@@ -172,7 +172,7 @@ class GraphQLTripService: ObservableObject {
                 let tripDTOs = trips.compactMap { TripDTO.from(coreData: $0) }
                 promise(.success(tripDTOs))
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.3), scheduler: DispatchQueue.main)
@@ -202,7 +202,7 @@ class GraphQLTripService: ObservableObject {
                     promise(.failure(.unknown("Trip nicht gefunden")))
                 }
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.2), scheduler: DispatchQueue.main)
@@ -237,7 +237,7 @@ class GraphQLTripService: ObservableObject {
                     promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
                 }
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
@@ -281,7 +281,7 @@ class GraphQLTripService: ObservableObject {
                     promise(.failure(.unknown("Trip nicht gefunden")))
                 }
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
@@ -312,7 +312,7 @@ class GraphQLTripService: ObservableObject {
                     promise(.failure(.unknown("Trip nicht gefunden")))
                 }
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.3), scheduler: DispatchQueue.main)

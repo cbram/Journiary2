@@ -112,8 +112,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 761954FC2DF57EB7003E92C7 /* Build configuration list for PBXNativeTarget "Journiary" */;
 			buildPhases = (
-				761954D12DF57EB6003E92C7 /* Sources */,
 				761954D22DF57EB6003E92C7 /* Frameworks */,
+				761954D12DF57EB6003E92C7 /* Sources */,
 				761954D32DF57EB6003E92C7 /* Resources */,
 			);
 			buildRules = (
@@ -208,6 +208,8 @@
 			);
 			mainGroup = 761954CC2DF57EB6003E92C7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 761954D62DF57EB6003E92C7 /* Products */;
 			projectDirPath = "";

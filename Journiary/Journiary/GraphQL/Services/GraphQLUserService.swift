@@ -200,7 +200,7 @@ class GraphQLUserService: ObservableObject {
                         promise(.failure(.unknown("Kein aktueller User gefunden")))
                     }
                 } catch {
-                    promise(.failure(.coreDataError(error)))
+                    promise(.failure(.cacheError(error.localizedDescription)))
                 }
             }
             .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
@@ -362,7 +362,7 @@ class GraphQLUserService: ObservableObject {
                 }
                 
             } catch {
-                promise(.failure(.coreDataError(error)))
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .eraseToAnyPublisher()
