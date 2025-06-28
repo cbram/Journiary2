@@ -156,6 +156,17 @@
         <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <relationship name="memories" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Memory" inverseName="bucketListItem" inverseEntity="Memory"/>
     </entity>
+    <entity name="User" representedClassName="User" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="username" optional="YES" attributeType="String"/>
+        <attribute name="firstName" optional="YES" attributeType="String"/>
+        <attribute name="lastName" optional="YES" attributeType="String"/>
+        <attribute name="isCurrentUser" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="backendUserId" optional="YES" attributeType="String"/>
+        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+    </entity>
     <elements>
         <element name="Trip" positionX="-63" positionY="-18" width="128" height="149"/>
         <element name="Memory" positionX="160" positionY="-18" width="128" height="209"/>
@@ -168,5 +179,6 @@
         <element name="Tag" positionX="700" positionY="-18" width="128" height="269"/>
         <element name="TagCategory" positionX="880" positionY="-18" width="128" height="179"/>
         <element name="BucketListItem" positionX="1060" positionY="-18" width="128" height="239"/>
+        <element name="User" positionX="1240" positionY="-18" width="128" height="179"/>
     </elements>
 </model>

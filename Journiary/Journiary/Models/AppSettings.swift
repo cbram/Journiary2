@@ -64,8 +64,24 @@ class AppSettings: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        self.storageMode = StorageMode(rawValue: UserDefaults.standard.string(forKey: "StorageMode") ?? "") ?? .default
-        self.backendURL = UserDefaults.standard.string(forKey: "BackendURL") ?? "https://api.journiary.com"
+        // Beim ersten Start soll der Benutzer explizit wählen - kein Default setzen
+        let storedMode = UserDefaults.standard.string(forKey: "StorageMode")
+        if let storedMode = storedMode, !storedMode.isEmpty {
+            self.storageMode = StorageMode(rawValue: storedMode) ?? .cloudKit
+        } else {
+            // Beim ersten Start: CloudKit als fallback, aber wird durch StorageModeSelection überschrieben
+            self.storageMode = .cloudKit
+        }
+        
+        // Development: Verwende lokalen Server oder Demo-Mode
+        let defaultURL: String
+        #if DEBUG
+        defaultURL = "http://localhost:4000" // Lokaler Development Server
+        #else
+        defaultURL = "https://api.journiary.com"
+        #endif
+        
+        self.backendURL = UserDefaults.standard.string(forKey: "BackendURL") ?? defaultURL
         self.username = UserDefaults.standard.string(forKey: "BackendUsername") ?? ""
         self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "AutoSyncEnabled")
         self.syncInterval = UserDefaults.standard.double(forKey: "SyncInterval") == 0 ? 300 : UserDefaults.standard.double(forKey: "SyncInterval") // 5 Minuten default

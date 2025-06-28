@@ -101,19 +101,12 @@ class APIClient: ObservableObject {
                 timestamp: Date()
             )
         }
-        .catch { error in
+        .catch { (error: APIError) in
             let responseTime = Date().timeIntervalSince(startTime)
-            let apiError: APIError
-            
-            if error is APIError {
-                apiError = error as! APIError
-            } else {
-                apiError = .unknown(error.localizedDescription)
-            }
             
             let result = ConnectionTestResult(
                 isSuccessful: false,
-                error: apiError,
+                error: error,
                 responseTime: responseTime,
                 serverVersion: nil,
                 timestamp: Date()

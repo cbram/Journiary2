@@ -14,6 +14,7 @@ struct SettingsView: View {
     @EnvironmentObject var locationManager: LocationManager
     @StateObject private var mapCache = MapCacheManager.shared
     @StateObject private var appSettings = AppSettings.shared
+    @StateObject private var authManager = AuthManager.shared
     
     @State private var showingDeleteAlert = false
     @State private var showingBackendSettings = false
@@ -21,6 +22,7 @@ struct SettingsView: View {
     @State private var showingGPXDebugTest = false
     @State private var showingTracesTrackSettings = false
     @State private var showingGPSDebugView = false
+    @State private var showingUserProfile = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -30,6 +32,11 @@ struct SettingsView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // User-Bereich (nur bei Backend-Mode)
+                    if appSettings.shouldUseBackend && authManager.isAuthenticated {
+                        userSection
+                    }
+                    
                     // Ortssuche Einstellungen
                     placeSearchSection
                     
@@ -88,6 +95,11 @@ struct SettingsView: View {
         .sheet(isPresented: $showingBackendSettings) {
             BackendSettingsView()
         }
+        .sheet(isPresented: $showingUserProfile) {
+            UserProfileView()
+                .environmentObject(authManager)
+                .environmentObject(appSettings)
+        }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
                 deleteAllData()
@@ -99,6 +111,60 @@ struct SettingsView: View {
     }
     
     // MARK: - Settings Sections
+    
+    private var userSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Benutzerkonto")
+                .font(.headline)
+            
+            VStack(spacing: 8) {
+                Button(action: {
+                    showingUserProfile = true
+                }) {
+                    HStack(spacing: 12) {
+                        // User Avatar
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(
+                                    colors: [.blue, .blue.opacity(0.7)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ))
+                                .frame(width: 50, height: 50)
+                            
+                            Text(authManager.currentUser?.initials ?? "?")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                        
+                        // User Info
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(authManager.currentUser?.displayName ?? "Unbekannter Benutzer")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+                            
+                            Text(authManager.currentUser?.email ?? "")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+    }
     
     private var placeSearchSection: some View {
         VStack(alignment: .leading, spacing: 16) {

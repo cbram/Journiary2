@@ -84,11 +84,53 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 struct JourniaryApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     let persistenceController = PersistenceController.shared
+    
+    // MARK: - Managers
+    @StateObject private var authManager = AuthManager.shared
+    @StateObject private var appSettings = AppSettings.shared
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environmentObject(authManager)
+                .environmentObject(appSettings)
+                .onAppear {
+                    // Initial Setup
+                    setupApp()
+                }
+        }
+    }
+    
+    // MARK: - Setup
+    
+    private func setupApp() {
+        print("✅ Travel Companion App gestartet")
+        
+        // DEBUG: Auskommentiert - Storage Mode Reset
+        // #if DEBUG
+        // // Für Debug/Development: Storage Mode zurücksetzen um neuen Flow zu testen
+        // UserDefaults.standard.removeObject(forKey: "StorageMode")
+        // print("🔧 DEBUG: Storage Mode zurückgesetzt für Test des neuen Flows")
+        // #endif
+        
+        let isFirstLaunch = UserDefaults.standard.string(forKey: "StorageMode") == nil
+        
+        if isFirstLaunch {
+            print("🆕 Erstmaliger App-Start - Storage Mode Selection wird angezeigt")
+        } else {
+            print("📱 Storage Mode: \(appSettings.storageMode.displayName)")
+            
+            if appSettings.shouldUseBackend {
+                print("🔐 Backend-Authentifizierung erforderlich")
+                if authManager.isAuthenticated {
+                    print("✅ Benutzer bereits authentifiziert: \(authManager.currentUser?.displayName ?? "Unbekannt")")
+                } else {
+                    print("❌ Benutzer nicht authentifiziert - Login erforderlich")
+                }
+            } else {
+                print("☁️ CloudKit-Modus - Keine Authentifizierung erforderlich")
+            }
         }
     }
 }
