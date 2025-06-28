@@ -1043,22 +1043,81 @@ struct GraphQLTestView: View {
             duration: 0
         ))
         
-        // Wenn kein Token vorhanden, Test abbrechen
-        guard token != nil else {
+        // 🔍 JWT TOKEN ANALYSIS: Dekodiere und analysiere den Token
+        if let token = token {
+            analyzeJWTToken(token)
+        }
+    }
+    
+    private func analyzeJWTToken(_ token: String) {
+        // JWT Token in Parts aufteilen
+        let parts = token.components(separatedBy: ".")
+        guard parts.count == 3 else {
             addTestResult(.init(
-                name: "1. Trip Create",
+                name: "JWT Format Check",
                 success: false,
-                message: "❌ ABGEBROCHEN: Kein JWT Token verfügbar. Versuche automatischen Login...",
+                message: "❌ Ungültiges JWT Format - erwartet 3 Teile, gefunden: \(parts.count)",
                 duration: 0
             ))
-            
-            // Automatischer Login-Versuch
-            performAutoLoginForTests()
             return
         }
         
-        // 🔍 DIRECT HTTP DEBUG: Teste genau denselben Request
-        performDirectHTTPDebugTest(token: token!)
+        // Header und Payload dekodieren
+        if let headerData = base64UrlDecode(parts[0]),
+           let payloadData = base64UrlDecode(parts[1]) {
+            
+            do {
+                let headerJson = try JSONSerialization.jsonObject(with: headerData) as? [String: Any]
+                let payloadJson = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any]
+                
+                let alg = headerJson?["alg"] as? String ?? "unknown"
+                let typ = headerJson?["typ"] as? String ?? "unknown"
+                let userId = payloadJson?["userId"] as? String ?? "missing"
+                let exp = payloadJson?["exp"] as? TimeInterval ?? 0
+                let iat = payloadJson?["iat"] as? TimeInterval ?? 0
+                
+                let expDate = Date(timeIntervalSince1970: exp)
+                let iatDate = Date(timeIntervalSince1970: iat)
+                let isExpired = Date() > expDate
+                
+                addTestResult(.init(
+                    name: "JWT Token Analysis",
+                    success: !isExpired,
+                    message: "🔍 Alg: \(alg), Typ: \(typ), UserId: \(userId), Exp: \(expDate), Gültig: \(!isExpired)",
+                    duration: 0
+                ))
+                
+                // Continue with HTTP debug test if token is valid
+                if !isExpired {
+                    performDirectHTTPDebugTest(token: token)
+                } else {
+                    performAutoLoginForTests()
+                }
+                
+            } catch {
+                addTestResult(.init(
+                    name: "JWT Decode Error",
+                    success: false,
+                    message: "❌ Fehler beim Dekodieren: \(error.localizedDescription)",
+                    duration: 0
+                ))
+            }
+        }
+    }
+    
+    // Base64URL Dekodierung (JWT Standard)
+    private func base64UrlDecode(_ input: String) -> Data? {
+        var base64 = input
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        
+        // Padding hinzufügen wenn nötig
+        let remainder = base64.count % 4
+        if remainder > 0 {
+            base64 = base64.padding(toLength: base64.count + 4 - remainder, withPad: "=", startingAt: 0)
+        }
+        
+        return Data(base64Encoded: base64)
     }
     
     private func performDirectHTTPDebugTest(token: String) {
