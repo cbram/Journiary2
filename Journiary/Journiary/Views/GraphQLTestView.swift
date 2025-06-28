@@ -1022,6 +1022,41 @@ struct GraphQLTestView: View {
     
     private func performTripCreateTest() {
         let startTime = Date()
+        
+        // 🔍 DEBUGGING: Prüfe JWT Token Status
+        let token = AuthManager.shared.getCurrentAuthToken()
+        let currentUser = AuthManager.shared.currentUser
+        
+        // Token Status anzeigen
+        let tokenStatus: String
+        if let token = token {
+            let tokenPreview = String(token.prefix(20)) + "..." + String(token.suffix(10))
+            tokenStatus = "Token: \(tokenPreview)"
+        } else {
+            tokenStatus = "❌ KEIN TOKEN"
+        }
+        
+        addTestResult(.init(
+            name: "JWT Token Status",
+            success: token != nil,
+            message: "🔑 \(tokenStatus) | User: \(currentUser?.email ?? "Nicht eingeloggt")",
+            duration: 0
+        ))
+        
+        // Wenn kein Token vorhanden, Test abbrechen
+        guard token != nil else {
+            addTestResult(.init(
+                name: "1. Trip Create",
+                success: false,
+                message: "❌ ABGEBROCHEN: Kein JWT Token verfügbar. Versuche automatischen Login...",
+                duration: 0
+            ))
+            
+            // Automatischer Login-Versuch
+            performAutoLoginForTests()
+            return
+        }
+        
         let testTripName = "GraphQL Test Trip \(Int.random(in: 1000...9999))"
         
         tripService.createTrip(
@@ -1621,6 +1656,74 @@ struct GraphQLTestView: View {
     }
     
     @State private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Auto Login für Tests
+    
+    private func performAutoLoginForTests() {
+        let startTime = Date()
+        
+        addTestResult(.init(
+            name: "Auto-Login für Tests",
+            success: true,
+            message: "🔑 Versuche Login mit Test-Credentials...",
+            duration: 0
+        ))
+        
+        // Verwende echte Backend-Credentials (ersetzen Sie mit gültigen Test-Accounts)
+        userService.login(username: "test@example.com", password: "testpassword")
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    switch completion {
+                    case .finished:
+                        break
+                    case .failure(let error):
+                        addTestResult(.init(
+                            name: "Auto-Login",
+                            success: false,
+                            message: "❌ Login fehlgeschlagen: \(error.localizedDescription)",
+                            duration: duration
+                        ))
+                        
+                        addTestResult(.init(
+                            name: "LÖSUNG",
+                            success: false,
+                            message: "🔧 Bitte loggen Sie sich manuell in der App ein oder erstellen Sie einen Test-Account auf: \(AppSettings.shared.backendURL)",
+                            duration: 0
+                        ))
+                        
+                        isLoading = false
+                    }
+                },
+                receiveValue: { userDTO in
+                    let duration = Date().timeIntervalSince(startTime)
+                    
+                    addTestResult(.init(
+                        name: "Auto-Login",
+                        success: true,
+                        message: "✅ Erfolgreich eingeloggt als \(userDTO.email)",
+                        duration: duration
+                    ))
+                    
+                    // JWT Token nach Login prüfen
+                    let newToken = AuthManager.shared.getCurrentAuthToken()
+                    addTestResult(.init(
+                        name: "Token nach Login",
+                        success: newToken != nil,
+                        message: newToken != nil ? "✅ JWT Token erhalten" : "❌ Kein Token nach Login",
+                        duration: 0
+                    ))
+                    
+                    // Retry Trip Create Test
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        performTripCreateTest()
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
 }
 
 // MARK: - Supporting Views
