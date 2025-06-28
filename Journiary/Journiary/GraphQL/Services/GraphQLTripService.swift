@@ -26,6 +26,7 @@ class GraphQLTripService: ObservableObject {
     // MARK: - Demo Mode
     
     private var isDemoMode: Bool {
+        // Nur für lokale Entwicklung - echtes Backend für production
         return AppSettings.shared.backendURL.contains("localhost") ||
                AppSettings.shared.backendURL.contains("127.0.0.1")
     }
@@ -40,7 +41,51 @@ class GraphQLTripService: ObservableObject {
             return loadTripsFromCoreData()
         }
         
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        let query = """
+        query GetTrips {
+            getTrips {
+                id
+                name
+                isActive
+            }
+        }
+        """
+        
+        return performGraphQLQuery(query: query)
+            .tryMap { data -> [TripDTO] in
+                guard let trips = data["getTrips"] as? [[String: Any]] else {
+                    throw GraphQLError.parseError("Ungültige getTrips Antwort")
+                }
+                
+                let dateFormatter = ISO8601DateFormatter()
+                
+                return trips.compactMap { tripData -> TripDTO? in
+                    guard let id = tripData["id"] as? String,
+                          let name = tripData["name"] as? String,
+                          let isActive = tripData["isActive"] as? Bool else {
+                        return nil
+                    }
+                    
+                    return TripDTO(
+                        id: id,
+                        name: name,
+                        description: nil, // Backend schema unknown
+                        startDate: nil,   // Backend schema unknown
+                        endDate: nil,     // Backend schema unknown
+                        isActive: isActive,
+                        createdAt: Date(), // Fallback
+                        updatedAt: Date()  // Fallback
+                    )
+                }
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
             .eraseToAnyPublisher()
     }
     
@@ -53,7 +98,46 @@ class GraphQLTripService: ObservableObject {
             return loadTripFromCoreData(id: id)
         }
         
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        let query = """
+        query GetTrip($id: ID!) {
+            getTrip(id: $id) {
+                id
+                name
+                isActive
+            }
+        }
+        """
+        
+        let variables = ["id": id]
+        
+        return performGraphQLQuery(query: query, variables: variables)
+            .tryMap { data -> TripDTO in
+                guard let trip = data["getTrip"] as? [String: Any],
+                      let id = trip["id"] as? String,
+                      let name = trip["name"] as? String,
+                      let isActive = trip["isActive"] as? Bool else {
+                    throw GraphQLError.parseError("Ungültige getTrip Antwort")
+                }
+                
+                return TripDTO(
+                    id: id,
+                    name: name,
+                    description: nil, // Backend schema unknown
+                    startDate: nil,   // Backend schema unknown
+                    endDate: nil,     // Backend schema unknown
+                    isActive: isActive,
+                    createdAt: Date(), // Fallback
+                    updatedAt: Date()  // Fallback
+                )
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
             .eraseToAnyPublisher()
     }
     
@@ -80,7 +164,69 @@ class GraphQLTripService: ObservableObject {
             )
         }
         
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        let mutation = """
+        mutation CreateTrip($input: TripInput!) {
+            createTrip(input: $input) {
+                id
+                name
+                isActive
+            }
+        }
+        """
+        
+        var variables: [String: Any] = [
+            "input": [
+                "name": name,
+                "isActive": true
+            ]
+        ]
+        
+        // Backend-required Felder (startDate und endDate sind REQUIRED!)
+        let actualStartDate = startDate ?? Date()
+        let actualEndDate = endDate ?? Calendar.current.date(byAdding: .day, value: 7, to: actualStartDate) ?? Date()
+        
+        var inputDict: [String: Any] = [
+            "name": name,
+            "isActive": true,
+            "startDate": ISO8601DateFormatter().string(from: actualStartDate),
+            "endDate": ISO8601DateFormatter().string(from: actualEndDate)
+        ]
+        
+        // Optionale Beschreibung hinzufügen (Backend erwartet tripDescription!)
+        if let description = description {
+            inputDict["tripDescription"] = description
+        }
+        
+        variables["input"] = inputDict
+        
+        return performGraphQLMutation(query: mutation, variables: variables)
+            .tryMap { data -> TripDTO in
+                guard let createTrip = data["createTrip"] as? [String: Any],
+                      let id = createTrip["id"] as? String,
+                      let name = createTrip["name"] as? String,
+                      let isActive = createTrip["isActive"] as? Bool else {
+                    throw GraphQLError.parseError("Ungültige createTrip Antwort")
+                }
+                
+                return TripDTO(
+                    id: id,
+                    name: name,
+                    description: nil, // Backend schema unknown
+                    startDate: nil,   // Backend schema unknown
+                    endDate: nil,     // Backend schema unknown
+                    isActive: isActive,
+                    createdAt: Date(), // Fallback
+                    updatedAt: Date()  // Fallback
+                )
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
             .eraseToAnyPublisher()
     }
     
@@ -113,7 +259,56 @@ class GraphQLTripService: ObservableObject {
             )
         }
         
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        let mutation = """
+        mutation UpdateTrip($id: ID!, $input: UpdateTripInput!) {
+            updateTrip(id: $id, input: $input) {
+                id
+                name
+                isActive
+            }
+        }
+        """
+        
+        var inputDict: [String: Any] = [:]
+        if let name = name { inputDict["name"] = name }
+        if let description = description { inputDict["tripDescription"] = description }
+        if let startDate = startDate { inputDict["startDate"] = ISO8601DateFormatter().string(from: startDate) }
+        if let endDate = endDate { inputDict["endDate"] = ISO8601DateFormatter().string(from: endDate) }
+        if let isActive = isActive { inputDict["isActive"] = isActive }
+        
+        let variables: [String: Any] = [
+            "id": id,
+            "input": inputDict
+        ]
+        
+        return performGraphQLMutation(query: mutation, variables: variables)
+            .tryMap { data -> TripDTO in
+                guard let updateTrip = data["updateTrip"] as? [String: Any],
+                      let id = updateTrip["id"] as? String,
+                      let name = updateTrip["name"] as? String,
+                      let isActive = updateTrip["isActive"] as? Bool else {
+                    throw GraphQLError.parseError("Ungültige updateTrip Antwort")
+                }
+                
+                return TripDTO(
+                    id: id,
+                    name: name,
+                    description: nil, // Backend schema unknown
+                    startDate: nil,   // Backend schema unknown
+                    endDate: nil,     // Backend schema unknown
+                    isActive: isActive,
+                    createdAt: Date(), // Fallback
+                    updatedAt: Date()  // Fallback
+                )
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
             .eraseToAnyPublisher()
     }
     
@@ -126,7 +321,29 @@ class GraphQLTripService: ObservableObject {
             return deleteTripFromCoreData(id: id)
         }
         
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // 🚀 ECHTE BACKEND IMPLEMENTATION
+        let mutation = """
+        mutation DeleteTrip($id: ID!) {
+            deleteTrip(id: $id)
+        }
+        """
+        
+        let variables = ["id": id]
+        
+        return performGraphQLMutation(query: mutation, variables: variables)
+            .tryMap { data -> Bool in
+                guard let success = data["deleteTrip"] as? Bool else {
+                    throw GraphQLError.parseError("Ungültige deleteTrip Antwort")
+                }
+                return success
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
             .eraseToAnyPublisher()
     }
     
@@ -317,6 +534,69 @@ class GraphQLTripService: ObservableObject {
         }
         .delay(for: .seconds(0.3), scheduler: DispatchQueue.main)
         .eraseToAnyPublisher()
+    }
+    
+    // MARK: - HTTP GraphQL Helper
+    
+    private func performGraphQLQuery(query: String, variables: [String: Any] = [:]) -> AnyPublisher<[String: Any], GraphQLError> {
+        guard let url = URL(string: "\(AppSettings.shared.backendURL)/graphql") else {
+            return Fail(error: GraphQLError.networkError("Ungültige Backend URL"))
+                .eraseToAnyPublisher()
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // JWT Token hinzufügen falls vorhanden
+        if let token = AuthManager.shared.getCurrentAuthToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        let body: [String: Any] = [
+            "query": query,
+            "variables": variables
+        ]
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            return Fail(error: GraphQLError.invalidInput("JSON Serialization fehlgeschlagen"))
+                .eraseToAnyPublisher()
+        }
+        
+        return URLSession.shared.dataTaskPublisher(for: request)
+            .map(\.data)
+            .tryMap { data -> [String: Any] in
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw GraphQLError.invalidInput("Ungültige JSON Antwort")
+                }
+                
+                // GraphQL Errors prüfen
+                if let errors = json["errors"] as? [[String: Any]], !errors.isEmpty {
+                    let errorMessage = errors.compactMap { $0["message"] as? String }.joined(separator: ", ")
+                    throw GraphQLError.serverError(errorMessage)
+                }
+                
+                guard let data = json["data"] as? [String: Any] else {
+                    throw GraphQLError.invalidInput("Fehlende data in GraphQL Antwort")
+                }
+                
+                return data
+            }
+            .mapError { error -> GraphQLError in
+                if let graphQLError = error as? GraphQLError {
+                    return graphQLError
+                } else {
+                    return GraphQLError.networkError(error.localizedDescription)
+                }
+            }
+            .eraseToAnyPublisher()
+    }
+    
+    private func performGraphQLMutation(query: String, variables: [String: Any] = [:]) -> AnyPublisher<[String: Any], GraphQLError> {
+        // Mutations verwenden dieselbe HTTP-Methode wie Queries
+        return performGraphQLQuery(query: query, variables: variables)
     }
 }
 

@@ -1098,7 +1098,9 @@ struct GraphQLTestView: View {
             "input": [
                 "name": "HTTP Debug Test Trip",
                 "tripDescription": "Direct HTTP test",
-                "isActive": true
+                "isActive": true,
+                "startDate": ISO8601DateFormatter().string(from: Date()),
+                "endDate": ISO8601DateFormatter().string(from: Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date())
             ]
         ]
         
