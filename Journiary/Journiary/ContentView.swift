@@ -33,14 +33,16 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.5), value: currentViewState)
+        .animation(.easeInOut(duration: 0.3), value: currentViewState) // Kürzere Animation für bessere Performance
         .environmentObject(authManager)
         .environmentObject(appSettings)
         .onAppear {
             checkStorageModeConfiguration()
         }
         .onReceive(appSettings.$storageMode) { _ in
-            checkStorageModeConfiguration()
+            DispatchQueue.main.async { // Verhindere synchrone Updates
+                checkStorageModeConfiguration()
+            }
         }
     }
     
@@ -113,9 +115,12 @@ struct ContentView: View {
                      appSettings.shouldUseBackend && 
                      !authManager.isAuthenticated
         
+        // Reduziere Debug-Output um Performance zu verbessern
+        #if DEBUG
         if result {
             print("📱 ContentView: Login-Screen wird angezeigt (isLoading: \(authManager.isLoading))")
         }
+        #endif
         
         return result
     }
@@ -128,9 +133,12 @@ struct ContentView: View {
         let result = isStorageModeConfigured &&
                      (!appSettings.shouldUseBackend || authManager.isAuthenticated)
         
+        // Reduziere Debug-Output um Performance zu verbessern
+        #if DEBUG
         if result {
             print("📱 ContentView: Hauptapp wird angezeigt")
         }
+        #endif
         
         return result
     }
@@ -139,31 +147,36 @@ struct ContentView: View {
         let userDefaultsValue = UserDefaults.standard.string(forKey: "StorageMode")
         let hasStoredValue = userDefaultsValue != nil && !userDefaultsValue!.isEmpty
         
-        print("🔍 StorageMode Check: UserDefaults=\(userDefaultsValue ?? "nil"), hasStored=\(hasStoredValue)")
-        
-        // Update State
+        // Nur loggen wenn sich der State ändert
+        let previousState = isStorageModeConfigured
         isStorageModeConfigured = hasStoredValue
         
-        if hasStoredValue {
-            print("✅ Storage Mode konfiguriert: \(appSettings.storageMode.displayName)")
-            if appSettings.shouldUseBackend {
-                print("🔐 Backend-Mode → Login wird angezeigt")
-            } else {
-                print("☁️ CloudKit-Mode → Direkt zur App")
+        #if DEBUG
+        if previousState != hasStoredValue {
+            print("🔍 StorageMode Check: UserDefaults=\(userDefaultsValue ?? "nil"), hasStored=\(hasStoredValue)")
+            
+            if hasStoredValue {
+                print("✅ Storage Mode konfiguriert: \(appSettings.storageMode.displayName)")
+                if appSettings.shouldUseBackend {
+                    print("🔐 Backend-Mode → Login wird angezeigt")
+                } else {
+                    print("☁️ CloudKit-Mode → Direkt zur App")
+                }
             }
         }
+        #endif
     }
     
-    // Für Animation-Tracking
-    private var currentViewState: String {
+    // Für Animation-Tracking - mit Cache um wiederholte String-Berechnungen zu vermeiden
+    private var currentViewState: Int {
         if shouldShowStorageModeSelection {
-            return "storageSelection"
+            return 0 // "storageSelection"
         } else if shouldShowLogin {
-            return "login"
+            return 1 // "login"
         } else if shouldShowMainApp {
-            return "authenticated"
+            return 2 // "authenticated"
         } else {
-            return "loading"
+            return 3 // "loading"
         }
     }
 }

@@ -176,7 +176,9 @@ class AuthManager: ObservableObject {
         isAuthenticated = true
         authenticationError = nil
         
+        #if DEBUG
         print("✅ Benutzer erfolgreich angemeldet: \(response.user.username)")
+        #endif
     }
     
     func logout() {
@@ -200,7 +202,9 @@ class AuthManager: ObservableObject {
         isAuthenticated = false
         authenticationError = nil
         
+        #if DEBUG
         print("✅ Benutzer abgemeldet")
+        #endif
     }
     
     private func loadCurrentUser() {

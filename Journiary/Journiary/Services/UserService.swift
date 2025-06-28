@@ -20,14 +20,25 @@ class UserService: ObservableObject {
     
     // MARK: - Demo Mode (für Development/Testing)
     
+    // Cache für bessere Performance
+    private static var _isDemoModeCache: Bool?
+    
     private var isDemoMode: Bool {
         #if DEBUG
+        // Cache verwenden um wiederholte Prüfungen zu vermeiden
+        if let cached = Self._isDemoModeCache {
+            return cached
+        }
+        
         // Aktiviere Demo-Mode für Development
-        // Entweder localhost oder wenn explizit in Debug-Mode
         let isLocalhost = baseURL.contains("localhost") || baseURL.contains("127.0.0.1")
         let isDevelopment = true // In Debug-Builds immer Demo-Mode aktivieren
         let isDemo = isLocalhost || isDevelopment
+        
+        // Nur einmal loggen
         print("🔍 Demo-Mode Check: baseURL=\(baseURL), isLocalhost=\(isLocalhost), isDevelopment=\(isDevelopment), isDemoMode=\(isDemo)")
+        
+        Self._isDemoModeCache = isDemo
         return isDemo
         #else
         return false
@@ -444,7 +455,9 @@ class UserService: ObservableObject {
         let lastName = user.lastName?.isEmpty == false ? user.lastName : nil
         let username = user.username ?? extractUsernameFromEmail(email)
         
+        #if DEBUG
         print("🔍 Demo-Mode: Benutzer gefunden - \(firstName ?? "nil") \(lastName ?? "nil")")
+        #endif
         
         let demoUser = UserData(
             id: user.id?.uuidString ?? "demo-user-id",
