@@ -1,6 +1,7 @@
 import { ObjectType, Field, ID, Int } from 'type-graphql';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
 import { Memory } from './Memory';
+import { User } from './User';
 
 @ObjectType({ description: "Represents a media file (photo, video, etc.) associated with a memory" })
 @Entity()
@@ -36,6 +37,9 @@ export class MediaItem {
     @Field({ nullable: true, description: "The name of the thumbnail object in the storage (e.g., MinIO)" })
     @Column({ nullable: true })
     thumbnailObjectName?: string;
+
+    @ManyToOne(() => User, user => user.uploadedMediaItems)
+    uploader!: User;
 
     @Field(() => Memory)
     @ManyToOne(() => Memory, (memory: Memory) => memory.mediaItems)

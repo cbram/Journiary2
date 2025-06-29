@@ -5,6 +5,7 @@ import { MediaItem } from './MediaItem';
 import { Tag } from './Tag';
 import { GPXTrack } from './GPXTrack';
 import { BucketListItem } from './BucketListItem';
+import { User } from './User';
 
 @ObjectType({ description: "Represents a single memory or event within a trip" })
 @Entity()
@@ -49,6 +50,9 @@ export class Memory {
     @ManyToMany(() => Tag, tag => tag.memories)
     @JoinTable()
     tags!: Tag[];
+
+    @ManyToOne(() => User, user => user.createdMemories)
+    creator!: User;
 
     @ManyToOne(() => Trip, (trip: Trip) => trip.memories)
     trip!: Trip;

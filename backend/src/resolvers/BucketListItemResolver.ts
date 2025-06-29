@@ -12,7 +12,7 @@ export class BucketListItemResolver {
     @Query(() => [BucketListItem])
     async bucketListItems(@Ctx() { userId }: MyContext): Promise<BucketListItem[]> {
         if (!userId) return [];
-        return AppDataSource.getRepository(BucketListItem).find({ where: { user: { id: userId } } });
+        return AppDataSource.getRepository(BucketListItem).find({ where: { creator: { id: userId } } });
     }
 
     @Mutation(() => BucketListItem)
@@ -24,7 +24,7 @@ export class BucketListItemResolver {
         const user = await AppDataSource.getRepository(User).findOneBy({ id: userId });
         if (!user) throw new AuthenticationError("User not found.");
 
-        const item = AppDataSource.getRepository(BucketListItem).create({ ...input, user });
+        const item = AppDataSource.getRepository(BucketListItem).create({ ...input, creator: user });
         return await AppDataSource.getRepository(BucketListItem).save(item);
     }
 
@@ -35,7 +35,7 @@ export class BucketListItemResolver {
         @Ctx() { userId }: MyContext
     ): Promise<BucketListItem | null> {
         if (!userId) throw new AuthenticationError("You must be logged in.");
-        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, user: { id: userId } } });
+        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, creator: { id: userId } } });
         if (!item) throw new UserInputError("Item not found or you don't have access.");
 
         await AppDataSource.getRepository(BucketListItem).update(id, input);
@@ -50,7 +50,7 @@ export class BucketListItemResolver {
     ): Promise<BucketListItem | null> {
         if (!userId) throw new AuthenticationError("You must be logged in.");
         
-        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, user: { id: userId } } });
+        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, creator: { id: userId } } });
         if (!item) throw new UserInputError("Bucket list item not found or you don't have access.");
 
         const hasAccessToMemory = await AppDataSource.getRepository(Memory).count({ where: { id: memoryId, trip: { members: { user: { id: userId } } } } });
@@ -72,7 +72,7 @@ export class BucketListItemResolver {
         @Ctx() { userId }: MyContext
     ): Promise<boolean> {
         if (!userId) throw new AuthenticationError("You must be logged in.");
-        const result = await AppDataSource.getRepository(BucketListItem).delete({ id, user: { id: userId } });
+        const result = await AppDataSource.getRepository(BucketListItem).delete({ id, creator: { id: userId } });
         return result.affected === 1;
     }
 } 

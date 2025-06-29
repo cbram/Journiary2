@@ -50,8 +50,8 @@ export class BucketListItem {
     @CreateDateColumn()
     createdAt!: Date;
 
-    @ManyToOne(() => User, user => user.bucketListItems)
-    user!: User;
+    @ManyToOne(() => User, user => user.createdBucketListItems)
+    creator!: User;
 
     @Field({ nullable: true })
     @Column({ type: "timestamp", nullable: true })

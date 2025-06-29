@@ -1,6 +1,7 @@
 import { ObjectType, Field, ID, Int } from "type-graphql";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, OneToMany, ManyToOne } from "typeorm";
 import { Tag } from "./Tag";
+import { User } from "./User";
 
 @ObjectType({ description: "Represents a category for grouping tags" })
 @Entity()
@@ -40,6 +41,9 @@ export class TagCategory {
     @Field()
     @CreateDateColumn()
     createdAt!: Date;
+
+    @ManyToOne(() => User, user => user.createdTagCategories)
+    creator!: User;
 
     @Field(() => [Tag])
     @OneToMany(() => Tag, tag => tag.category)
