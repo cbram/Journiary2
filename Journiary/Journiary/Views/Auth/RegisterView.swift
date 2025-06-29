@@ -225,12 +225,9 @@ struct RegisterView: View {
             // Username
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Benutzername")
+                    Text("Benutzername (optional)")
                         .font(.subheadline)
                         .foregroundColor(.primary)
-                    
-                    Text("*")
-                        .foregroundColor(.red)
                     
                     Spacer()
                     
@@ -241,7 +238,7 @@ struct RegisterView: View {
                     }
                 }
                 
-                TextField("benutzername", text: $username)
+                TextField("wird aus E-Mail generiert, falls leer", text: $username)
                     .textFieldStyle(CustomTextFieldStyle(isValid: username.isEmpty || isValidUsername))
                     .textContentType(.username)
                     .autocapitalization(.none)
@@ -432,7 +429,7 @@ struct RegisterView: View {
     }
     
     private var isValidUsername: Bool {
-        return username.count >= 3 && username.allSatisfy { $0.isLetter || $0.isNumber }
+        return username.isEmpty || (username.count >= 3 && username.allSatisfy { $0.isLetter || $0.isNumber })
     }
     
     private var isValidPassword: Bool {
@@ -444,7 +441,7 @@ struct RegisterView: View {
     }
     
     private var isValidRegistrationData: Bool {
-        return isValidEmail && isValidUsername && isValidPassword && passwordsMatch && agreedToTerms
+        return isValidEmail && isValidPassword && passwordsMatch && agreedToTerms
     }
     
     // MARK: - Actions
@@ -461,9 +458,12 @@ struct RegisterView: View {
         let firstNameValue = firstName.isEmpty ? nil : firstName
         let lastNameValue = lastName.isEmpty ? nil : lastName
         
+        // Username aus E-Mail generieren, falls leer
+        let usernameValue = username.isEmpty ? email.components(separatedBy: "@").first ?? "user" : username
+        
         authManager.register(
             email: email,
-            username: username,
+            username: usernameValue,
             password: password,
             firstName: firstNameValue,
             lastName: lastNameValue
