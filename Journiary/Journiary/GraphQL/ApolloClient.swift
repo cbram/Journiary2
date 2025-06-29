@@ -662,6 +662,8 @@ class GraphQLNetworkClient {
         }
         
         return session.dataTaskPublisher(for: request)
+            .timeout(.seconds(30), scheduler: DispatchQueue.main)
+            .retry(2) // Automatisch 2x wiederholen bei Netzwerkfehlern
             .map(\.data)
             .tryMap { data -> [String: Any] in
                 guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -679,6 +681,20 @@ class GraphQLNetworkClient {
             .mapError { error -> GraphQLError in
                 if let graphQLError = error as? GraphQLError {
                     return graphQLError
+                } else if let urlError = error as? URLError {
+                    // Spezifische URLError Behandlung
+                    switch urlError.code {
+                    case .notConnectedToInternet:
+                        return GraphQLError.networkError("Keine Internetverbindung verfügbar. Bitte prüfen Sie Ihre Netzwerkeinstellungen.")
+                    case .timedOut:
+                        return GraphQLError.networkError("Die Anfrage hat zu lange gedauert. Bitte versuchen Sie es erneut.")
+                    case .cannotConnectToHost, .cannotFindHost:
+                        return GraphQLError.networkError("Der Backend-Server ist nicht erreichbar. Möglicherweise ist er offline.")
+                    case .networkConnectionLost:
+                        return GraphQLError.networkError("Die Netzwerkverbindung wurde unterbrochen.")
+                    default:
+                        return GraphQLError.networkError("Netzwerkfehler: \(urlError.localizedDescription)")
+                    }
                 } else {
                     return GraphQLError.networkError(error.localizedDescription)
                 }

@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var showingGraphQLTest = false
     @State private var showingTripCrudTest = false
     @State private var showingAdminPanel = false
+    @State private var showingErrorHandlingTest = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -112,6 +113,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingAdminPanel) {
             AdminPanelView()
+        }
+        .sheet(isPresented: $showingErrorHandlingTest) {
+            ErrorHandlingTestView()
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
@@ -391,6 +395,17 @@ struct SettingsView: View {
                         title: "Admin Panel",
                         icon: "person.badge.key",
                         status: "User verwalten"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingErrorHandlingTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "Error Handling Test",
+                        icon: "exclamationmark.triangle",
+                        status: "Fehlerbehandlung testen"
                     )
                 }
                 .buttonStyle(PlainButtonStyle())

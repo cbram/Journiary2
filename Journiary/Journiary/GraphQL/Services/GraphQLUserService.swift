@@ -92,6 +92,18 @@ class GraphQLUserService: ObservableObject {
             .mapError { error -> GraphQLError in
                 if let graphQLError = error as? GraphQLError {
                     return graphQLError
+                } else if let urlError = error as? URLError {
+                    // Spezifische URLError Behandlung für besseres Error Handling
+                    switch urlError.code {
+                    case .notConnectedToInternet:
+                        return GraphQLError.networkError("Keine Internetverbindung verfügbar")
+                    case .timedOut:
+                        return GraphQLError.networkError("Zeitüberschreitung beim Login")
+                    case .cannotConnectToHost, .cannotFindHost:
+                        return GraphQLError.networkError("Backend-Server nicht erreichbar")
+                    default:
+                        return GraphQLError.networkError(urlError.localizedDescription)
+                    }
                 } else {
                     return GraphQLError.networkError(error.localizedDescription)
                 }
@@ -296,6 +308,18 @@ class GraphQLUserService: ObservableObject {
             .mapError { error -> GraphQLError in
                 if let graphQLError = error as? GraphQLError {
                     return graphQLError
+                } else if let urlError = error as? URLError {
+                    // Spezifische URLError Behandlung
+                    switch urlError.code {
+                    case .notConnectedToInternet:
+                        return GraphQLError.networkError("Keine Internetverbindung verfügbar")
+                    case .timedOut:
+                        return GraphQLError.networkError("Zeitüberschreitung bei GraphQL Anfrage")
+                    case .cannotConnectToHost, .cannotFindHost:
+                        return GraphQLError.networkError("Backend-Server nicht erreichbar")
+                    default:
+                        return GraphQLError.networkError(urlError.localizedDescription)
+                    }
                 } else {
                     return GraphQLError.networkError(error.localizedDescription)
                 }

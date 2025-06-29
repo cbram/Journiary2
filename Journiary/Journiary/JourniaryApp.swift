@@ -95,6 +95,7 @@ struct JourniaryApp: App {
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .environmentObject(authManager)
                 .environmentObject(appSettings)
+                .handleErrors() // Globales Error Handling für die gesamte App
                 .onAppear {
                     // Initial Setup
                     setupApp()

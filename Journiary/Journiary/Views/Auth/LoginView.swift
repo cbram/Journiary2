@@ -9,10 +9,10 @@ import SwiftUI
 
 struct LoginView: View {
     @StateObject private var authManager = AuthManager.shared
+    @StateObject private var errorHandler = ErrorHandler.shared
     @State private var email = ""
     @State private var password = ""
     @State private var showingRegister = false
-    @State private var showingAlert = false
     @State private var rememberMe = false
     
     // Animation und Fokus
@@ -46,19 +46,15 @@ struct LoginView: View {
         .sheet(isPresented: $showingRegister) {
             RegisterView()
         }
-        .alert("Anmeldung fehlgeschlagen", isPresented: $showingAlert) {
-            Button("OK") { 
-                authManager.authenticationError = nil
-            }
-        } message: {
-            Text(authManager.authenticationError?.localizedDescription ?? "Unbekannter Fehler")
-        }
+        .handleErrors()
         .onReceive(authManager.$authenticationError) { error in
-            // Verzögerung hinzufügen, um Alert-Konflikte zu vermeiden
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                if error != nil && !showingAlert {
-                    showingAlert = true
+            if let error = error {
+                errorHandler.handle(error) {
+                    // Retry login with same credentials
+                    performLogin()
                 }
+                // Clear the auth manager error to avoid duplicate handling
+                authManager.authenticationError = nil
             }
         }
         .onAppear {
