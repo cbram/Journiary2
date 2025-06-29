@@ -31,6 +31,7 @@
     "minio": "latest",
     "pg": "latest",
     "reflect-metadata": "latest",
+    "sqlite3": "^5.1.7",
     "type-graphql": "latest",
     "typedi": "latest",
     "typeorm": "latest",

@@ -15,29 +15,59 @@ import { TripMembership } from "../entities/TripMembership";
 
 const databaseUrl = process.env.DATABASE_URL;
 
-if (!databaseUrl) {
-    throw new Error("DATABASE_URL environment variable is not set.");
+// Development-Modus: Verwende SQLite wenn keine DATABASE_URL gesetzt ist
+const isLocalDevelopment = !databaseUrl;
+
+if (isLocalDevelopment) {
+    console.log("🏠 Development-Modus: Verwende lokale SQLite-Datenbank");
+} else {
+    console.log("🐘 Production-Modus: Verwende PostgreSQL-Datenbank");
 }
 
-export const AppDataSource = new DataSource({
-    type: "postgres",
-    url: databaseUrl,
-    synchronize: true, // DEV only: automatically creates the database schema on every application launch
-    logging: true,
-    entities: [
-        Trip, 
-        Memory, 
-        MediaItem, 
-        RoutePoint, 
-        Tag, 
-        TagCategory, 
-        BucketListItem, 
-        GPXTrack, 
-        TrackSegment, 
-        TrackMetadata,
-        User,
-        TripMembership
-    ],
-    subscribers: [],
-    migrations: [],
-}); 
+export const AppDataSource = new DataSource(
+    isLocalDevelopment ? {
+        // SQLite-Konfiguration für lokale Entwicklung
+        type: "sqlite",
+        database: "./journiary-dev.sqlite",
+        synchronize: true, // DEV only: automatisch Schema erstellen
+        logging: false, // Weniger Logs für lokale Entwicklung
+        entities: [
+            Trip, 
+            Memory, 
+            MediaItem, 
+            RoutePoint, 
+            Tag, 
+            TagCategory, 
+            BucketListItem, 
+            GPXTrack, 
+            TrackSegment, 
+            TrackMetadata,
+            User,
+            TripMembership
+        ],
+        subscribers: [],
+        migrations: [],
+    } : {
+        // PostgreSQL-Konfiguration für Production
+        type: "postgres",
+        url: databaseUrl,
+        synchronize: true,
+        logging: true,
+        entities: [
+            Trip, 
+            Memory, 
+            MediaItem, 
+            RoutePoint, 
+            Tag, 
+            TagCategory, 
+            BucketListItem, 
+            GPXTrack, 
+            TrackSegment, 
+            TrackMetadata,
+            User,
+            TripMembership
+        ],
+        subscribers: [],
+        migrations: [],
+    }
+); 

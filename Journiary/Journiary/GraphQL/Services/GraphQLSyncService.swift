@@ -117,7 +117,9 @@ class GraphQLSyncService: ObservableObject {
                     // Fehler ignorieren bei stiller Sync
                 },
                 receiveValue: { [weak self] _ in
-                    self?.lastSyncDate = Date()
+                    DispatchQueue.main.async {
+                        self?.lastSyncDate = Date()
+                    }
                 }
             )
             .store(in: &cancellables)
