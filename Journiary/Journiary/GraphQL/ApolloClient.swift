@@ -292,6 +292,30 @@ class GraphQLCache {
     }
     
     private func createTable() {
+        // Prüfe, ob die Tabelle das neue Schema hat
+        let checkColumnSQL = "PRAGMA table_info(graphql_cache);"
+        var statement: OpaquePointer?
+        var hasAccessCount = false
+        var hasLastAccess = false
+        
+        if sqlite3_prepare_v2(db, checkColumnSQL, -1, &statement, nil) == SQLITE_OK {
+            while sqlite3_step(statement) == SQLITE_ROW {
+                if let columnName = sqlite3_column_text(statement, 1) {
+                    let name = String(cString: columnName)
+                    if name == "access_count" { hasAccessCount = true }
+                    if name == "last_access" { hasLastAccess = true }
+                }
+            }
+        }
+        sqlite3_finalize(statement)
+        
+        // Migration: Wenn alte Tabelle ohne neue Spalten existiert, droppen und neu erstellen
+        if !hasAccessCount || !hasLastAccess {
+            print("🔄 GraphQL Cache Migration: Alte Tabelle wird neu erstellt...")
+            let dropSQL = "DROP TABLE IF EXISTS graphql_cache;"
+            sqlite3_exec(db, dropSQL, nil, nil, nil)
+        }
+        
         let createTableSQL = """
             CREATE TABLE IF NOT EXISTS graphql_cache (
                 query_hash TEXT PRIMARY KEY,
@@ -301,15 +325,26 @@ class GraphQLCache {
                 access_count INTEGER DEFAULT 1,
                 last_access INTEGER NOT NULL
             );
-            
-            -- Performance Index für schnelle Lookups
-            CREATE INDEX IF NOT EXISTS idx_query_hash_expiry ON graphql_cache(query_hash, expires_at);
-            CREATE INDEX IF NOT EXISTS idx_last_access ON graphql_cache(last_access);
         """
         
         if sqlite3_exec(db, createTableSQL, nil, nil, nil) != SQLITE_OK {
             print("❌ Cache Tabelle konnte nicht erstellt werden")
+            return
         }
+        
+        // Indizes separat erstellen
+        let indexSQL = [
+            "CREATE INDEX IF NOT EXISTS idx_query_hash_expiry ON graphql_cache(query_hash, expires_at);",
+            "CREATE INDEX IF NOT EXISTS idx_last_access ON graphql_cache(last_access);"
+        ]
+        
+        for sql in indexSQL {
+            if sqlite3_exec(db, sql, nil, nil, nil) != SQLITE_OK {
+                print("⚠️ Index konnte nicht erstellt werden: \(sql)")
+            }
+        }
+        
+        print("✅ GraphQL Cache Tabelle erfolgreich erstellt/migriert")
     }
     
     private func optimizeDatabase() {
