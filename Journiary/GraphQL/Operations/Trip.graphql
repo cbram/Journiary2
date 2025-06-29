@@ -3,16 +3,20 @@
 fragment TripFragment on Trip {
   id
   name
-  description
+  tripDescription
+  coverImageObjectName
+  coverImageUrl
+  travelCompanions
+  visitedCountries
   startDate
   endDate
-  userId
-  createdAt
-  updatedAt
+  isActive
+  totalDistance
+  gpsTrackingEnabled
 }
 
-query GetTrips($userId: ID) {
-  trips(userId: $userId) {
+query GetTrips {
+  trips {
     ...TripFragment
   }
 }

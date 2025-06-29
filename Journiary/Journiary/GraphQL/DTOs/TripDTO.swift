@@ -8,17 +8,26 @@
 import Foundation
 import CoreData
 
-/// Trip Data Transfer Object - Vereinfachte Version ohne Apollo
-/// Für Datenübertragung zwischen Core Data und Demo GraphQL Service
-struct TripDTO {
+/// Trip Data Transfer Object - Production-ready Version
+/// Für Datenübertragung zwischen Backend GraphQL und iOS App
+struct TripDTO: Codable, Identifiable, Equatable {
     let id: String
     let name: String
-    let description: String?
+    let tripDescription: String? // Backend verwendet tripDescription, nicht description
+    let coverImageObjectName: String?
+    let coverImageUrl: String?
+    let travelCompanions: String?
+    let visitedCountries: String?
     let startDate: Date?
     let endDate: Date?
     let isActive: Bool
+    let totalDistance: Double
+    let gpsTrackingEnabled: Bool
     let createdAt: Date
     let updatedAt: Date
+    
+    // Legacy compatibility
+    var description: String? { tripDescription }
     
     // MARK: - Computed Properties
     
@@ -70,6 +79,14 @@ struct TripDTO {
         let components = calendar.dateComponents([.day], from: startDate, to: endDate)
         return components.day
     }
+    
+    /// Formatierte Distanz
+    var formattedDistance: String {
+        if totalDistance > 0 {
+            return String(format: "%.1f km", totalDistance / 1000)
+        }
+        return "Keine Distanz"
+    }
 }
 
 // MARK: - Core Data Conversion
@@ -87,10 +104,16 @@ extension TripDTO {
         return TripDTO(
             id: id,
             name: name,
-            description: coreDataTrip.tripDescription,
+            tripDescription: coreDataTrip.tripDescription,
+            coverImageObjectName: nil,
+            coverImageUrl: nil,
+            travelCompanions: nil,
+            visitedCountries: nil,
             startDate: coreDataTrip.startDate,
             endDate: coreDataTrip.endDate,
             isActive: coreDataTrip.isActive,
+            totalDistance: 0.0,
+            gpsTrackingEnabled: true,
             createdAt: Date(), // Fallback da Core Data kein createdAt hat
             updatedAt: Date() // Fallback da Core Data kein updatedAt hat
         )
@@ -119,7 +142,7 @@ extension TripDTO {
         
         // Daten aktualisieren
         trip.name = name
-        trip.tripDescription = description
+        trip.tripDescription = tripDescription
         trip.startDate = startDate
         trip.endDate = endDate
         trip.isActive = isActive
@@ -131,15 +154,64 @@ extension TripDTO {
 // MARK: - GraphQL Conversion
 
 extension TripDTO {
-    /// Erstellt GraphQL TripInput Dictionary
+    /// Erstellt GraphQL TripInput Dictionary (für Create)
     /// - Returns: Dictionary für GraphQL TripInput
-    func toGraphQLInput() -> [String: Any] {
+    func toGraphQLCreateInput() -> [String: Any] {
         var input: [String: Any] = [
-            "name": name
+            "name": name,
+            "isActive": isActive,
+            "totalDistance": totalDistance,
+            "gpsTrackingEnabled": gpsTrackingEnabled
         ]
         
-        if let description = description {
-            input["description"] = description
+        // Required startDate
+        if let startDate = startDate {
+            input["startDate"] = ISO8601DateFormatter().string(from: startDate)
+        } else {
+            // Backend requires startDate, use current date as fallback
+            input["startDate"] = ISO8601DateFormatter().string(from: Date())
+        }
+        
+        // Optional fields
+        if let description = tripDescription {
+            input["tripDescription"] = description
+        }
+        
+        if let companions = travelCompanions {
+            input["travelCompanions"] = companions
+        }
+        
+        if let countries = visitedCountries {
+            input["visitedCountries"] = countries
+        }
+        
+        if let endDate = endDate {
+            input["endDate"] = ISO8601DateFormatter().string(from: endDate)
+        }
+        
+        return input
+    }
+    
+    /// Erstellt GraphQL UpdateTripInput Dictionary (für Update)
+    /// - Returns: Dictionary für GraphQL UpdateTripInput
+    func toGraphQLUpdateInput() -> [String: Any] {
+        var input: [String: Any] = [:]
+        
+        input["name"] = name
+        input["isActive"] = isActive
+        input["totalDistance"] = totalDistance  
+        input["gpsTrackingEnabled"] = gpsTrackingEnabled
+        
+        if let description = tripDescription {
+            input["tripDescription"] = description
+        }
+        
+        if let companions = travelCompanions {
+            input["travelCompanions"] = companions
+        }
+        
+        if let countries = visitedCountries {
+            input["visitedCountries"] = countries
         }
         
         if let startDate = startDate {
@@ -152,33 +224,38 @@ extension TripDTO {
         
         return input
     }
-    
-    /// Erstellt GraphQL UpdateTripInput Dictionary
-    /// - Returns: Dictionary für GraphQL UpdateTripInput
-    func toGraphQLUpdateInput() -> [String: Any] {
-        var input: [String: Any] = [:]
-        
-        input["name"] = name
-        
-        if let description = description {
-            input["description"] = description
-        } else {
-            input["description"] = NSNull()
+}
+
+// MARK: - GraphQL Response Parsing
+
+extension TripDTO {
+    /// Erstellt TripDTO aus GraphQL Response
+    /// - Parameter graphQLData: GraphQL Response Dictionary
+    /// - Returns: TripDTO oder nil
+    static func from(graphQL graphQLData: [String: Any]) -> TripDTO? {
+        guard let id = graphQLData["id"] as? String,
+              let name = graphQLData["name"] as? String else {
+            return nil
         }
         
-        if let startDate = startDate {
-            input["startDate"] = ISO8601DateFormatter().string(from: startDate)
-        } else {
-            input["startDate"] = NSNull()
-        }
+        let dateFormatter = ISO8601DateFormatter()
         
-        if let endDate = endDate {
-            input["endDate"] = ISO8601DateFormatter().string(from: endDate)
-        } else {
-            input["endDate"] = NSNull()
-        }
-        
-        return input
+        return TripDTO(
+            id: id,
+            name: name,
+            tripDescription: graphQLData["tripDescription"] as? String,
+            coverImageObjectName: graphQLData["coverImageObjectName"] as? String,
+            coverImageUrl: graphQLData["coverImageUrl"] as? String,
+            travelCompanions: graphQLData["travelCompanions"] as? String,
+            visitedCountries: graphQLData["visitedCountries"] as? String,
+            startDate: (graphQLData["startDate"] as? String).flatMap { dateFormatter.date(from: $0) },
+            endDate: (graphQLData["endDate"] as? String).flatMap { dateFormatter.date(from: $0) },
+            isActive: graphQLData["isActive"] as? Bool ?? false,
+            totalDistance: graphQLData["totalDistance"] as? Double ?? 0.0,
+            gpsTrackingEnabled: graphQLData["gpsTrackingEnabled"] as? Bool ?? true,
+            createdAt: (graphQLData["createdAt"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date(),
+            updatedAt: (graphQLData["updatedAt"] as? String).flatMap { dateFormatter.date(from: $0) } ?? Date()
+        )
     }
 }
 

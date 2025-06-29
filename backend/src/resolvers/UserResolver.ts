@@ -58,17 +58,36 @@ export class UserResolver {
 
     @Mutation(() => AuthResponse, { description: "Log in a user" })
     async login(@Arg("input") { email, password }: UserInput): Promise<AuthResponse> {
+        console.log("🔐 LOGIN DEBUG - Attempting login for:", email);
+        console.log("🔐 LOGIN DEBUG - Password length:", password.length);
+        
         // 1. Find user by email
         const user = await AppDataSource.getRepository(User).findOneBy({ email });
         if (!user) {
+            console.log("❌ LOGIN DEBUG - User not found:", email);
             throw new UserInputError("Invalid credentials. Please check email and password.");
         }
+        
+        console.log("✅ LOGIN DEBUG - User found:", user.id, "email:", user.email);
+        console.log("🔐 LOGIN DEBUG - Stored password hash:", user.password.substring(0, 20) + "...");
+        console.log("🔐 LOGIN DEBUG - Input password:", password);
 
         // 2. Validate password
+        console.log("🔐 LOGIN DEBUG - Comparing passwords...");
         const isValid = await bcrypt.compare(password, user.password);
+        console.log("🔐 LOGIN DEBUG - Password comparison result:", isValid);
+        
         if (!isValid) {
+            console.log("❌ LOGIN DEBUG - Password mismatch! Hash:", user.password.substring(0, 30));
+            
+            // Test: Create a new hash of the input password to compare
+            const testHash = await bcrypt.hash(password, 12);
+            console.log("🔐 LOGIN DEBUG - Test hash of input password:", testHash.substring(0, 30));
+            
             throw new UserInputError("Invalid credentials. Please check email and password.");
         }
+        
+        console.log("✅ LOGIN DEBUG - Password valid!");
 
         // 3. Generate JWT
         // TODO: Move JWT_SECRET to a secure environment variable!

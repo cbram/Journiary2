@@ -1,0 +1,41 @@
+# Admin Operations for User Management
+# Production: These should be secured/removed in final version
+
+query ListUsers {
+    listUsers {
+        success
+        message
+        users {
+            id
+            email
+            passwordHash
+            createdAt
+        }
+    }
+}
+
+mutation ResetUserPassword($email: String!, $newPassword: String!) {
+    resetUserPassword(email: $email, newPassword: $newPassword) {
+        success
+        message
+        users {
+            id
+            email
+            passwordHash
+            createdAt
+        }
+    }
+}
+
+mutation EnsureAdminUser($email: String!, $password: String!) {
+    ensureAdminUser(email: $email, password: $password) {
+        success
+        message
+        users {
+            id
+            email
+            passwordHash
+            createdAt
+        }
+    }
+} 

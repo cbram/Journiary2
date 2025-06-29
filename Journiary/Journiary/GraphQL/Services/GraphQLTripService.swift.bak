@@ -111,6 +111,8 @@ class GraphQLTripService: ObservableObject {
                 "isActive": tripData.isActive,
                 "totalDistance": tripData.totalDistance,
                 "gpsTrackingEnabled": tripData.gpsTrackingEnabled,
+                "createdAt": tripData.createdAt,
+                "updatedAt": tripData.updatedAt
             ]
             
             // Handle optional fields explicitly
@@ -213,6 +215,8 @@ class GraphQLTripService: ObservableObject {
                 "isActive": tripData.isActive,
                 "totalDistance": tripData.totalDistance,
                 "gpsTrackingEnabled": tripData.gpsTrackingEnabled,
+                "createdAt": tripData.createdAt,
+                "updatedAt": tripData.updatedAt
             ]
             
             // Handle optional fields explicitly
@@ -325,6 +329,8 @@ class GraphQLTripService: ObservableObject {
                 "isActive": tripData.isActive,
                 "totalDistance": tripData.totalDistance,
                 "gpsTrackingEnabled": tripData.gpsTrackingEnabled,
+                "createdAt": tripData.createdAt,
+                "updatedAt": tripData.updatedAt
             ]
             
             // Handle optional fields explicitly

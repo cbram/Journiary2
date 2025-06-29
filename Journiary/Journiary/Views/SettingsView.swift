@@ -24,6 +24,8 @@ struct SettingsView: View {
     @State private var showingGPSDebugView = false
     @State private var showingUserProfile = false
     @State private var showingGraphQLTest = false
+    @State private var showingTripCrudTest = false
+    @State private var showingAdminPanel = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -104,6 +106,12 @@ struct SettingsView: View {
         .sheet(isPresented: $showingGraphQLTest) {
             GraphQLTestView()
                 .environmentObject(appSettings)
+        }
+        .sheet(isPresented: $showingTripCrudTest) {
+            TripCrudTestView()
+        }
+        .sheet(isPresented: $showingAdminPanel) {
+            AdminPanelView()
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
@@ -361,6 +369,28 @@ struct SettingsView: View {
                         title: "GraphQL Connectivity Test",
                         icon: "network",
                         status: "Backend testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingTripCrudTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "Trip CRUD Test",
+                        icon: "suitcase",
+                        status: "Reisen testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingAdminPanel = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "Admin Panel",
+                        icon: "person.badge.key",
+                        status: "User verwalten"
                     )
                 }
                 .buttonStyle(PlainButtonStyle())

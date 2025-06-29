@@ -74,38 +74,72 @@ class AuthManager: ObservableObject {
         
         // Prüfen ob JWT Token vorhanden ist
         if let token = getJWTToken(), !token.isEmpty {
+            // Prüfe ob es ein Demo-Token ist (Production-Fix)
+            if token.contains("demo-signature") {
+                print("⚠️ Demo-Token erkannt beim Startup - bereinige Authentication...")
+                performCompleteLogout()
+                return
+            }
+            
             // Token validieren
             validateToken(token)
         } else {
-            isAuthenticated = false
-            currentUser = nil
+            // Kein JWT Token vorhanden - kompletter Logout erforderlich
+            print("⚠️ Kein JWT Token vorhanden - führe kompletten Logout durch...")
+            performCompleteLogout()
         }
     }
     
     private func validateToken(_ token: String) {
-        // Einfache Token-Validierung (Prüfung auf Ablauf)
+        // Production-Ready Token-Validierung
         if isTokenExpired(token) {
-            // Versuche Token zu erneuern
-            refreshAuthenticationToken()
+            print("⚠️ JWT Token ist abgelaufen - führe kompletten Logout durch")
+            performCompleteLogout()
         } else {
             // Token ist gültig, lade Benutzerdaten
+            print("✅ JWT Token ist gültig - lade Benutzerdaten")
             loadCurrentUser()
         }
     }
     
     private func isTokenExpired(_ token: String) -> Bool {
+        // Prüfe zuerst ob es ein Demo-Token ist (Production-Fix)
+        if token.contains("demo-signature") {
+            print("⚠️ Demo-Token ist immer als abgelaufen zu betrachten")
+            return true
+        }
+        
         // JWT Token dekodieren und Ablaufzeit prüfen
         let parts = token.components(separatedBy: ".")
-        guard parts.count == 3,
-              let data = Data(base64Encoded: parts[1]) else {
+        guard parts.count == 3 else {
+            print("❌ JWT Token ist malformed - hat \(parts.count) Teile statt 3")
+            return true
+        }
+        
+        // Base64 Padding hinzufügen falls nötig
+        var payload = parts[1]
+        while payload.count % 4 != 0 {
+            payload += "="
+        }
+        
+        guard let data = Data(base64Encoded: payload) else {
+            print("❌ JWT Payload kann nicht dekodiert werden")
             return true
         }
         
         do {
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let exp = json["exp"] as? TimeInterval {
-                let expirationDate = Date(timeIntervalSince1970: exp)
-                return expirationDate <= Date()
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("🔍 JWT Payload: \(json)")
+                
+                if let exp = json["exp"] as? TimeInterval {
+                    let expirationDate = Date(timeIntervalSince1970: exp)
+                    let isExpired = expirationDate <= Date()
+                    print("🕒 JWT Token Ablauf: \(expirationDate), abgelaufen: \(isExpired)")
+                    return isExpired
+                } else {
+                    print("❌ JWT Token hat kein 'exp' Feld")
+                    return true
+                }
             }
         } catch {
             print("❌ Fehler beim Dekodieren des JWT Tokens: \(error)")
@@ -373,7 +407,49 @@ class AuthManager: ObservableObject {
     // MARK: - Public Token Access
     
     func getCurrentAuthToken() -> String? {
-        return getJWTToken()
+        let token = getJWTToken()
+        print("🔍 AuthManager.getCurrentAuthToken() = \(token?.prefix(20) ?? "nil")...")
+        
+        // Prüfe ob es ein Demo-Token ist (Production-Fix)
+        if let token = token, token.contains("demo-signature") {
+            print("⚠️ Demo-Token erkannt! Führe kompletten Logout durch...")
+            DispatchQueue.main.async {
+                self.performCompleteLogout()
+            }
+            return nil
+        }
+        
+        return token
+    }
+    
+    // MARK: - Complete Logout (Production-Ready)
+    
+    private func performCompleteLogout() {
+        print("🔄 Führe kompletten Logout durch...")
+        
+        // 1. JWT Token löschen
+        deleteJWTToken()
+        deleteRefreshToken()
+        
+        // 2. Aktuellen Benutzer in Core Data deaktivieren
+        if let currentUser = currentUser {
+            let context = PersistenceController.shared.container.viewContext
+            currentUser.isCurrentUser = false
+            
+            do {
+                try context.save()
+                print("✅ Core Data User deaktiviert")
+            } catch {
+                print("❌ Fehler beim Deaktivieren des Core Data Users: \(error)")
+            }
+        }
+        
+        // 3. Authentication Status zurücksetzen
+        currentUser = nil
+        isAuthenticated = false
+        authenticationError = nil
+        
+        print("✅ Kompletter Logout abgeschlossen - Benutzer muss sich neu anmelden")
     }
 }
 

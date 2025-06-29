@@ -628,7 +628,25 @@ class GraphQLNetworkClient {
         // JWT Token hinzufügen (Production JWT Authentication)
         if let token = AuthManager.shared.getCurrentAuthToken() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            print("🔐 JWT Token hinzugefügt: \(token.prefix(10))...")
+            print("🔐 JWT Token hinzugefügt: \(token.prefix(20))...")
+            print("🔍 JWT Token vollständig: \(token)")
+            
+            // Token-Details analysieren
+            let parts = token.components(separatedBy: ".")
+            if parts.count == 3 {
+                print("📊 JWT Parts: Header=\(parts[0].prefix(10)), Payload=\(parts[1].prefix(10)), Signature=\(parts[2].prefix(10))")
+                
+                // Payload dekodieren
+                if let payloadData = Data(base64Encoded: parts[1]) {
+                    if let payloadJSON = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
+                        print("📋 JWT Payload: \(payloadJSON)")
+                    }
+                }
+            } else {
+                print("❌ JWT Token ist malformed - hat \(parts.count) Teile statt 3")
+            }
+        } else {
+            print("❌ Kein JWT Token verfügbar!")
         }
         
         let body: [String: Any] = [

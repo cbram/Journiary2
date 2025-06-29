@@ -55,13 +55,16 @@ enum GraphQL {
     struct Trip: Codable {
         let id: String
         let name: String
-        let description: String?
+        let tripDescription: String?
+        let coverImageObjectName: String?
+        let coverImageUrl: String?
+        let travelCompanions: String?
+        let visitedCountries: String?
         let startDate: String?
         let endDate: String?
-        let userId: String
-        let createdAt: String
-        let updatedAt: String
-        let coverImageUrl: String?
+        let isActive: Bool
+        let totalDistance: Double
+        let gpsTrackingEnabled: Bool
     }
     
     struct Memory: Codable {
@@ -142,16 +145,26 @@ struct RegisterInput: Codable {
 
 struct CreateTripInput: Codable {
     let name: String
-    let description: String?
-    let startDate: String?
+    let tripDescription: String?
+    let travelCompanions: String?
+    let visitedCountries: String?
+    let startDate: String
     let endDate: String?
+    let isActive: Bool
+    let totalDistance: Double
+    let gpsTrackingEnabled: Bool
 }
 
 struct UpdateTripInput: Codable {
     let name: String?
-    let description: String?
+    let tripDescription: String?
+    let travelCompanions: String?
+    let visitedCountries: String?
     let startDate: String?
     let endDate: String?
+    let isActive: Bool?
+    let totalDistance: Double?
+    let gpsTrackingEnabled: Bool?
 }
 
 struct CreateMemoryInput: Codable {
@@ -199,13 +212,16 @@ struct GetTripsQuery: GraphQLQuery {
             trips {
                 id
                 name
-                description
+                tripDescription
+                coverImageObjectName
+                coverImageUrl
+                travelCompanions
+                visitedCountries
                 startDate
                 endDate
-                userId
-                createdAt
-                updatedAt
-                coverImageUrl
+                isActive
+                totalDistance
+                gpsTrackingEnabled
             }
         }
     """
@@ -223,13 +239,16 @@ struct GetTripQuery: GraphQLQuery {
             trip(id: $id) {
                 id
                 name
-                description
+                tripDescription
+                coverImageObjectName
+                coverImageUrl
+                travelCompanions
+                visitedCountries
                 startDate
                 endDate
-                userId
-                createdAt
-                updatedAt
-                coverImageUrl
+                isActive
+                totalDistance
+                gpsTrackingEnabled
             }
         }
     """
@@ -384,17 +403,20 @@ struct RegisterMutation: GraphQLMutation {
 struct CreateTripMutation: GraphQLMutation {
     static let operationName = "CreateTrip"
     static let document = """
-        mutation CreateTrip($input: CreateTripInput!) {
+        mutation CreateTrip($input: TripInput!) {
             createTrip(input: $input) {
                 id
                 name
-                description
+                tripDescription
+                coverImageObjectName
+                coverImageUrl
+                travelCompanions
+                visitedCountries
                 startDate
                 endDate
-                userId
-                createdAt
-                updatedAt
-                coverImageUrl
+                isActive
+                totalDistance
+                gpsTrackingEnabled
             }
         }
     """
@@ -416,13 +438,16 @@ struct UpdateTripMutation: GraphQLMutation {
             updateTrip(id: $id, input: $input) {
                 id
                 name
-                description
+                tripDescription
+                coverImageObjectName
+                coverImageUrl
+                travelCompanions
+                visitedCountries
                 startDate
                 endDate
-                userId
-                createdAt
-                updatedAt
-                coverImageUrl
+                isActive
+                totalDistance
+                gpsTrackingEnabled
             }
         }
     """

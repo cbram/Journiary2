@@ -18,6 +18,7 @@ import { BucketListItemResolver } from "./resolvers/BucketListItemResolver";
 import { GPXResolver } from "./resolvers/GPXResolver";
 import jwt from 'jsonwebtoken';
 import { UserResolver } from "./resolvers/UserResolver";
+import { AdminResolver } from "./resolvers/AdminResolver";
 import { User } from "./entities/User";
 
 export interface MyContext {
@@ -56,7 +57,8 @@ async function startServer() {
                 TagCategoryResolver,
                 BucketListItemResolver,
                 GPXResolver,
-                UserResolver
+                UserResolver,
+                AdminResolver
             ],
             validate: false,
         }),
@@ -67,14 +69,22 @@ async function startServer() {
             if (authHeader) {
                 const token = authHeader.split(' ')[1];
                 
+                console.log('🔍 Backend received token:', token?.substring(0, 20) + '...');
+                console.log('🔍 Full token:', token);
+                
                 if (token) {
                     try {
+                        console.log('🔐 Attempting to verify token with secret: "your-super-secret-key"');
                         const decoded = jwt.verify(token, "your-super-secret-key") as { userId: string };
+                        console.log('✅ JWT verified successfully, userId:', decoded.userId);
                         context.userId = decoded.userId;
                     } catch (err: any) {
                         console.log('❌ JWT Verification failed:', err.message);
+                        console.log('❌ JWT Error details:', err);
                         // No fallback - only accept valid tokens
                     }
+                } else {
+                    console.log('❌ No token found in Authorization header');
                 }
             }
             

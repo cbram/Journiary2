@@ -30,13 +30,12 @@ class UserService: ObservableObject {
             return cached
         }
         
-        // Aktiviere Demo-Mode für Development
+        // Demo-Mode nur für localhost/127.0.0.1 (Production-Ready)
         let isLocalhost = baseURL.contains("localhost") || baseURL.contains("127.0.0.1")
-        let isDevelopment = true // In Debug-Builds immer Demo-Mode aktivieren
-        let isDemo = isLocalhost || isDevelopment
+        let isDemo = isLocalhost
         
         // Nur einmal loggen
-        print("🔍 Demo-Mode Check: baseURL=\(baseURL), isLocalhost=\(isLocalhost), isDevelopment=\(isDevelopment), isDemoMode=\(isDemo)")
+        print("🔍 Demo-Mode Check: baseURL=\(baseURL), isLocalhost=\(isLocalhost), isDemoMode=\(isDemo)")
         
         Self._isDemoModeCache = isDemo
         return isDemo
@@ -48,42 +47,86 @@ class UserService: ObservableObject {
     // MARK: - Login
     
     func login(email: String, password: String) -> AnyPublisher<LoginResponse, Error> {
+        print("🔐 Backend-Login gestartet für: \(email)")
+        
         // Demo Mode für Development
         if isDemoMode {
             print("🎭 Demo-Mode: Login simuliert für \(email)")
             return createDemoLoginResponse(email: email)
         }
+        
+        print("🌐 Echtes Backend-Login wird durchgeführt...")
+        
         let mutation = """
-        mutation Login($email: String!, $password: String!) {
-            login(email: $email, password: $password) {
+        mutation Login($input: UserInput!) {
+            login(input: $input) {
                 token
-                refreshToken
                 user {
                     id
                     email
-                    username
-                    firstName
-                    lastName
+                    createdAt
+                    updatedAt
                 }
             }
         }
         """
         
         let variables: [String: Any] = [
-            "email": email,
-            "password": password
+            "input": [
+                "email": email,
+                "password": password
+            ]
         ]
+        
+        print("📤 Sende Login-Mutation an Backend...")
+        print("🔍 Login-Mutation: \(mutation)")
+        print("🔍 Login-Variables: \(variables)")
         
         return performGraphQLRequest(query: mutation, variables: variables)
             .tryMap { data in
-                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let responseData = json["data"] as? [String: Any],
-                      let loginData = responseData["login"] as? [String: Any] else {
+                print("📥 Login-Response erhalten: \(data.count) bytes")
+                
+                // Parse JSON Response
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    print("❌ Login-Response ist kein gültiges JSON")
                     throw UserServiceError.invalidResponse
                 }
                 
-                return try self.parseLoginResponse(loginData)
+                print("🔍 Login-Response JSON: \(json)")
+                
+                // Check for GraphQL errors first
+                if let errors = json["errors"] as? [[String: Any]] {
+                    let errorMessages = errors.compactMap { $0["message"] as? String }
+                    let errorMessage = errorMessages.joined(separator: ", ")
+                    print("❌ GraphQL Login-Fehler: \(errorMessage)")
+                    throw UserServiceError.graphqlError(errorMessage)
+                }
+                
+                // Parse successful response
+                guard let responseData = json["data"] as? [String: Any],
+                      let loginData = responseData["login"] as? [String: Any] else {
+                    print("❌ Login-Response hat keine 'data.login' Struktur")
+                    print("🔍 Response Data: \(json["data"] ?? "nil")")
+                    throw UserServiceError.invalidResponse
+                }
+                
+                print("✅ Login-Daten erfolgreich empfangen")
+                
+                return try self.parseAuthResponse(loginData)
             }
+            .handleEvents(
+                receiveCompletion: { completion in
+                    switch completion {
+                    case .finished:
+                        print("✅ Login-Request erfolgreich abgeschlossen")
+                    case .failure(let error):
+                        print("❌ Login fehlgeschlagen: \(error)")
+                        if let userServiceError = error as? UserServiceError {
+                            print("🔍 UserServiceError Details: \(userServiceError.localizedDescription)")
+                        }
+                    }
+                }
+            )
             .eraseToAnyPublisher()
     }
     
@@ -98,32 +141,18 @@ class UserService: ObservableObject {
         let mutation = """
         mutation Register($input: UserInput!) {
             register(input: $input) {
-                token
-                refreshToken
-                user {
-                    id
-                    email
-                    username
-                    firstName
-                    lastName
-                }
+                id
+                email
+                createdAt
+                updatedAt
             }
         }
         """
         
-        var userInput: [String: Any] = [
+        let userInput: [String: Any] = [
             "email": email,
-            "username": username,
             "password": password
         ]
-        
-        if let firstName = firstName {
-            userInput["firstName"] = firstName
-        }
-        
-        if let lastName = lastName {
-            userInput["lastName"] = lastName
-        }
         
         let variables: [String: Any] = [
             "input": userInput
@@ -131,13 +160,38 @@ class UserService: ObservableObject {
         
         return performGraphQLRequest(query: mutation, variables: variables)
             .tryMap { data in
-                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let responseData = json["data"] as? [String: Any],
-                      let registerData = responseData["register"] as? [String: Any] else {
+                print("📥 Register-Response erhalten: \(data.count) bytes")
+                
+                guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    print("❌ Register-Response ist kein gültiges JSON")
                     throw UserServiceError.invalidResponse
                 }
                 
-                return try self.parseLoginResponse(registerData)
+                print("🔍 Register-Response JSON: \(json)")
+                
+                // Check for GraphQL errors first
+                if let errors = json["errors"] as? [[String: Any]] {
+                    let errorMessages = errors.compactMap { $0["message"] as? String }
+                    let errorMessage = errorMessages.joined(separator: ", ")
+                    print("❌ GraphQL Register-Fehler: \(errorMessage)")
+                    throw UserServiceError.graphqlError(errorMessage)
+                }
+                
+                guard let responseData = json["data"] as? [String: Any],
+                      let userData = responseData["register"] as? [String: Any] else {
+                    print("❌ Register-Response hat keine 'data.register' Struktur")
+                    throw UserServiceError.invalidResponse
+                }
+                
+                print("✅ Register erfolgreich - User erstellt: \(userData)")
+                return userData
+            }
+            .flatMap { userData in
+                print("🔄 Starte automatischen Login nach erfolgreicher Registrierung...")
+                return self.login(email: email, password: password)
+                    .handleEvents(receiveOutput: { loginResponse in
+                        print("✅ Automatischer Login nach Registrierung erfolgreich!")
+                    })
             }
             .eraseToAnyPublisher()
     }
@@ -254,35 +308,94 @@ class UserService: ObservableObject {
     
     // MARK: - Helper Methods
     
-    private func parseLoginResponse(_ data: [String: Any]) throws -> LoginResponse {
+    // MARK: - Backend-Schema Response Parsing
+    
+    /// Parse AuthResponse (für Login)
+    private func parseAuthResponse(_ data: [String: Any]) throws -> LoginResponse {
         guard let token = data["token"] as? String,
               let userData = data["user"] as? [String: Any] else {
+            print("❌ AuthResponse fehlt token oder user: \(data)")
             throw UserServiceError.invalidResponse
         }
         
-        let refreshToken = data["refreshToken"] as? String
-        let user = try parseUserData(userData)
+        let user = try parseBackendUserData(userData)
         
-        return LoginResponse(token: token, refreshToken: refreshToken, user: user)
+        return LoginResponse(token: token, refreshToken: nil, user: user)
+    }
+    
+    /// Parse User Registration Response (für Register + Auto-Login)
+    private func parseUserRegistrationResponse(_ userData: [String: Any], email: String, password: String) throws -> LoginResponse {
+        print("🔄 User registriert - führe automatischen Login durch...")
+        
+        // Für das Backend machen wir automatisch einen Login nach der Registrierung
+        // Da das Register nur User zurückgibt, aber die App ein Token braucht
+        let user = try parseBackendUserData(userData)
+        
+        // Erstelle einen "fake" LoginResponse für die Demo
+        // In der Produktion sollte das Backend direkt ein Token zurückgeben
+        // oder wir machen einen echten Login-Call
+        return LoginResponse(
+            token: "registration-requires-login", // Marker für nachgelagerten Login
+            refreshToken: nil,
+            user: user
+        )
+    }
+    
+    /// Parse Backend User Data (echtes Schema)
+    private func parseBackendUserData(_ data: [String: Any]) throws -> UserData {
+        guard let id = data["id"] as? String,
+              let email = data["email"] as? String else {
+            print("❌ Backend User fehlt id oder email: \(data)")
+            throw UserServiceError.invalidResponse
+        }
+        
+        // Backend hat nur email, generiere username aus email
+        let username = email.components(separatedBy: "@").first ?? "user"
+        
+        return UserData(
+            id: id,
+            email: email,
+            username: username,
+            firstName: nil,  // Backend hat keine Namen
+            lastName: nil    // Backend hat keine Namen
+        )
+    }
+    
+    // MARK: - Legacy Demo Methods (für Compatibility)
+    
+    private func parseLoginResponse(_ data: [String: Any]) throws -> LoginResponse {
+        // Legacy method - sollte nicht mehr verwendet werden
+        return try parseAuthResponse(data)
     }
     
     private func parseUserData(_ data: [String: Any]) throws -> UserData {
-        guard let id = data["id"] as? String,
-              let email = data["email"] as? String,
-              let username = data["username"] as? String else {
-            throw UserServiceError.invalidResponse
+        // Legacy method - versuche zuerst neues Schema, dann altes
+        if data["username"] != nil {
+            // Altes Demo-Schema
+            guard let id = data["id"] as? String,
+                  let email = data["email"] as? String,
+                  let username = data["username"] as? String else {
+                throw UserServiceError.invalidResponse
+            }
+            
+            let firstName = data["firstName"] as? String
+            let lastName = data["lastName"] as? String
+            
+            return UserData(id: id, email: email, username: username, firstName: firstName, lastName: lastName)
+        } else {
+            // Neues Backend-Schema
+            return try parseBackendUserData(data)
         }
-        
-        let firstName = data["firstName"] as? String
-        let lastName = data["lastName"] as? String
-        
-        return UserData(id: id, email: email, username: username, firstName: firstName, lastName: lastName)
     }
     
     // MARK: - GraphQL Request Methods
     
     private func performGraphQLRequest(query: String, variables: [String: Any]?) -> AnyPublisher<Data, Error> {
-        guard let url = URL(string: "\(baseURL)/graphql") else {
+        let fullURL = baseURL.hasSuffix("/graphql") ? baseURL : "\(baseURL)/graphql"
+        print("🌐 GraphQL Request an: \(fullURL)")
+        
+        guard let url = URL(string: fullURL) else {
+            print("❌ Ungültige Backend-URL: \(fullURL)")
             return Fail(error: UserServiceError.invalidURL)
                 .eraseToAnyPublisher()
         }
@@ -293,6 +406,9 @@ class UserService: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = 30.0
         
+        print("🔗 Request URL: \(url)")
+        print("⏱️ Timeout: 30.0 Sekunden")
+        
         var requestBody: [String: Any] = ["query": query]
         if let variables = variables {
             requestBody["variables"] = variables
@@ -300,16 +416,32 @@ class UserService: ObservableObject {
         
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+            print("📤 Request Body: \(requestBody)")
         } catch {
+            print("❌ Fehler beim JSON-Kodieren: \(error)")
             return Fail(error: UserServiceError.encodingError)
                 .eraseToAnyPublisher()
         }
         
+        print("🚀 Sende HTTP-Request...")
+        
         return session.dataTaskPublisher(for: request)
             .timeout(.seconds(30), scheduler: DispatchQueue.main)
             .tryMap { data, response in
+                print("📥 HTTP-Response erhalten")
+                
                 guard let httpResponse = response as? HTTPURLResponse else {
+                    print("❌ Response ist keine HTTPURLResponse")
                     throw UserServiceError.invalidResponse
+                }
+                
+                print("📊 HTTP Status Code: \(httpResponse.statusCode)")
+                print("📋 Response Headers: \(httpResponse.allHeaderFields)")
+                print("📦 Response Data: \(data.count) bytes")
+                
+                // Response Data als String für Debugging
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("📄 Response Body: \(responseString)")
                 }
                 
                 // GraphQL kann auch bei 200 Fehler enthalten
@@ -335,22 +467,29 @@ class UserService: ObservableObject {
                 }
             }
             .mapError { error in
+                print("❌ GraphQL Request Fehler: \(error)")
+                
                 if error is UserServiceError {
                     return error
                 }
                 
                 // Network-Fehler behandeln
                 if let urlError = error as? URLError {
+                    print("🌐 URLError: \(urlError.localizedDescription) (Code: \(urlError.code.rawValue))")
                     switch urlError.code {
                     case .notConnectedToInternet:
+                        print("🚫 Keine Internetverbindung")
                         return UserServiceError.noInternetConnection
                     case .timedOut:
+                        print("⏰ Request-Timeout")
                         return UserServiceError.timeout
                     default:
+                        print("🌐 Allgemeiner Netzwerk-Fehler")
                         return UserServiceError.networkError(urlError.localizedDescription)
                     }
                 }
                 
+                print("❓ Unbekannter Fehler: \(error)")
                 return UserServiceError.unknownError(0)
             }
             .eraseToAnyPublisher()
@@ -543,6 +682,7 @@ enum UserServiceError: LocalizedError {
     case timeout
     case networkError(String)
     case graphqlError(String)
+    case registrationSuccess // Special case für automatischen Login nach Registration
     
     var errorDescription: String? {
         switch self {
@@ -568,6 +708,8 @@ enum UserServiceError: LocalizedError {
             return "Netzwerkfehler: \(message)"
         case .graphqlError(let message):
             return message
+        case .registrationSuccess:
+            return "Registrierung erfolgreich"
         }
     }
 } 
