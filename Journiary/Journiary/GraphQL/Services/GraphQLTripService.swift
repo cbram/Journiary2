@@ -44,7 +44,7 @@ class GraphQLTripService: ObservableObject {
         // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
         let query = """
         query GetTrips {
-            getTrips {
+            trips {
                 id
                 name
                 isActive
@@ -54,9 +54,9 @@ class GraphQLTripService: ObservableObject {
         
         return performGraphQLQuery(query: query)
             .tryMap { data -> [TripDTO] in
-                guard let trips = data["getTrips"] as? [[String: Any]] else {
-                    throw GraphQLError.parseError("Ungültige getTrips Antwort")
-                }
+                            guard let trips = data["trips"] as? [[String: Any]] else {
+                throw GraphQLError.parseError("Ungültige trips Antwort")
+            }
                 
                 let dateFormatter = ISO8601DateFormatter()
                 
@@ -101,7 +101,7 @@ class GraphQLTripService: ObservableObject {
         // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
         let query = """
         query GetTrip($id: ID!) {
-            getTrip(id: $id) {
+            trip(id: $id) {
                 id
                 name
                 isActive
@@ -113,11 +113,11 @@ class GraphQLTripService: ObservableObject {
         
         return performGraphQLQuery(query: query, variables: variables)
             .tryMap { data -> TripDTO in
-                guard let trip = data["getTrip"] as? [String: Any],
+                guard let trip = data["trip"] as? [String: Any],
                       let id = trip["id"] as? String,
                       let name = trip["name"] as? String,
                       let isActive = trip["isActive"] as? Bool else {
-                    throw GraphQLError.parseError("Ungültige getTrip Antwort")
+                    throw GraphQLError.parseError("Ungültige trip Antwort")
                 }
                 
                 return TripDTO(

@@ -1097,7 +1097,7 @@ struct GraphQLTestView: View {
                 
                 let alg = headerJson?["alg"] as? String ?? "unknown"
                 let typ = headerJson?["typ"] as? String ?? "unknown"
-                let userId = payloadJson?["userId"] as? String ?? "missing"
+                let userId = payloadJson?["sub"] as? String ?? (payloadJson?["userId"] as? String ?? "missing")
                 let exp = payloadJson?["exp"] as? TimeInterval ?? 0
                 let iat = payloadJson?["iat"] as? TimeInterval ?? 0
                 

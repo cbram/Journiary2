@@ -173,14 +173,21 @@ export class TripResolver {
             throw new AuthenticationError("You must be an owner to delete this trip.");
         }
         
-        const deleteResult = await AppDataSource.getRepository(Trip).delete(id);
-        
-        if (deleteResult.affected === 0) {
-            // Consider throwing a NotFoundError if the trip didn't exist
-            return false;
+        // Use transaction to ensure proper cleanup order
+        try {
+            await AppDataSource.transaction(async (transactionalEntityManager) => {
+                // First delete all trip memberships
+                await transactionalEntityManager.delete(TripMembership, { trip: { id } });
+                
+                // Then delete the trip itself
+                await transactionalEntityManager.delete(Trip, { id });
+            });
+            
+            return true;
+        } catch (error) {
+            console.error("Error deleting trip:", error);
+            throw new Error("Could not delete trip.");
         }
-
-        return true;
     }
 
     @FieldResolver(() => [Memory])
