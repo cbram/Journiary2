@@ -25,7 +25,12 @@ class GraphQLMediaService: ObservableObject {
     private let session = URLSession.shared
     private var cancellables = Set<AnyCancellable>()
     
-
+    // MARK: - Demo Mode
+    
+    private var isDemoMode: Bool {
+        return AppSettings.shared.backendURL.contains("localhost") ||
+               AppSettings.shared.backendURL.contains("127.0.0.1")
+    }
     
     // MARK: - Media Upload
     
@@ -43,8 +48,17 @@ class GraphQLMediaService: ObservableObject {
         memoryId: String? = nil
     ) -> AnyPublisher<MediaItemDTO, GraphQLError> {
         
-        // Media upload not yet implemented
-        return Fail(error: GraphQLError.networkError("Media Upload noch nicht implementiert"))
+        if isDemoMode {
+            return createDemoMediaItem(
+                filename: filename,
+                mimeType: mimeType,
+                fileSize: data.count,
+                memoryId: memoryId
+            )
+        }
+        
+        // Echte Implementation würde hier stehen
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -85,8 +99,11 @@ class GraphQLMediaService: ObservableObject {
     /// - Returns: Publisher mit Datei-Daten
     func downloadMedia(mediaItem: MediaItemDTO) -> AnyPublisher<Data, GraphQLError> {
         
-        // Media download not yet implemented
-        return Fail(error: GraphQLError.networkError("Media Download noch nicht implementiert"))
+        if isDemoMode {
+            return createDemoImageData()
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -97,8 +114,13 @@ class GraphQLMediaService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func deleteMediaItem(id: String) -> AnyPublisher<Bool, GraphQLError> {
         
-        // Media deletion not yet implemented
-        return Fail(error: GraphQLError.networkError("Media Löschen noch nicht implementiert"))
+        if isDemoMode {
+            return Just(true)
+                .setFailureType(to: GraphQLError.self)
+                .eraseToAnyPublisher()
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     

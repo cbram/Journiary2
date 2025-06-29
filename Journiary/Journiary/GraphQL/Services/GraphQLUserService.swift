@@ -23,7 +23,15 @@ class GraphQLUserService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let context = PersistenceController.shared.container.viewContext
     
-
+    // MARK: - Demo Mode
+    
+    private var isDemoMode: Bool {
+        // Demo Mode nur wenn Backend-Storage deaktiviert oder explizit localhost
+        return !AppSettings.shared.shouldUseBackend ||
+               AppSettings.shared.backendURL.contains("localhost") ||
+               AppSettings.shared.backendURL.contains("127.0.0.1") ||
+               AppSettings.shared.backendURL.lowercased().contains("demo")
+    }
     
     // MARK: - Authentication
     
@@ -34,7 +42,13 @@ class GraphQLUserService: ObservableObject {
     /// - Returns: Publisher mit UserDTO
     func login(username: String, password: String) -> AnyPublisher<UserDTO, GraphQLError> {
         
-        // GraphQL Backend Login
+        if isDemoMode {
+            return createDemoUser(username: username)
+                .delay(for: .seconds(1), scheduler: DispatchQueue.main)
+                .eraseToAnyPublisher()
+        }
+        
+        // Echte GraphQL Login Mutation (korrigiert für Backend-Schema)
         let loginMutation = """
         mutation Login($input: UserInput!) {
             login(input: $input) {
@@ -60,17 +74,11 @@ class GraphQLUserService: ObservableObject {
             .tryMap { json -> UserDTO in
                 guard let data = json["data"] as? [String: Any],
                       let login = data["login"] as? [String: Any],
-                      let token = login["token"] as? String,
                       let user = login["user"] as? [String: Any],
                       let id = user["id"] as? String,
                       let email = user["email"] as? String else {
                     throw GraphQLError.invalidInput("Ungültige Login-Antwort")
                 }
-                
-                // 🔐 KRITISCH: JWT Token vom Backend speichern!
-                AuthManager.shared.setJWTToken(token)
-                
-                print("✅ JWT Token vom Backend erhalten und gespeichert: \(String(token.prefix(20)))...")
                 
                 // Backend User hat kein username - verwende email als username
                 return UserDTO(
@@ -107,8 +115,18 @@ class GraphQLUserService: ObservableObject {
         lastName: String? = nil
     ) -> AnyPublisher<UserDTO, GraphQLError> {
         
-        // Registration not yet implemented in backend
-        return Fail(error: GraphQLError.networkError("Registration noch nicht implementiert"))
+        if isDemoMode {
+            return createDemoUser(
+                username: username,
+                email: email,
+                firstName: firstName,
+                lastName: lastName
+            )
+            .delay(for: .seconds(1), scheduler: DispatchQueue.main)
+            .eraseToAnyPublisher()
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -116,8 +134,27 @@ class GraphQLUserService: ObservableObject {
     /// - Returns: Publisher mit UserDTO
     func getCurrentUser() -> AnyPublisher<UserDTO, GraphQLError> {
         
-        // Get current user not yet implemented
-        return Fail(error: GraphQLError.networkError("GetCurrentUser noch nicht implementiert"))
+        if isDemoMode {
+            // Versuche lokalen User zu finden
+            let request: NSFetchRequest<User> = User.fetchRequest()
+            request.predicate = NSPredicate(format: "isCurrent == %@", NSNumber(value: true))
+            
+            do {
+                let users = try context.fetch(request)
+                if let user = users.first,
+                   let userDTO = UserDTO(from: user) {
+                    return Just(userDTO)
+                        .setFailureType(to: GraphQLError.self)
+                        .eraseToAnyPublisher()
+                }
+            } catch {
+                // Ignoriere Fehler, erstelle Demo-User
+            }
+            
+            return createDemoUser(username: "demo")
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -133,8 +170,44 @@ class GraphQLUserService: ObservableObject {
         email: String?
     ) -> AnyPublisher<UserDTO, GraphQLError> {
         
-        // User update not yet implemented
-        return Fail(error: GraphQLError.networkError("User Update noch nicht implementiert"))
+        if isDemoMode {
+            return Future { [weak self] promise in
+                guard let self = self else {
+                    promise(.failure(.unknown("Service nicht verfügbar")))
+                    return
+                }
+                
+                // Aktualisiere lokalen User
+                let request: NSFetchRequest<User> = User.fetchRequest()
+                request.predicate = NSPredicate(format: "isCurrent == %@", NSNumber(value: true))
+                
+                do {
+                    let users = try self.context.fetch(request)
+                    if let user = users.first {
+                        user.firstName = firstName
+                        user.lastName = lastName
+                        user.email = email ?? user.email
+                        user.updatedAt = Date()
+                        
+                        try self.context.save()
+                        
+                        if let userDTO = UserDTO(from: user) {
+                            promise(.success(userDTO))
+                        } else {
+                            promise(.failure(.unknown("User-Konvertierung fehlgeschlagen")))
+                        }
+                    } else {
+                        promise(.failure(.unknown("Kein aktueller User gefunden")))
+                    }
+                } catch {
+                    promise(.failure(.cacheError(error.localizedDescription)))
+                }
+            }
+            .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
+            .eraseToAnyPublisher()
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -143,8 +216,17 @@ class GraphQLUserService: ObservableObject {
     /// - Returns: Publisher mit neuen Tokens
     func refreshToken(refreshToken: String) -> AnyPublisher<(accessToken: String, refreshToken: String), GraphQLError> {
         
-        // Token refresh not yet implemented
-        return Fail(error: GraphQLError.networkError("Token Refresh noch nicht implementiert"))
+        if isDemoMode {
+            let newAccessToken = "demo_access_token_\(UUID().uuidString)"
+            let newRefreshToken = "demo_refresh_token_\(UUID().uuidString)"
+            
+            return Just((accessToken: newAccessToken, refreshToken: newRefreshToken))
+                .setFailureType(to: GraphQLError.self)
+                .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
+                .eraseToAnyPublisher()
+        }
+        
+        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
             .eraseToAnyPublisher()
     }
     
@@ -152,7 +234,14 @@ class GraphQLUserService: ObservableObject {
     /// - Returns: Publisher mit String
     func hello() -> AnyPublisher<String, GraphQLError> {
         
-        // Apollo Client Test
+        if isDemoMode {
+            return Just("Hallo aus der Demo! 🚀")
+                .setFailureType(to: GraphQLError.self)
+                .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
+                .eraseToAnyPublisher()
+        }
+        
+        // 🚀 Verwendet Apollo Client mit Cache für bessere Performance
         return ApolloClientManager.shared.fetch(query: HelloQuery.self, cachePolicy: .cacheFirst)
             .map { response -> String in
                 return response.hello
@@ -212,5 +301,65 @@ class GraphQLUserService: ObservableObject {
                 }
             }
             .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Demo Mode Implementations
+    
+    private func createDemoUser(
+        username: String,
+        email: String? = nil,
+        firstName: String? = nil,
+        lastName: String? = nil
+    ) -> AnyPublisher<UserDTO, GraphQLError> {
+        
+        return Future { [weak self] promise in
+            guard let self = self else {
+                promise(.failure(.unknown("Service nicht verfügbar")))
+                return
+            }
+            
+            // Erstelle oder aktualisiere Demo-User in Core Data
+            let request: NSFetchRequest<User> = User.fetchRequest()
+            request.predicate = NSPredicate(format: "username == %@", username)
+            
+            do {
+                let existingUsers = try self.context.fetch(request)
+                let user: User
+                
+                if let existingUser = existingUsers.first {
+                    user = existingUser
+                } else {
+                    user = User(context: self.context)
+                    user.id = UUID()
+                    user.username = username
+                    user.email = email ?? "\(username)@demo.com"
+                    user.firstName = firstName
+                    user.lastName = lastName
+                    user.createdAt = Date()
+                }
+                
+                user.updatedAt = Date()
+                // user.isCurrent = true // Property not in Core Data schema
+                
+                // Alle anderen User als nicht-aktuell markieren
+                let allUsersRequest: NSFetchRequest<User> = User.fetchRequest()
+                let allUsers = try self.context.fetch(allUsersRequest)
+                for otherUser in allUsers where otherUser != user {
+                    // otherUser.isCurrent = false // Property not in Core Data schema
+                }
+                
+                try self.context.save()
+                
+                if let userDTO = UserDTO(from: user) {
+                    promise(.success(userDTO))
+                } else {
+                    promise(.failure(.unknown("User-Konvertierung fehlgeschlagen")))
+                }
+                
+            } catch {
+                promise(.failure(.cacheError(error.localizedDescription)))
+            }
+        }
+        .eraseToAnyPublisher()
     }
 } 

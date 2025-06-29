@@ -222,18 +222,14 @@ class ApolloClientManager: ObservableObject {
                     case .finished:
                         break
                     case .failure(let error):
-                        DispatchQueue.main.async {
-                            self?.isConnected = false
-                            self?.lastError = error
-                        }
+                        self?.isConnected = false
+                        self?.lastError = error
                     }
                 },
                 receiveValue: { [weak self] success in
-                    DispatchQueue.main.async {
-                        self?.isConnected = success
-                        if success {
-                            self?.lastError = nil
-                        }
+                    self?.isConnected = success
+                    if success {
+                        self?.lastError = nil
                     }
                 }
             )

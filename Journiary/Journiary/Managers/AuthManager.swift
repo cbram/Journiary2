@@ -297,7 +297,7 @@ class AuthManager: ObservableObject {
         return getKeychainItem(key: jwtTokenKey)
     }
     
-    func setJWTToken(_ token: String) {
+    private func setJWTToken(_ token: String) {
         setKeychainItem(key: jwtTokenKey, value: token)
     }
     
