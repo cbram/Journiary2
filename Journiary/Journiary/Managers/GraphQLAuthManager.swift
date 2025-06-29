@@ -30,13 +30,20 @@ extension AuthManager {
     func loginWithGraphQL(username: String, password: String) -> AnyPublisher<Bool, GraphQLError> {
         return userService.login(username: username, password: password)
             .map { [weak self] userDTO in
-                // UserData für AuthManager erstellen
-                let userData = UserData(
+                // GraphQL.User für AuthManager erstellen
+                let displayName = [userDTO.firstName, userDTO.lastName].compactMap { $0 }.joined(separator: " ").isEmpty ? userDTO.username : [userDTO.firstName, userDTO.lastName].compactMap { $0 }.joined(separator: " ")
+                let initials = [userDTO.firstName, userDTO.lastName].compactMap { $0?.prefix(1) }.joined().uppercased()
+                
+                let userData = GraphQL.User(
                     id: userDTO.id,
                     email: userDTO.email,
                     username: userDTO.username,
                     firstName: userDTO.firstName,
-                    lastName: userDTO.lastName
+                    lastName: userDTO.lastName,
+                    displayName: displayName,
+                    initials: initials.isEmpty ? String(userDTO.username.prefix(2)).uppercased() : initials,
+                    createdAt: ISO8601DateFormatter().string(from: Date()),
+                    updatedAt: ISO8601DateFormatter().string(from: Date())
                 )
                 
                 // Demo Login simulieren
@@ -72,13 +79,20 @@ extension AuthManager {
             lastName: lastName
         )
         .map { [weak self] userDTO in
-            // UserData für AuthManager erstellen
-            let userData = UserData(
+            // GraphQL.User für AuthManager erstellen
+            let displayName = [userDTO.firstName, userDTO.lastName].compactMap { $0 }.joined(separator: " ").isEmpty ? userDTO.username : [userDTO.firstName, userDTO.lastName].compactMap { $0 }.joined(separator: " ")
+            let initials = [userDTO.firstName, userDTO.lastName].compactMap { $0?.prefix(1) }.joined().uppercased()
+            
+            let userData = GraphQL.User(
                 id: userDTO.id,
                 email: userDTO.email,
                 username: userDTO.username,
                 firstName: userDTO.firstName,
-                lastName: userDTO.lastName
+                lastName: userDTO.lastName,
+                displayName: displayName,
+                initials: initials.isEmpty ? String(userDTO.username.prefix(2)).uppercased() : initials,
+                createdAt: ISO8601DateFormatter().string(from: Date()),
+                updatedAt: ISO8601DateFormatter().string(from: Date())
             )
             
             // Demo Registration simulieren
@@ -139,7 +153,7 @@ extension AuthManager {
     
     /// Simuliere erfolgreichen Login für Demo Mode
     /// Arbeitet direkt mit Core Data ohne private AuthManager Methoden
-    private func simulateSuccessfulLogin(userData: UserData) {
+    private func simulateSuccessfulLogin(userData: GraphQL.User) {
         let context = PersistenceController.shared.container.viewContext
         
         // Prüfen ob Benutzer bereits existiert
@@ -176,7 +190,7 @@ extension AuthManager {
             authenticationError = nil
             
             #if DEBUG
-            print("✅ GraphQL Demo Login erfolgreich: \(userData.username)")
+            print("✅ GraphQL Demo Login erfolgreich: \(userData.username ?? userData.email)")
             #endif
             
         } catch {

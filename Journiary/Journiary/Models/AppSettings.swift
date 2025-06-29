@@ -73,13 +73,9 @@ class AppSettings: ObservableObject {
             self.storageMode = .cloudKit
         }
         
-        // Development: Verwende lokalen Server oder Demo-Mode
-        let defaultURL: String
-        #if DEBUG
-        defaultURL = "http://localhost:4001" // Lokaler Development Server (Docker Port-Mapping)
-        #else
-        defaultURL = "https://api.journiary.com"
-        #endif
+        // Self-Hosting App: Keine Default-Server-URL
+        // User muss explizit seinen eigenen Server konfigurieren
+        let defaultURL = "" // Leere URL zwingt User zur Konfiguration
         
         self.backendURL = UserDefaults.standard.string(forKey: "BackendURL") ?? defaultURL
         self.username = UserDefaults.standard.string(forKey: "BackendUsername") ?? ""

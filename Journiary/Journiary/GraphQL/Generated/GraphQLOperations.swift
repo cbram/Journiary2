@@ -48,6 +48,8 @@ enum GraphQL {
         let username: String?
         let firstName: String?
         let lastName: String?
+        let displayName: String?
+        let initials: String?
         let createdAt: String
         let updatedAt: String
     }
@@ -65,19 +67,24 @@ enum GraphQL {
         let isActive: Bool
         let totalDistance: Double
         let gpsTrackingEnabled: Bool
+        let createdAt: String
+        let updatedAt: String
     }
     
     struct Memory: Codable {
         let id: String
         let title: String
         let content: String?
-        let tripId: String
-        let userId: String
+        let date: String
         let latitude: Double?
         let longitude: Double?
+        let address: String?
+        let tripId: String
+        let userId: String
         let createdAt: String
         let updatedAt: String
         let mediaItems: [MediaItem]?
+        let tags: [Tag]?
     }
     
     struct MediaItem: Codable {
@@ -86,9 +93,17 @@ enum GraphQL {
         let originalFilename: String?
         let mimeType: String
         let fileSize: Int?
+        let width: Int?
+        let height: Int?
+        let duration: Double?
+        let s3Key: String
+        let s3Bucket: String
+        let thumbnailS3Key: String?
         let memoryId: String?
+        let tripId: String?
+        let userId: String
         let createdAt: String
-        let url: String?
+        let updatedAt: String
     }
     
     struct Tag: Codable {
@@ -98,14 +113,18 @@ enum GraphQL {
         let categoryId: String?
         let userId: String
         let createdAt: String
+        let updatedAt: String
     }
     
     struct TagCategory: Codable {
         let id: String
         let name: String
         let color: String?
+        let icon: String?
         let userId: String
         let createdAt: String
+        let updatedAt: String
+        let tags: [Tag]?
     }
     
     struct RoutePoint: Codable {
@@ -113,39 +132,23 @@ enum GraphQL {
         let latitude: Double
         let longitude: Double
         let altitude: Double?
-        let timestamp: String
         let accuracy: Double?
+        let timestamp: String
         let speed: Double?
         let heading: Double?
         let tripId: String
+        let userId: String
+        let createdAt: String
+        let updatedAt: String
     }
-}
-
-// MARK: - Auth Types
-
-struct AuthResponse: Codable {
-    let token: String
-    let user: GraphQL.User
-}
-
-struct LoginInput: Codable {
-    let email: String
-    let password: String
-}
-
-struct RegisterInput: Codable {
-    let email: String
-    let password: String
-    let username: String?
-    let firstName: String?
-    let lastName: String?
 }
 
 // MARK: - Input Types
 
-struct CreateTripInput: Codable {
+struct TripInput: Codable {
     let name: String
     let tripDescription: String?
+    let coverImageObjectName: String?
     let travelCompanions: String?
     let visitedCountries: String?
     let startDate: String
@@ -158,6 +161,7 @@ struct CreateTripInput: Codable {
 struct UpdateTripInput: Codable {
     let name: String?
     let tripDescription: String?
+    let coverImageObjectName: String?
     let travelCompanions: String?
     let visitedCountries: String?
     let startDate: String?
@@ -167,25 +171,95 @@ struct UpdateTripInput: Codable {
     let gpsTrackingEnabled: Bool?
 }
 
-struct CreateMemoryInput: Codable {
+struct MemoryInput: Codable {
     let title: String
     let content: String?
-    let tripId: String
+    let date: String
     let latitude: Double?
     let longitude: Double?
+    let address: String?
+    let tripId: String
 }
 
-struct CreateTagInput: Codable {
+struct UpdateMemoryInput: Codable {
+    let title: String?
+    let content: String?
+    let date: String?
+    let latitude: Double?
+    let longitude: Double?
+    let address: String?
+}
+
+struct MediaItemInput: Codable {
+    let filename: String
+    let originalFilename: String?
+    let mimeType: String
+    let fileSize: Int?
+    let width: Int?
+    let height: Int?
+    let duration: Double?
+    let s3Key: String
+    let s3Bucket: String
+    let thumbnailS3Key: String?
+    let memoryId: String?
+    let tripId: String?
+}
+
+struct TagInput: Codable {
     let name: String
     let color: String?
     let categoryId: String?
 }
 
-// MARK: - Upload Types
+struct UpdateTagInput: Codable {
+    let name: String?
+    let color: String?
+    let categoryId: String?
+}
 
-struct UploadUrlResponse: Codable {
+struct TagCategoryInput: Codable {
+    let name: String
+    let color: String?
+    let icon: String?
+}
+
+struct UpdateTagCategoryInput: Codable {
+    let name: String?
+    let color: String?
+    let icon: String?
+}
+
+struct UserInput: Codable {
+    let username: String
+    let email: String
+    let password: String
+    let firstName: String?
+    let lastName: String?
+}
+
+struct UpdateUserInput: Codable {
+    let username: String?
+    let email: String?
+    let firstName: String?
+    let lastName: String?
+}
+
+// MARK: - Response Types
+
+struct LoginResponse: Codable {
+    let token: String
+    let refreshToken: String
+    let user: GraphQL.User
+}
+
+struct TokenRefreshResponse: Codable {
+    let token: String
+    let refreshToken: String
+}
+
+struct PresignedUrlResponse: Codable {
     let uploadUrl: String
-    let fileKey: String
+    let key: String
 }
 
 // MARK: - QUERIES
@@ -204,7 +278,7 @@ struct HelloQuery: GraphQLQuery {
     }
 }
 
-// Get Trips Query
+// Trip Queries
 struct GetTripsQuery: GraphQLQuery {
     static let operationName = "GetTrips"
     static let document = """
@@ -222,6 +296,8 @@ struct GetTripsQuery: GraphQLQuery {
                 isActive
                 totalDistance
                 gpsTrackingEnabled
+                createdAt
+                updatedAt
             }
         }
     """
@@ -231,7 +307,6 @@ struct GetTripsQuery: GraphQLQuery {
     }
 }
 
-// Get Trip Query
 struct GetTripQuery: GraphQLQuery {
     static let operationName = "GetTrip"
     static let document = """
@@ -249,20 +324,53 @@ struct GetTripQuery: GraphQLQuery {
                 isActive
                 totalDistance
                 gpsTrackingEnabled
+                createdAt
+                updatedAt
+                memories {
+                    id
+                    title
+                    content
+                    date
+                    latitude
+                    longitude
+                    address
+                    createdAt
+                    updatedAt
+                }
             }
         }
     """
-    
-    struct Variables: Codable {
-        let id: String
-    }
     
     struct Data: Codable {
         let trip: GraphQL.Trip?
     }
 }
 
-// Get Memories Query
+// User Queries
+struct GetCurrentUserQuery: GraphQLQuery {
+    static let operationName = "GetCurrentUser"
+    static let document = """
+        query GetCurrentUser {
+            getCurrentUser {
+                id
+                username
+                email
+                firstName
+                lastName
+                displayName
+                initials
+                createdAt
+                updatedAt
+            }
+        }
+    """
+    
+    struct Data: Codable {
+        let getCurrentUser: GraphQL.User?
+    }
+}
+
+// Memory Queries
 struct GetMemoriesQuery: GraphQLQuery {
     static let operationName = "GetMemories"
     static let document = """
@@ -271,10 +379,12 @@ struct GetMemoriesQuery: GraphQLQuery {
                 id
                 title
                 content
-                tripId
-                userId
+                date
                 latitude
                 longitude
+                address
+                tripId
+                userId
                 createdAt
                 updatedAt
                 mediaItems {
@@ -283,22 +393,26 @@ struct GetMemoriesQuery: GraphQLQuery {
                     originalFilename
                     mimeType
                     fileSize
-                    url
+                    s3Key
+                    thumbnailS3Key
+                    createdAt
+                }
+                tags {
+                    id
+                    name
+                    color
+                    categoryId
                 }
             }
         }
     """
-    
-    struct Variables: Codable {
-        let tripId: String?
-    }
     
     struct Data: Codable {
         let memories: [GraphQL.Memory]
     }
 }
 
-// Get Tags Query
+// Tag Queries
 struct GetTagsQuery: GraphQLQuery {
     static let operationName = "GetTags"
     static let document = """
@@ -310,6 +424,7 @@ struct GetTagsQuery: GraphQLQuery {
                 categoryId
                 userId
                 createdAt
+                updatedAt
             }
         }
     """
@@ -319,7 +434,6 @@ struct GetTagsQuery: GraphQLQuery {
     }
 }
 
-// Get Tag Categories Query
 struct GetTagCategoriesQuery: GraphQLQuery {
     static let operationName = "GetTagCategories"
     static let document = """
@@ -328,8 +442,15 @@ struct GetTagCategoriesQuery: GraphQLQuery {
                 id
                 name
                 color
+                icon
                 userId
                 createdAt
+                updatedAt
+                tags {
+                    id
+                    name
+                    color
+                }
             }
         }
     """
@@ -341,19 +462,22 @@ struct GetTagCategoriesQuery: GraphQLQuery {
 
 // MARK: - MUTATIONS
 
-// Login Mutation
+// Auth Mutations
 struct LoginMutation: GraphQLMutation {
     static let operationName = "Login"
     static let document = """
-        mutation Login($input: LoginInput!) {
-            login(input: $input) {
+        mutation Login($email: String!, $password: String!) {
+            login(email: $email, password: $password) {
                 token
+                refreshToken
                 user {
                     id
-                    email
                     username
+                    email
                     firstName
                     lastName
+                    displayName
+                    initials
                     createdAt
                     updatedAt
                 }
@@ -361,28 +485,26 @@ struct LoginMutation: GraphQLMutation {
         }
     """
     
-    struct Variables: Codable {
-        let input: LoginInput
-    }
-    
     struct Data: Codable {
-        let login: AuthResponse
+        let login: LoginResponse
     }
 }
 
-// Register Mutation
 struct RegisterMutation: GraphQLMutation {
     static let operationName = "Register"
     static let document = """
-        mutation Register($input: RegisterInput!) {
+        mutation Register($input: UserInput!) {
             register(input: $input) {
                 token
+                refreshToken
                 user {
                     id
-                    email
                     username
+                    email
                     firstName
                     lastName
+                    displayName
+                    initials
                     createdAt
                     updatedAt
                 }
@@ -390,16 +512,12 @@ struct RegisterMutation: GraphQLMutation {
         }
     """
     
-    struct Variables: Codable {
-        let input: RegisterInput
-    }
-    
     struct Data: Codable {
-        let register: AuthResponse
+        let register: LoginResponse
     }
 }
 
-// Create Trip Mutation
+// Trip Mutations
 struct CreateTripMutation: GraphQLMutation {
     static let operationName = "CreateTrip"
     static let document = """
@@ -417,20 +535,17 @@ struct CreateTripMutation: GraphQLMutation {
                 isActive
                 totalDistance
                 gpsTrackingEnabled
+                createdAt
+                updatedAt
             }
         }
     """
-    
-    struct Variables: Codable {
-        let input: CreateTripInput
-    }
     
     struct Data: Codable {
         let createTrip: GraphQL.Trip
     }
 }
 
-// Update Trip Mutation
 struct UpdateTripMutation: GraphQLMutation {
     static let operationName = "UpdateTrip"
     static let document = """
@@ -448,21 +563,17 @@ struct UpdateTripMutation: GraphQLMutation {
                 isActive
                 totalDistance
                 gpsTrackingEnabled
+                createdAt
+                updatedAt
             }
         }
     """
-    
-    struct Variables: Codable {
-        let id: String
-        let input: UpdateTripInput
-    }
     
     struct Data: Codable {
         let updateTrip: GraphQL.Trip
     }
 }
 
-// Delete Trip Mutation
 struct DeleteTripMutation: GraphQLMutation {
     static let operationName = "DeleteTrip"
     static let document = """
@@ -471,100 +582,80 @@ struct DeleteTripMutation: GraphQLMutation {
         }
     """
     
-    struct Variables: Codable {
-        let id: String
-    }
-    
     struct Data: Codable {
         let deleteTrip: Bool
     }
 }
 
-// Create Memory Mutation
+// Memory Mutations
 struct CreateMemoryMutation: GraphQLMutation {
     static let operationName = "CreateMemory"
     static let document = """
-        mutation CreateMemory($input: CreateMemoryInput!) {
+        mutation CreateMemory($input: MemoryInput!) {
             createMemory(input: $input) {
                 id
                 title
                 content
-                tripId
-                userId
+                date
                 latitude
                 longitude
+                address
+                tripId
+                userId
                 createdAt
                 updatedAt
             }
         }
     """
     
-    struct Variables: Codable {
-        let input: CreateMemoryInput
-    }
-    
     struct Data: Codable {
         let createMemory: GraphQL.Memory
     }
 }
 
-// Create Upload URL Mutation
-struct CreateUploadUrlMutation: GraphQLMutation {
-    static let operationName = "CreateUploadUrl"
+struct UpdateMemoryMutation: GraphQLMutation {
+    static let operationName = "UpdateMemory"
     static let document = """
-        mutation CreateUploadUrl($filename: String!, $mimeType: String!) {
-            createUploadUrl(filename: $filename, mimeType: $mimeType) {
-                uploadUrl
-                fileKey
-            }
-        }
-    """
-    
-    struct Variables: Codable {
-        let filename: String
-        let mimeType: String
-    }
-    
-    struct Data: Codable {
-        let createUploadUrl: UploadUrlResponse
-    }
-}
-
-// Create Media Item Mutation
-struct CreateMediaItemMutation: GraphQLMutation {
-    static let operationName = "CreateMediaItem"
-    static let document = """
-        mutation CreateMediaItem($fileKey: String!, $filename: String!, $mimeType: String!, $memoryId: ID) {
-            createMediaItem(fileKey: $fileKey, filename: $filename, mimeType: $mimeType, memoryId: $memoryId) {
+        mutation UpdateMemory($id: ID!, $input: UpdateMemoryInput!) {
+            updateMemory(id: $id, input: $input) {
                 id
-                filename
-                originalFilename
-                mimeType
-                fileSize
-                memoryId
+                title
+                content
+                date
+                latitude
+                longitude
+                address
+                tripId
+                userId
                 createdAt
-                url
+                updatedAt
             }
         }
     """
     
-    struct Variables: Codable {
-        let fileKey: String
-        let filename: String
-        let mimeType: String
-        let memoryId: String?
-    }
-    
     struct Data: Codable {
-        let createMediaItem: GraphQL.MediaItem
+        let updateMemory: GraphQL.Memory
     }
 }
 
-// Create Tag Mutation
+struct DeleteMemoryMutation: GraphQLMutation {
+    static let operationName = "DeleteMemory"
+    static let document = """
+        mutation DeleteMemory($id: ID!) {
+            deleteMemory(id: $id)
+        }
+    """
+    
+    struct Data: Codable {
+        let deleteMemory: Bool
+    }
+}
+
+// Tag Mutations
 struct CreateTagMutation: GraphQLMutation {
     static let operationName = "CreateTag"
     static let document = """
-        mutation CreateTag($input: CreateTagInput!) {
+        mutation CreateTag($input: TagInput!) {
             createTag(input: $input) {
                 id
                 name
@@ -572,15 +663,61 @@ struct CreateTagMutation: GraphQLMutation {
                 categoryId
                 userId
                 createdAt
+                updatedAt
             }
         }
     """
     
-    struct Variables: Codable {
-        let input: CreateTagInput
-    }
-    
     struct Data: Codable {
         let createTag: GraphQL.Tag
+    }
+}
+
+struct CreateTagCategoryMutation: GraphQLMutation {
+    static let operationName = "CreateTagCategory"
+    static let document = """
+        mutation CreateTagCategory($input: TagCategoryInput!) {
+            createTagCategory(input: $input) {
+                id
+                name
+                color
+                icon
+                userId
+                createdAt
+                updatedAt
+            }
+        }
+    """
+    
+    struct Data: Codable {
+        let createTagCategory: GraphQL.TagCategory
+    }
+}
+
+// Media Mutations
+struct CreateMediaItemMutation: GraphQLMutation {
+    static let operationName = "CreateMediaItem"
+    static let document = """
+        mutation CreateMediaItem($input: MediaItemInput!) {
+            createMediaItem(input: $input) {
+                id
+                filename
+                originalFilename
+                mimeType
+                fileSize
+                s3Key
+                s3Bucket
+                thumbnailS3Key
+                memoryId
+                tripId
+                userId
+                createdAt
+                updatedAt
+            }
+        }
+    """
+    
+    struct Data: Codable {
+        let createMediaItem: GraphQL.MediaItem
     }
 } 

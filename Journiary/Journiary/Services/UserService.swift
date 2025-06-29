@@ -198,7 +198,7 @@ class UserService: ObservableObject {
     
     // MARK: - Get Current User
     
-    func getCurrentUser() -> AnyPublisher<UserData, Error> {
+    func getCurrentUser() -> AnyPublisher<GraphQL.User, Error> {
         let query = """
         query GetCurrentUser {
             me {
@@ -226,7 +226,7 @@ class UserService: ObservableObject {
     
     // MARK: - Update User
     
-    func updateUser(firstName: String?, lastName: String?, email: String?) -> AnyPublisher<UserData, Error> {
+    func updateUser(firstName: String?, lastName: String?, email: String?) -> AnyPublisher<GraphQL.User, Error> {
         let mutation = """
         mutation UpdateUser($input: UpdateUserInput!) {
             updateUser(input: $input) {
@@ -320,7 +320,7 @@ class UserService: ObservableObject {
         
         let user = try parseBackendUserData(userData)
         
-        return LoginResponse(token: token, refreshToken: nil, user: user)
+        return LoginResponse(token: token, refreshToken: "", user: user)
     }
     
     /// Parse User Registration Response (für Register + Auto-Login)
@@ -336,13 +336,13 @@ class UserService: ObservableObject {
         // oder wir machen einen echten Login-Call
         return LoginResponse(
             token: "registration-requires-login", // Marker für nachgelagerten Login
-            refreshToken: nil,
+            refreshToken: "",
             user: user
         )
     }
     
     /// Parse Backend User Data (echtes Schema)
-    private func parseBackendUserData(_ data: [String: Any]) throws -> UserData {
+    private func parseBackendUserData(_ data: [String: Any]) throws -> GraphQL.User {
         guard let id = data["id"] as? String,
               let email = data["email"] as? String else {
             print("❌ Backend User fehlt id oder email: \(data)")
@@ -352,12 +352,16 @@ class UserService: ObservableObject {
         // Backend hat nur email, generiere username aus email
         let username = email.components(separatedBy: "@").first ?? "user"
         
-        return UserData(
+        return GraphQL.User(
             id: id,
             email: email,
             username: username,
-            firstName: nil,  // Backend hat keine Namen
-            lastName: nil    // Backend hat keine Namen
+            firstName: nil,
+            lastName: nil,
+            displayName: username,
+            initials: String(username.prefix(2)).uppercased(),
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            updatedAt: ISO8601DateFormatter().string(from: Date())
         )
     }
     
@@ -368,7 +372,7 @@ class UserService: ObservableObject {
         return try parseAuthResponse(data)
     }
     
-    private func parseUserData(_ data: [String: Any]) throws -> UserData {
+    private func parseUserData(_ data: [String: Any]) throws -> GraphQL.User {
         // Legacy method - versuche zuerst neues Schema, dann altes
         if data["username"] != nil {
             // Altes Demo-Schema
@@ -381,7 +385,20 @@ class UserService: ObservableObject {
             let firstName = data["firstName"] as? String
             let lastName = data["lastName"] as? String
             
-            return UserData(id: id, email: email, username: username, firstName: firstName, lastName: lastName)
+            let displayName = [firstName, lastName].compactMap { $0 }.joined(separator: " ").isEmpty ? username : [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+            let initials = [firstName, lastName].compactMap { $0?.prefix(1) }.joined().uppercased()
+            
+            return GraphQL.User(
+                id: id,
+                email: email,
+                username: username,
+                firstName: firstName,
+                lastName: lastName,
+                displayName: displayName,
+                initials: initials.isEmpty ? String(username.prefix(2)).uppercased() : initials,
+                createdAt: ISO8601DateFormatter().string(from: Date()),
+                updatedAt: ISO8601DateFormatter().string(from: Date())
+            )
         } else {
             // Neues Backend-Schema
             return try parseBackendUserData(data)
@@ -598,12 +615,19 @@ class UserService: ObservableObject {
         print("🔍 Demo-Mode: Benutzer gefunden - \(firstName ?? "nil") \(lastName ?? "nil")")
         #endif
         
-        let demoUser = UserData(
+        let displayName = [firstName, lastName].compactMap { $0 }.joined(separator: " ").isEmpty ? username : [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+        let initials = [firstName, lastName].compactMap { $0?.prefix(1) }.joined().uppercased()
+        
+        let demoUser = GraphQL.User(
             id: user.id?.uuidString ?? "demo-user-id",
             email: email,
             username: username,
             firstName: firstName,
-            lastName: lastName
+            lastName: lastName,
+            displayName: displayName,
+            initials: initials.isEmpty ? String(username.prefix(2)).uppercased() : initials,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            updatedAt: ISO8601DateFormatter().string(from: Date())
         )
         
         let response = LoginResponse(
@@ -625,12 +649,19 @@ class UserService: ObservableObject {
     private func createDemoRegisterResponse(email: String, username: String, firstName: String?, lastName: String?) -> AnyPublisher<LoginResponse, Error> {
         print("🎭 Demo-Mode: Registrierung für \(email) simuliert")
         
-        let demoUser = UserData(
+        let displayName = [firstName, lastName].compactMap { $0 }.joined(separator: " ").isEmpty ? username : [firstName, lastName].compactMap { $0 }.joined(separator: " ")
+        let initials = [firstName, lastName].compactMap { $0?.prefix(1) }.joined().uppercased()
+        
+        let demoUser = GraphQL.User(
             id: "demo-user-\(UUID().uuidString)",
             email: email,
             username: username,
             firstName: firstName,
-            lastName: lastName
+            lastName: lastName,
+            displayName: displayName,
+            initials: initials.isEmpty ? String(username.prefix(2)).uppercased() : initials,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            updatedAt: ISO8601DateFormatter().string(from: Date())
         )
         
         let response = LoginResponse(

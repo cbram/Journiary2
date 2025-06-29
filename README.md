@@ -1,6 +1,9 @@
 # Travel Companion App
 
-Eine umfassende Reisebegleiter-App für iOS, die es Benutzern ermöglicht, Reisen zu planen, Erinnerungen festzuhalten und Reiserouten aufzuzeichnen.
+Eine umfassende **Self-Hosting** Reisebegleiter-App für iOS, die es Benutzern ermöglicht, Reisen zu planen, Erinnerungen festzuhalten und Reiserouten aufzuzeichnen.
+
+> **⚠️ WICHTIG: Diese App ist für Self-Hosting konzipiert.**  
+> Es gibt **keine Default-Server-URLs** - Sie müssen Ihren eigenen Backend-Server betreiben oder CloudKit verwenden.
 
 ## Funktionen
 
@@ -48,13 +51,28 @@ Eine umfassende Reisebegleiter-App für iOS, die es Benutzern ermöglicht, Reise
 - MinIO für Medienspeicherung (S3-kompatibel)
 - Docker für einfache Bereitstellung
 
-## Self-Hosted Modus
+## 🏠 Self-Hosting Setup
 
-Die App unterstützt einen Self-Hosted Modus, bei dem Sie Ihre eigene Backend-Instanz betreiben können:
+**Die App ist ausschließlich für Self-Hosting konzipiert** - es gibt keine vorkonfigurierten Server:
 
-1. Klonen Sie das Repository
-2. Starten Sie die Docker-Container mit `docker-compose up -d`
-3. Konfigurieren Sie die Backend-URL in den App-Einstellungen
+### Für End-User (App Store Download):
+1. **Backend betreiben**: Eigenen Server mit Docker aufsetzen
+2. **App konfigurieren**: Bei erstem Start Backend-URL eingeben
+3. **Verbindung testen**: App validiert Server vor Nutzung
+
+### Für Entwickler:
+1. Repository klonen
+2. Backend starten: `cd server-deployment && docker-compose up -d`
+3. Schema downloaden: `BACKEND_URL=http://localhost:4001/graphql ./update_schema.sh`
+4. App in Xcode öffnen und bauen
+
+> **📖 Detaillierte Anleitung**: Siehe [SELF_HOSTING_GUIDE.md](SELF_HOSTING_GUIDE.md)
+
+### Warum Self-Hosting?
+- **🔒 Datenschutz**: Ihre Daten bleiben auf Ihrem Server
+- **🛡️ Sicherheit**: Keine Abhängigkeit von Drittanbietern
+- **⚙️ Kontrolle**: Vollständige Kontrolle über Ihre Infrastruktur
+- **💰 Kosten**: Keine monatlichen Cloud-Gebühren
 
 ## Synchronisierungssystem
 

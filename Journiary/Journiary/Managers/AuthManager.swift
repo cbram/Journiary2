@@ -159,14 +159,14 @@ class AuthManager: ObservableObject {
         userService.login(email: email, password: password)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<Error>) in
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
                         self?.authenticationError = AuthError.loginFailed(error.localizedDescription)
                     }
                 },
-                receiveValue: { [weak self] response in
+                receiveValue: { [weak self] (response: LoginResponse) in
                     self?.handleSuccessfulLogin(response)
                 }
             )
@@ -182,14 +182,14 @@ class AuthManager: ObservableObject {
         userService.register(email: email, username: username, password: password, firstName: firstName, lastName: lastName)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<Error>) in
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
                         self?.authenticationError = AuthError.registrationFailed(error.localizedDescription)
                     }
                 },
-                receiveValue: { [weak self] response in
+                receiveValue: { [weak self] (response: LoginResponse) in
                     self?.handleSuccessfulLogin(response)
                 }
             )
@@ -199,9 +199,7 @@ class AuthManager: ObservableObject {
     private func handleSuccessfulLogin(_ response: LoginResponse) {
         // JWT Token speichern
         setJWTToken(response.token)
-        if let refreshToken = response.refreshToken {
-            setRefreshToken(refreshToken)
-        }
+        setRefreshToken(response.refreshToken)
         
         // Benutzerdaten in Core Data speichern/aktualisieren
         saveUserToCore(response.user)
@@ -211,7 +209,7 @@ class AuthManager: ObservableObject {
         authenticationError = nil
         
         #if DEBUG
-        print("✅ Benutzer erfolgreich angemeldet: \(response.user.username)")
+        print("✅ Benutzer erfolgreich angemeldet: \(response.user.username ?? response.user.email)")
         #endif
     }
     
@@ -250,12 +248,12 @@ class AuthManager: ObservableObject {
             userService.getCurrentUser()
                 .receive(on: DispatchQueue.main)
                 .sink(
-                    receiveCompletion: { completion in
+                    receiveCompletion: { (completion: Subscribers.Completion<Error>) in
                         if case .failure(let error) = completion {
                             print("❌ Fehler beim Laden des aktuellen Benutzers: \(error)")
                         }
                     },
-                    receiveValue: { [weak self] user in
+                    receiveValue: { [weak self] (user: GraphQL.User) in
                         self?.saveUserToCore(user)
                     }
                 )
@@ -263,7 +261,7 @@ class AuthManager: ObservableObject {
         }
     }
     
-    private func saveUserToCore(_ userData: UserData) {
+    private func saveUserToCore(_ userData: GraphQL.User) {
         let context = PersistenceController.shared.container.viewContext
         
         // Prüfen ob Benutzer bereits existiert
@@ -309,16 +307,14 @@ class AuthManager: ObservableObject {
         userService.refreshToken(refreshToken)
             .receive(on: DispatchQueue.main)
             .sink(
-                receiveCompletion: { [weak self] completion in
+                receiveCompletion: { [weak self] (completion: Subscribers.Completion<Error>) in
                     if case .failure = completion {
                         self?.logout()
                     }
                 },
-                receiveValue: { [weak self] response in
+                receiveValue: { [weak self] (response: LoginResponse) in
                     self?.setJWTToken(response.token)
-                    if let newRefreshToken = response.refreshToken {
-                        self?.setRefreshToken(newRefreshToken)
-                    }
+                    self?.setRefreshToken(response.refreshToken)
                     self?.loadCurrentUser()
                 }
             )
@@ -478,16 +474,4 @@ enum AuthError: LocalizedError {
     }
 }
 
-struct LoginResponse {
-    let token: String
-    let refreshToken: String?
-    let user: UserData
-}
-
-struct UserData {
-    let id: String
-    let email: String
-    let username: String
-    let firstName: String?
-    let lastName: String?
-} 
+// LoginResponse ist jetzt in GraphQLOperations.swift definiert 
