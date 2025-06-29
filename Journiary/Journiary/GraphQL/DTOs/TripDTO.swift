@@ -105,15 +105,15 @@ extension TripDTO {
             id: id,
             name: name,
             tripDescription: coreDataTrip.tripDescription,
-            coverImageObjectName: nil,
+            coverImageObjectName: nil, // Core Data hat coverImageData, nicht coverImageObjectName
             coverImageUrl: nil,
-            travelCompanions: nil,
-            visitedCountries: nil,
+            travelCompanions: coreDataTrip.travelCompanions,
+            visitedCountries: coreDataTrip.visitedCountries,
             startDate: coreDataTrip.startDate,
             endDate: coreDataTrip.endDate,
             isActive: coreDataTrip.isActive,
-            totalDistance: 0.0,
-            gpsTrackingEnabled: true,
+            totalDistance: coreDataTrip.totalDistance,
+            gpsTrackingEnabled: coreDataTrip.gpsTrackingEnabled,
             createdAt: Date(), // Fallback da Core Data kein createdAt hat
             updatedAt: Date() // Fallback da Core Data kein updatedAt hat
         )
@@ -143,9 +143,13 @@ extension TripDTO {
         // Daten aktualisieren
         trip.name = name
         trip.tripDescription = tripDescription
+        trip.travelCompanions = travelCompanions
+        trip.visitedCountries = visitedCountries
         trip.startDate = startDate
         trip.endDate = endDate
         trip.isActive = isActive
+        trip.totalDistance = totalDistance
+        trip.gpsTrackingEnabled = gpsTrackingEnabled
         
         return trip
     }
@@ -197,6 +201,7 @@ extension TripDTO {
     func toGraphQLUpdateInput() -> [String: Any] {
         var input: [String: Any] = [:]
         
+        // Nur nicht-nil Werte für Update senden
         input["name"] = name
         input["isActive"] = isActive
         input["totalDistance"] = totalDistance  

@@ -58,6 +58,14 @@ export class Trip {
     @Column({ default: true })
     gpsTrackingEnabled!: boolean;
 
+    @Field()
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
+    createdAt!: Date;
+
+    @Field()
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    updatedAt!: Date;
+
     @OneToMany(() => TripMembership, membership => membership.trip)
     members!: TripMembership[];
 

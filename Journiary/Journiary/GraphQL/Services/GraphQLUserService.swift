@@ -137,7 +137,7 @@ class GraphQLUserService: ObservableObject {
         if isDemoMode {
             // Versuche lokalen User zu finden
             let request: NSFetchRequest<User> = User.fetchRequest()
-            request.predicate = NSPredicate(format: "isCurrent == %@", NSNumber(value: true))
+            request.predicate = NSPredicate(format: "isCurrentUser == %@", NSNumber(value: true))
             
             do {
                 let users = try context.fetch(request)
@@ -179,7 +179,7 @@ class GraphQLUserService: ObservableObject {
                 
                 // Aktualisiere lokalen User
                 let request: NSFetchRequest<User> = User.fetchRequest()
-                request.predicate = NSPredicate(format: "isCurrent == %@", NSNumber(value: true))
+                request.predicate = NSPredicate(format: "isCurrentUser == %@", NSNumber(value: true))
                 
                 do {
                     let users = try self.context.fetch(request)
@@ -339,13 +339,13 @@ class GraphQLUserService: ObservableObject {
                 }
                 
                 user.updatedAt = Date()
-                // user.isCurrent = true // Property not in Core Data schema
+                user.isCurrentUser = true // Setze als aktueller User
                 
                 // Alle anderen User als nicht-aktuell markieren
                 let allUsersRequest: NSFetchRequest<User> = User.fetchRequest()
                 let allUsers = try self.context.fetch(allUsersRequest)
                 for otherUser in allUsers where otherUser != user {
-                    // otherUser.isCurrent = false // Property not in Core Data schema
+                    otherUser.isCurrentUser = false
                 }
                 
                 try self.context.save()
