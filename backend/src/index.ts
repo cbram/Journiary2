@@ -18,6 +18,7 @@ import { BucketListItemResolver } from "./resolvers/BucketListItemResolver";
 import { GPXResolver } from "./resolvers/GPXResolver";
 import jwt from 'jsonwebtoken';
 import { UserResolver } from "./resolvers/UserResolver";
+import { User } from "./entities/User";
 
 export interface MyContext {
     req: any;
@@ -25,10 +26,48 @@ export interface MyContext {
     userId?: string;
 }
 
+// Create demo user for production token compatibility
+async function createDemoUserIfNotExists() {
+    const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
+    const demoEmail = 'chbram@mailbox.org';
+    
+    try {
+        const userRepository = AppDataSource.getRepository(User);
+        const existingUser = await userRepository.findOneBy({ id: demoUserId });
+        
+        if (!existingUser) {
+            // Check if user exists by email
+            const existingByEmail = await userRepository.findOneBy({ email: demoEmail });
+            
+            if (!existingByEmail) {
+                // Create new demo user
+                const demoUser = userRepository.create({
+                    id: demoUserId,
+                    email: demoEmail,
+                    password: 'demo-password-hash' // Dummy password
+                });
+                
+                await userRepository.save(demoUser);
+                console.log('✅ Demo user created:', demoEmail, 'with UUID:', demoUserId);
+            } else {
+                console.log('✅ Demo user already exists by email:', demoEmail);
+            }
+        } else {
+            console.log('✅ Demo user already exists:', demoUserId);
+        }
+    } catch (error) {
+        console.log('⚠️  Could not create demo user:', error);
+    }
+}
+
 async function startServer() {
     try {
         await AppDataSource.initialize();
         console.log("✅ Database connection initialized");
+        
+        // Create demo user if not exists
+        await createDemoUserIfNotExists();
+        
     } catch (error) {
         console.error("❌ Error during Data Source initialization", error);
         process.exit(1);
@@ -83,8 +122,17 @@ async function startServer() {
                                 console.log('🔍 JWT MIDDLEWARE - Payload structure:', JSON.stringify(payload));
                                 
                                 if (payload.sub) {
-                                    console.log('🔄 JWT MIDDLEWARE - Using production token sub field:', payload.sub);
-                                    context.userId = payload.sub;
+                                    console.log('🔄 JWT MIDDLEWARE - Production token sub field:', payload.sub);
+                                    
+                                    // Handle production demo user - map to local UUID
+                                    if (payload.sub === 'demo-user') {
+                                        // Use a fixed UUID for demo-user to match local database schema
+                                        const demoUserId = '550e8400-e29b-41d4-a716-446655440000';
+                                        console.log('🔄 JWT MIDDLEWARE - Mapping demo-user to UUID:', demoUserId);
+                                        context.userId = demoUserId;
+                                    } else {
+                                        context.userId = payload.sub;
+                                    }
                                 } else if (payload.userId) {
                                     console.log('🔄 JWT MIDDLEWARE - Using production token userId field:', payload.userId);
                                     context.userId = payload.userId;
