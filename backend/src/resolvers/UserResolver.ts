@@ -72,9 +72,23 @@ export class UserResolver {
 
         // 3. Generate JWT
         // TODO: Move JWT_SECRET to a secure environment variable!
-        const token = jwt.sign({ userId: user.id }, "your-super-secret-key", {
+        console.log("🔐 JWT DEBUG - Creating token for user:", user.id, "email:", user.email);
+        const payload = { userId: user.id };
+        console.log("🔐 JWT DEBUG - Payload:", JSON.stringify(payload));
+        
+        const token = jwt.sign(payload, "your-super-secret-key", {
             expiresIn: '7d', // Token expires in 7 days
         });
+        
+        console.log("🔐 JWT DEBUG - Generated token:", token.substring(0, 50) + "...");
+        
+        // Verify token immediately to test
+        try {
+            const decoded = jwt.verify(token, "your-super-secret-key") as any;
+            console.log("🔐 JWT DEBUG - Token verification successful:", JSON.stringify(decoded));
+        } catch (error) {
+            console.log("🔐 JWT DEBUG - Token verification FAILED:", error);
+        }
 
         // 4. Return token and user
         return {

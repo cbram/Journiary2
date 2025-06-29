@@ -18,6 +18,8 @@ struct GraphQLTestView: View {
     @State private var isLoading = false
     @State private var testResults: [TestResult] = []
     @State private var showingResults = false
+    @State private var showingPasswordAlert = false
+    @State private var passwordInput = ""
     
     var body: some View {
         NavigationView {
@@ -177,6 +179,17 @@ struct GraphQLTestView: View {
                         }
                         
                         TestButton(
+                            title: "🔄 Fresh Login (Production)",
+                            subtitle: "Neuen Token vom Production-Backend holen",
+                            icon: "person.crop.circle.badge.checkmark",
+                            color: .cyan,
+                            isDisabled: isLoading
+                                                 ) {
+                             testResults.removeAll()
+                             performFreshLogin()
+                         }
+                        
+                        TestButton(
                             title: "8. Full Integration Test",
                             subtitle: "Alle Tests durchführen",
                             icon: "checkmark.seal",
@@ -196,6 +209,18 @@ struct GraphQLTestView: View {
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingResults) {
                 TestResultsView(results: testResults)
+            }
+            .alert("Fresh Login - Passwort eingeben", isPresented: $showingPasswordAlert) {
+                SecureField("Passwort", text: $passwordInput)
+                Button("Login") {
+                    executeFreshLogin(password: passwordInput)
+                    passwordInput = "" // Clear password
+                }
+                Button("Abbrechen", role: .cancel) {
+                    passwordInput = "" // Clear password
+                }
+            } message: {
+                Text("Geben Sie Ihr Passwort für chbram@mailbox.org ein, um einen frischen Production-Token zu erhalten.")
             }
         }
     }
@@ -1077,8 +1102,24 @@ struct GraphQLTestView: View {
                 let iat = payloadJson?["iat"] as? TimeInterval ?? 0
                 
                 let expDate = Date(timeIntervalSince1970: exp)
-                let iatDate = Date(timeIntervalSince1970: iat)
+                let _ = Date(timeIntervalSince1970: iat)
                 let isExpired = Date() > expDate
+                
+                // VOLLSTÄNDIGE PAYLOAD DEBUG
+                let fullPayload = String(describing: payloadJson ?? [:])
+                addTestResult(.init(
+                    name: "🔍 JWT Header",
+                    success: true,
+                    message: "Header: \(String(describing: headerJson ?? [:]))",
+                    duration: 0
+                ))
+                
+                addTestResult(.init(
+                    name: "🔍 JWT Payload (VOLLSTÄNDIG)",
+                    success: true,
+                    message: "Payload: \(fullPayload)",
+                    duration: 0
+                ))
                 
                 addTestResult(.init(
                     name: "JWT Token Analysis",
@@ -1087,11 +1128,17 @@ struct GraphQLTestView: View {
                     duration: 0
                 ))
                 
-                // Continue with HTTP debug test if token is valid
+                // Continue with HTTP debug test if token is valid, otherwise fresh login
                 if !isExpired {
                     performDirectHTTPDebugTest(token: token)
                 } else {
-                    performAutoLoginForTests()
+                    addTestResult(.init(
+                        name: "🔄 Token Expired",
+                        success: false,
+                        message: "⚠️ Token abgelaufen - Fresh Login von Production-Backend erforderlich",
+                        duration: 0
+                    ))
+                    performFreshLogin()
                 }
                 
             } catch {
@@ -1861,7 +1908,6 @@ struct GraphQLTestView: View {
     // MARK: - Auto Login für Tests
     
     private func performAutoLoginForTests() {
-        let startTime = Date()
         
         addTestResult(.init(
             name: "Auto-Login für Tests",
@@ -1875,7 +1921,7 @@ struct GraphQLTestView: View {
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { completion in
-                    let duration = Date().timeIntervalSince(startTime)
+                    let duration = 0.0
                     
                     switch completion {
                     case .finished:
@@ -1899,7 +1945,7 @@ struct GraphQLTestView: View {
                     }
                 },
                 receiveValue: { userDTO in
-                    let duration = Date().timeIntervalSince(startTime)
+                    let duration = 0.0
                     
                     addTestResult(.init(
                         name: "Auto-Login",
@@ -1920,6 +1966,68 @@ struct GraphQLTestView: View {
                     // Retry Trip Create Test
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         performTripCreateTest()
+                    }
+                }
+            )
+            .store(in: &cancellables)
+    }
+    
+    // MARK: - Production Backend Fresh Login
+    
+    private func performFreshLogin() {
+        addTestResult(.init(
+            name: "🔄 Fresh Login Start",
+            success: true,
+            message: "🔄 Erzwinge Logout/Login für frischen Production-Token...",
+            duration: 0
+        ))
+        
+        // Show password input alert
+        showingPasswordAlert = true
+    }
+    
+    private func executeFreshLogin(password: String) {
+        // 1. Force Logout - Clear all tokens
+        AuthManager.shared.logout()
+        
+        // 2. Clear any cached tokens
+        AuthManager.shared.setJWTToken("")
+        
+        addTestResult(.init(
+            name: "🔑 Logout Complete",
+            success: true,
+            message: "✅ Alle Tokens gelöscht - Ready für Fresh Login",
+            duration: 0
+        ))
+        
+        // 3. Perform fresh login with production backend
+        userService.login(username: "chbram@mailbox.org", password: password)
+            .receive(on: DispatchQueue.main)
+            .sink(
+                receiveCompletion: { completion in
+                    switch completion {
+                    case .finished:
+                        break
+                    case .failure(let error):
+                        self.addTestResult(.init(
+                            name: "❌ Fresh Login Failed",
+                            success: false,
+                            message: "❌ Login-Fehler: \\(error.localizedDescription)",
+                            duration: 0
+                        ))
+                    }
+                },
+                receiveValue: { user in
+                    self.addTestResult(.init(
+                        name: "✅ Fresh Login Success",
+                        success: true,
+                        message: "✅ Frischer Production-Token erhalten für: \\(user.email)",
+                        duration: 0
+                    ))
+                    
+                    // 4. Test the fresh token immediately
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.performTripCreateTest()
                     }
                 }
             )
