@@ -30,12 +30,7 @@ class GraphQLSyncService: ObservableObject {
     private let tripService = GraphQLTripService()
     private let mediaService = GraphQLMediaService()
     
-    // MARK: - Demo Mode
-    
-    private var isDemoMode: Bool {
-        return AppSettings.shared.backendURL.contains("localhost") ||
-               AppSettings.shared.backendURL.contains("127.0.0.1")
-    }
+
     
     // MARK: - Full Sync Operations
     
@@ -43,11 +38,8 @@ class GraphQLSyncService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func performFullSync() -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return performDemoSync()
-        }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // Full sync not yet implemented
+        return Fail(error: GraphQLError.networkError("Full Sync noch nicht implementiert"))
             .eraseToAnyPublisher()
     }
     
@@ -55,11 +47,8 @@ class GraphQLSyncService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func uploadChanges() -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return simulateUpload()
-        }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // Upload changes not yet implemented
+        return Fail(error: GraphQLError.networkError("Upload Changes noch nicht implementiert"))
             .eraseToAnyPublisher()
     }
     
@@ -67,11 +56,8 @@ class GraphQLSyncService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func downloadChanges() -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return simulateDownload()
-        }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // Download changes not yet implemented
+        return Fail(error: GraphQLError.networkError("Download Changes noch nicht implementiert"))
             .eraseToAnyPublisher()
     }
     
@@ -82,14 +68,8 @@ class GraphQLSyncService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func resolveConflicts(strategy: ConflictResolutionStrategy = .serverWins) -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return Just(true)
-                .setFailureType(to: GraphQLError.self)
-                .delay(for: .seconds(1), scheduler: DispatchQueue.main)
-                .eraseToAnyPublisher()
-        }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // Conflict resolution not yet implemented
+        return Fail(error: GraphQLError.networkError("Conflict Resolution noch nicht implementiert"))
             .eraseToAnyPublisher()
     }
     

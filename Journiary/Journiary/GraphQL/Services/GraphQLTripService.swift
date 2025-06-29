@@ -23,13 +23,7 @@ class GraphQLTripService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let context = PersistenceController.shared.container.viewContext
     
-    // MARK: - Demo Mode
-    
-    private var isDemoMode: Bool {
-        // Nur für lokale Entwicklung - echtes Backend für production
-        return AppSettings.shared.backendURL.contains("localhost") ||
-               AppSettings.shared.backendURL.contains("127.0.0.1")
-    }
+
     
     // MARK: - CRUD Operations
     
@@ -37,11 +31,7 @@ class GraphQLTripService: ObservableObject {
     /// - Returns: Publisher mit [TripDTO]
     func getTrips() -> AnyPublisher<[TripDTO], GraphQLError> {
         
-        if isDemoMode {
-            return loadTripsFromCoreData()
-        }
-        
-        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        // GraphQL Backend Implementation
         let query = """
         query GetTrips {
             trips {
@@ -94,11 +84,7 @@ class GraphQLTripService: ObservableObject {
     /// - Returns: Publisher mit TripDTO
     func getTrip(id: String) -> AnyPublisher<TripDTO, GraphQLError> {
         
-        if isDemoMode {
-            return loadTripFromCoreData(id: id)
-        }
-        
-        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        // GraphQL Backend Implementation
         let query = """
         query GetTrip($id: ID!) {
             trip(id: $id) {
@@ -155,16 +141,7 @@ class GraphQLTripService: ObservableObject {
         endDate: Date? = nil
     ) -> AnyPublisher<TripDTO, GraphQLError> {
         
-        if isDemoMode {
-            return createTripInCoreData(
-                name: name,
-                description: description,
-                startDate: startDate,
-                endDate: endDate
-            )
-        }
-        
-        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        // GraphQL Backend Implementation
         let mutation = """
         mutation CreateTrip($input: TripInput!) {
             createTrip(input: $input) {
@@ -248,18 +225,7 @@ class GraphQLTripService: ObservableObject {
         isActive: Bool? = nil
     ) -> AnyPublisher<TripDTO, GraphQLError> {
         
-        if isDemoMode {
-            return updateTripInCoreData(
-                id: id,
-                name: name,
-                description: description,
-                startDate: startDate,
-                endDate: endDate,
-                isActive: isActive
-            )
-        }
-        
-        // 🚀 ECHTE BACKEND IMPLEMENTATION - Minimale Felder
+        // GraphQL Backend Implementation
         let mutation = """
         mutation UpdateTrip($id: ID!, $input: UpdateTripInput!) {
             updateTrip(id: $id, input: $input) {
@@ -317,11 +283,7 @@ class GraphQLTripService: ObservableObject {
     /// - Returns: Publisher mit Bool (Erfolg)
     func deleteTrip(id: String) -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return deleteTripFromCoreData(id: id)
-        }
-        
-        // 🚀 ECHTE BACKEND IMPLEMENTATION
+        // GraphQL Backend Implementation
         let mutation = """
         mutation DeleteTrip($id: ID!) {
             deleteTrip(id: $id)
@@ -359,181 +321,9 @@ class GraphQLTripService: ObservableObject {
         permission: String = "READ"
     ) -> AnyPublisher<Bool, GraphQLError> {
         
-        if isDemoMode {
-            return Just(true)
-                .setFailureType(to: GraphQLError.self)
-                .delay(for: .seconds(1), scheduler: DispatchQueue.main)
-                .eraseToAnyPublisher()
-        }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+        // Not implemented yet
+        return Fail(error: GraphQLError.networkError("Feature nicht implementiert"))
             .eraseToAnyPublisher()
-    }
-    
-    // MARK: - Demo Mode Core Data Operations
-    
-    private func loadTripsFromCoreData() -> AnyPublisher<[TripDTO], GraphQLError> {
-        return Future { [weak self] promise in
-            guard let self = self else {
-                promise(.failure(.unknown("Service nicht verfügbar")))
-                return
-            }
-            
-            let request: NSFetchRequest<Trip> = Trip.fetchRequest()
-            request.sortDescriptors = [
-                NSSortDescriptor(keyPath: \Trip.startDate, ascending: false)
-            ]
-            
-            do {
-                let trips = try self.context.fetch(request)
-                let tripDTOs = trips.compactMap { TripDTO.from(coreData: $0) }
-                promise(.success(tripDTOs))
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
-            }
-        }
-        .delay(for: .seconds(0.3), scheduler: DispatchQueue.main)
-        .eraseToAnyPublisher()
-    }
-    
-    private func loadTripFromCoreData(id: String) -> AnyPublisher<TripDTO, GraphQLError> {
-        return Future { [weak self] promise in
-            guard let self = self else {
-                promise(.failure(.unknown("Service nicht verfügbar")))
-                return
-            }
-            
-            let request: NSFetchRequest<Trip> = Trip.fetchRequest()
-            if let uuidID = UUID(uuidString: id) {
-                request.predicate = NSPredicate(format: "id == %@", uuidID as CVarArg)
-            } else {
-                request.predicate = NSPredicate(format: "name == %@", id)
-            }
-            
-            do {
-                let trips = try self.context.fetch(request)
-                if let trip = trips.first,
-                   let tripDTO = TripDTO.from(coreData: trip) {
-                    promise(.success(tripDTO))
-                } else {
-                    promise(.failure(.unknown("Trip nicht gefunden")))
-                }
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
-            }
-        }
-        .delay(for: .seconds(0.2), scheduler: DispatchQueue.main)
-        .eraseToAnyPublisher()
-    }
-    
-    private func createTripInCoreData(
-        name: String,
-        description: String?,
-        startDate: Date?,
-        endDate: Date?
-    ) -> AnyPublisher<TripDTO, GraphQLError> {
-        return Future { [weak self] promise in
-            guard let self = self else {
-                promise(.failure(.unknown("Service nicht verfügbar")))
-                return
-            }
-            
-            let trip = Trip(context: self.context)
-            trip.id = UUID()
-            trip.name = name
-            trip.tripDescription = description
-            trip.startDate = startDate
-            trip.endDate = endDate
-            trip.isActive = true
-            
-            do {
-                try self.context.save()
-                if let tripDTO = TripDTO.from(coreData: trip) {
-                    promise(.success(tripDTO))
-                } else {
-                    promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
-                }
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
-            }
-        }
-        .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
-        .eraseToAnyPublisher()
-    }
-    
-    private func updateTripInCoreData(
-        id: String,
-        name: String?,
-        description: String?,
-        startDate: Date?,
-        endDate: Date?,
-        isActive: Bool?
-    ) -> AnyPublisher<TripDTO, GraphQLError> {
-        return Future { [weak self] promise in
-            guard let self = self else {
-                promise(.failure(.unknown("Service nicht verfügbar")))
-                return
-            }
-            
-            let request: NSFetchRequest<Trip> = Trip.fetchRequest()
-            request.predicate = NSPredicate(format: "id == %@", id)
-            
-            do {
-                let trips = try self.context.fetch(request)
-                if let trip = trips.first {
-                    if let name = name { trip.name = name }
-                    if let description = description { trip.tripDescription = description }
-                    if let startDate = startDate { trip.startDate = startDate }
-                    if let endDate = endDate { trip.endDate = endDate }
-                    if let isActive = isActive { trip.isActive = isActive }
-                    
-                    try self.context.save()
-                    
-                    if let tripDTO = TripDTO.from(coreData: trip) {
-                        promise(.success(tripDTO))
-                    } else {
-                        promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
-                    }
-                } else {
-                    promise(.failure(.unknown("Trip nicht gefunden")))
-                }
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
-            }
-        }
-        .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)
-        .eraseToAnyPublisher()
-    }
-    
-    private func deleteTripFromCoreData(id: String) -> AnyPublisher<Bool, GraphQLError> {
-        return Future { [weak self] promise in
-            guard let self = self else {
-                promise(.failure(.unknown("Service nicht verfügbar")))
-                return
-            }
-            
-            let request: NSFetchRequest<Trip> = Trip.fetchRequest()
-            if let uuidID = UUID(uuidString: id) {
-                request.predicate = NSPredicate(format: "id == %@", uuidID as CVarArg)
-            } else {
-                request.predicate = NSPredicate(format: "name == %@", id)
-            }
-            
-            do {
-                let trips = try self.context.fetch(request)
-                if let trip = trips.first {
-                    self.context.delete(trip)
-                    try self.context.save()
-                    promise(.success(true))
-                } else {
-                    promise(.failure(.unknown("Trip nicht gefunden")))
-                }
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
-            }
-        }
-        .delay(for: .seconds(0.3), scheduler: DispatchQueue.main)
-        .eraseToAnyPublisher()
     }
     
     // MARK: - HTTP GraphQL Helper
