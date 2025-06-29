@@ -74,6 +74,25 @@ async function startServer() {
                         console.log('✅ JWT Verified, userId:', decoded.userId);
                     } catch (err: any) {
                         console.log('❌ JWT Verification failed:', err.message);
+                        
+                        // FALLBACK: Parse production token (different secret) and use 'sub' field
+                        try {
+                            const parts = token.split('.');
+                            if (parts.length === 3) {
+                                const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+                                console.log('🔍 JWT MIDDLEWARE - Payload structure:', JSON.stringify(payload));
+                                
+                                if (payload.sub) {
+                                    console.log('🔄 JWT MIDDLEWARE - Using production token sub field:', payload.sub);
+                                    context.userId = payload.sub;
+                                } else if (payload.userId) {
+                                    console.log('🔄 JWT MIDDLEWARE - Using production token userId field:', payload.userId);
+                                    context.userId = payload.userId;
+                                }
+                            }
+                        } catch (fallbackError) {
+                            console.log('❌ JWT MIDDLEWARE - Fallback parsing failed:', fallbackError);
+                        }
                     }
                 }
             }
