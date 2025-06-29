@@ -67,18 +67,24 @@ export class TripResolver {
         // Create a new trip instance
         const trip = tripRepository.create(input);
 
-        // Create a new membership instance for the owner
-        const membership = membershipRepository.create({
-            user: user,
-            trip: trip,
-            role: TripRole.OWNER,
-        });
-
         // Use a transaction to save both the trip and the membership
         try {
             await AppDataSource.transaction(async (transactionalEntityManager) => {
-                await transactionalEntityManager.save(trip);
-                await transactionalEntityManager.save(membership);
+                // First save the trip to get its ID
+                const savedTrip = await transactionalEntityManager.save(Trip, trip);
+                
+                // Now create membership with the saved trip
+                const membership = membershipRepository.create({
+                    user: user,
+                    trip: savedTrip,
+                    role: TripRole.OWNER,
+                });
+                
+                // Save the membership
+                await transactionalEntityManager.save(TripMembership, membership);
+                
+                // Update the trip reference for return
+                Object.assign(trip, savedTrip);
             });
             return trip;
         } catch (error) {
