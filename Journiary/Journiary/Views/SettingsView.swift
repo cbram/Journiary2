@@ -454,6 +454,19 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    Task {
+                        await fixLegacyTripsWithoutOwner()
+                    }
+                }) {
+                    SettingsRowNavigable(
+                        title: "🔧 Fix Legacy Trips ohne Owner",
+                        icon: "wrench.fill",
+                        status: "Repariert Trips ohne User-Zuordnung"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding()
             .background(Color(.systemBackground))
@@ -525,6 +538,53 @@ struct SettingsView: View {
             try context.save()
         } catch {
             print("Fehler beim Speichern: \(error)")
+        }
+    }
+    
+    // MARK: - Legacy Data Fix
+    
+    private func fixLegacyTripsWithoutOwner() async {
+        print("🔧 Starte Legacy-Trip-Fix...")
+        
+        let context = viewContext
+        
+        await context.perform {
+            do {
+                // Hole aktuellen User
+                let userRequest: NSFetchRequest<User> = User.fetchRequest()
+                userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
+                let currentUsers = try context.fetch(userRequest)
+                
+                guard let currentUser = currentUsers.first else {
+                    print("❌ Kein aktueller User gefunden")
+                    return
+                }
+                
+                // Finde Trips ohne Owner
+                let orphanTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
+                orphanTripsRequest.predicate = NSPredicate(format: "owner == nil")
+                let orphanTrips = try context.fetch(orphanTripsRequest)
+                
+                print("🔍 Gefunden: \(orphanTrips.count) Trips ohne Owner")
+                
+                // Weise alle Trips dem aktuellen User zu
+                for trip in orphanTrips {
+                    trip.owner = currentUser
+                    print("✅ Trip '\(trip.name ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
+                }
+                
+                // Speichere Änderungen
+                try context.save()
+                print("✅ Legacy-Trip-Fix erfolgreich abgeschlossen: \(orphanTrips.count) Trips repariert")
+                
+                // Zeige Erfolg in UI
+                DispatchQueue.main.async {
+                    // TODO: Toast oder Alert zeigen
+                }
+                
+            } catch {
+                print("❌ Fehler beim Legacy-Trip-Fix: \(error)")
+            }
         }
     }
     
