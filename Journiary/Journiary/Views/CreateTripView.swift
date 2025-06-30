@@ -374,11 +374,20 @@ struct CreateTripView: View {
             trip = Trip(context: viewContext)
             
             // WICHTIG: Owner zuweisen bei neuen Trips!
-            if let currentUser = UserContextManager.shared.currentUser {
-                trip.owner = currentUser
-                print("✅ Neue Reise mit Owner erstellt: \(currentUser.displayName)")
-            } else {
-                print("⚠️ Warnung: Neue Reise ohne Owner erstellt - kein aktueller User gefunden")
+            // User im GLEICHEN Context finden wie der Trip
+            let userRequest: NSFetchRequest<User> = User.fetchRequest()
+            userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
+            userRequest.fetchLimit = 1
+            
+            do {
+                if let currentUser = try viewContext.fetch(userRequest).first {
+                    trip.owner = currentUser
+                    print("✅ Neue Reise mit Owner erstellt: \(currentUser.displayName)")
+                } else {
+                    print("⚠️ Warnung: Neue Reise ohne Owner erstellt - kein aktueller User im Context gefunden")
+                }
+            } catch {
+                print("❌ Fehler beim Laden des aktuellen Users: \(error)")
             }
         }
         

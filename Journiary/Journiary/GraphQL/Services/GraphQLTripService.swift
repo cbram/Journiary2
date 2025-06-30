@@ -479,39 +479,35 @@ class GraphQLTripService: ObservableObject {
                 return
             }
             
-            // Hole aktuellen User auf Main Thread
-            DispatchQueue.main.async {
-                guard let currentUser = UserContextManager.shared.currentUser else {
-                    promise(.failure(.unknown("Kein aktueller User gefunden - Trip kann nicht erstellt werden")))
-                    return
+            let trip = Trip(context: self.context)
+            trip.id = UUID()
+            trip.name = name
+            trip.tripDescription = description
+            trip.startDate = startDate
+            trip.endDate = endDate
+            trip.isActive = true
+            
+            // WICHTIG: Owner im GLEICHEN Context finden!
+            let userRequest: NSFetchRequest<User> = User.fetchRequest()
+            userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
+            userRequest.fetchLimit = 1
+            
+            do {
+                if let currentUser = try self.context.fetch(userRequest).first {
+                    trip.owner = currentUser
+                    print("✅ Trip '\(name)' wird erstellt mit Owner: \(currentUser.displayName)")
+                } else {
+                    print("⚠️ Warnung: Trip '\(name)' ohne Owner erstellt - kein aktueller User im Context gefunden")
                 }
                 
-                // Wechsle zurück zu Background für Core Data Operation
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let trip = Trip(context: self.context)
-                    trip.id = UUID()
-                    trip.name = name
-                    trip.tripDescription = description
-                    trip.startDate = startDate
-                    trip.endDate = endDate
-                    trip.isActive = true
-                    
-                    // WICHTIG: Owner zuweisen!
-                    trip.owner = currentUser
-                    
-                    print("✅ Trip '\(name)' wird erstellt mit Owner: \(currentUser.displayName)")
-                    
-                    do {
-                        try self.context.save()
-                        if let tripDTO = TripDTO.from(coreData: trip) {
-                            promise(.success(tripDTO))
-                        } else {
-                            promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
-                        }
-                    } catch {
-                        promise(.failure(.cacheError(error.localizedDescription)))
-                    }
+                try self.context.save()
+                if let tripDTO = TripDTO.from(coreData: trip) {
+                    promise(.success(tripDTO))
+                } else {
+                    promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
                 }
+            } catch {
+                promise(.failure(.cacheError(error.localizedDescription)))
             }
         }
         .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)

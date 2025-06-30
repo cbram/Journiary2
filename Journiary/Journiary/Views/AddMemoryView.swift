@@ -1754,11 +1754,20 @@ struct AddMemoryView: View {
         memory.timestamp = selectedDate
         
         // WICHTIG: Creator zuweisen bei neuen Memories!
-        if let currentUser = UserContextManager.shared.currentUser {
-            memory.creator = currentUser
-            print("✅ Neue Memory mit Creator erstellt: \(currentUser.displayName)")
-        } else {
-            print("⚠️ Warnung: Neue Memory ohne Creator erstellt - kein aktueller User gefunden")
+        // User im GLEICHEN Context finden wie die Memory
+        let userRequest: NSFetchRequest<User> = User.fetchRequest()
+        userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
+        userRequest.fetchLimit = 1
+        
+        do {
+            if let currentUser = try viewContext.fetch(userRequest).first {
+                memory.creator = currentUser
+                print("✅ Neue Memory mit Creator erstellt: \(currentUser.displayName)")
+            } else {
+                print("⚠️ Warnung: Neue Memory ohne Creator erstellt - kein aktueller User im Context gefunden")
+            }
+        } catch {
+            print("❌ Fehler beim Laden des aktuellen Users: \(error)")
         }
         
         // Standort hinzufügen
@@ -1911,11 +1920,20 @@ struct AddMemoryView: View {
         tempMemory.locationName = finalLocationName
         
         // WICHTIG: Auch temporäre Memories brauchen einen Creator!
-        if let currentUser = UserContextManager.shared.currentUser {
-            tempMemory.creator = currentUser
-            print("✅ Temporäre Memory mit Creator erstellt: \(currentUser.displayName)")
-        } else {
-            print("⚠️ Warnung: Temporäre Memory ohne Creator erstellt")
+        // User im GLEICHEN Context finden wie die temporäre Memory
+        let userRequest: NSFetchRequest<User> = User.fetchRequest()
+        userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
+        userRequest.fetchLimit = 1
+        
+        do {
+            if let currentUser = try viewContext.fetch(userRequest).first {
+                tempMemory.creator = currentUser
+                print("✅ Temporäre Memory mit Creator erstellt: \(currentUser.displayName)")
+            } else {
+                print("⚠️ Warnung: Temporäre Memory ohne Creator erstellt - kein aktueller User im Context gefunden")
+            }
+        } catch {
+            print("❌ Fehler beim Laden des aktuellen Users für temporäre Memory: \(error)")
         }
         
         if let coordinate = finalCoordinate {
