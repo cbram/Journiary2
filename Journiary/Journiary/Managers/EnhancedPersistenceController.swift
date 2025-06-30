@@ -132,7 +132,7 @@ class EnhancedPersistenceController: ObservableObject {
         description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
         
         // CloudKit Container Options
-        let containerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.com.journiary.TravelCompanion")
+        let containerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.CHJB.Journiary")
         description.cloudKitContainerOptions = containerOptions
         
         print("✅ CloudKit Container konfiguriert")
