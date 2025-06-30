@@ -346,7 +346,8 @@ extension NSFetchRequest where ResultType == BucketListItem {
     }
     
     /// Fetch Completed Bucket List Items für einen User
-    static func completedBucketListItems(for user: User) -> NSFetchRequest<BucketListItem> {
+    /// Note: Erweiterte Performance-Version ist in CoreDataExtensions+Performance.swift verfügbar
+    static func completedBucketListItemsBasic(for user: User) -> NSFetchRequest<BucketListItem> {
         let request = NSFetchRequest<BucketListItem>(entityName: "BucketListItem")
         request.predicate = NSPredicate(format: "creator == %@ AND isDone == YES", user)
         request.sortDescriptors = [

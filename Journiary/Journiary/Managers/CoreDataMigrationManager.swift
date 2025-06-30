@@ -37,7 +37,7 @@ class CoreDataMigrationManager: ObservableObject {
     /// Überprüft ob Migration erforderlich ist
     /// - Parameter storeURL: URL des Core Data Stores
     /// - Returns: true wenn Migration erforderlich ist
-    func isMigrationRequired(storeURL: URL) -> Bool {
+    func isMigrationRequired(storeURL: URL) async -> Bool {
         guard FileManager.default.fileExists(atPath: storeURL.path) else {
             // Neuer Store - keine Migration erforderlich
             return false
@@ -111,30 +111,39 @@ class CoreDataMigrationManager: ObservableObject {
         let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
         context.persistentStoreCoordinator = coordinator
         
-        try await context.perform {
-            await self.incrementMigrationProgress("Erstelle Default User...")
+        // Schritt 1: Erstelle Standard-User für Legacy-Daten
+        await incrementMigrationProgress("Erstelle Standard-User für Legacy-Daten...")
+        
+        let defaultUser: User = try await context.perform {
+            // Prüfe ob bereits User existieren
+            let existingUsersRequest: NSFetchRequest<User> = User.fetchRequest()
+            let existingUsers = try context.fetch(existingUsersRequest)
             
-            // Default User erstellen/finden
-            let userRequest: NSFetchRequest<User> = User.fetchRequest()
-            userRequest.predicate = NSPredicate(format: "username == %@", "legacy_user")
-            userRequest.fetchLimit = 1
-            
-            let defaultUser: User
-            if let existingUser = try context.fetch(userRequest).first {
-                defaultUser = existingUser
+            if let firstUser = existingUsers.first {
+                // Verwende existierenden User
+                return firstUser
             } else {
-                defaultUser = User(context: context)
-                defaultUser.id = UUID()
-                defaultUser.username = "legacy_user"
-                defaultUser.email = "legacy@user.local"
-                defaultUser.firstName = "Legacy"
-                defaultUser.lastName = "User"
-                defaultUser.isCurrentUser = true
-                defaultUser.createdAt = Date()
-                defaultUser.updatedAt = Date()
+                // Erstelle neuen User nur wenn gar keine existieren
+                let newUser = User(context: context)
+                newUser.id = UUID()
+                newUser.username = "system_admin"
+                newUser.email = "admin@system.local"
+                newUser.firstName = "System"
+                newUser.lastName = "Administrator"
+                newUser.isCurrentUser = true
+                newUser.createdAt = Date()
+                newUser.updatedAt = Date()
+                return newUser
             }
-            
-            await self.incrementMigrationProgress("Weise Legacy-Trips zu...")
+        }
+        
+        await incrementMigrationProgress("Verwende User: \(defaultUser.displayName)")
+        
+        // Schritt 2: Migriere Legacy-Daten
+        await incrementMigrationProgress("Migriere Legacy-Daten...")
+        
+        let migrationCounts = try await context.perform {
+            var counts = [String: Int]()
             
             // Legacy Trips zuweisen
             let orphanTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
@@ -144,8 +153,7 @@ class CoreDataMigrationManager: ObservableObject {
             for trip in orphanTrips {
                 trip.owner = defaultUser
             }
-            
-            await self.incrementMigrationProgress("Weise Legacy-Memories zu...")
+            counts["Trips"] = orphanTrips.count
             
             // Legacy Memories zuweisen
             let orphanMemoriesRequest: NSFetchRequest<Memory> = Memory.fetchRequest()
@@ -155,14 +163,53 @@ class CoreDataMigrationManager: ObservableObject {
             for memory in orphanMemories {
                 memory.creator = defaultUser
             }
+            counts["Memories"] = orphanMemories.count
             
-            await self.incrementMigrationProgress("Speichere Änderungen...")
+            // Legacy MediaItems zuweisen
+            let orphanMediaRequest: NSFetchRequest<MediaItem> = MediaItem.fetchRequest()
+            orphanMediaRequest.predicate = NSPredicate(format: "uploader == nil")
+            let orphanMedia = try context.fetch(orphanMediaRequest)
             
-            try context.save()
-            print("✅ Legacy-Daten Migration: \(orphanTrips.count) Trips, \(orphanMemories.count) Memories")
+            for mediaItem in orphanMedia {
+                mediaItem.uploader = defaultUser
+            }
+            counts["MediaItems"] = orphanMedia.count
+            
+            // Legacy BucketListItems zuweisen
+            let orphanBucketRequest: NSFetchRequest<BucketListItem> = BucketListItem.fetchRequest()
+            orphanBucketRequest.predicate = NSPredicate(format: "creator == nil")
+            let orphanBucketItems = try context.fetch(orphanBucketRequest)
+            
+            for bucketItem in orphanBucketItems {
+                bucketItem.creator = defaultUser
+            }
+            counts["BucketListItems"] = orphanBucketItems.count
+            
+            // Legacy Tags zuweisen
+            let orphanTagsRequest: NSFetchRequest<Tag> = Tag.fetchRequest()
+            orphanTagsRequest.predicate = NSPredicate(format: "creator == nil")
+            let orphanTags = try context.fetch(orphanTagsRequest)
+            
+            for tag in orphanTags {
+                tag.creator = defaultUser
+            }
+            counts["Tags"] = orphanTags.count
+            
+            return counts
         }
         
-        coordinator.remove(store)
+        // Schritt 3: Speichere Änderungen
+        await incrementMigrationProgress("Speichere Änderungen...")
+        try await context.perform {
+            try context.save()
+        }
+        
+        // Migrations-Zusammenfassung loggen
+        let summary = migrationCounts.map { "\($0.value) \($0.key)" }.joined(separator: ", ")
+        print("✅ Legacy-Daten Migration erfolgreich: \(summary)")
+        print("👤 Zugewiesen an User: \(defaultUser.displayName) (\(defaultUser.email ?? "N/A"))")
+        
+        try coordinator.remove(store)
     }
     
     private func managedObjectModel() -> NSManagedObjectModel? {

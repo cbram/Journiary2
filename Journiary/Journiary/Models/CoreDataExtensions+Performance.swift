@@ -10,7 +10,8 @@ import CoreData
 
 // MARK: - Performance Optimized Multi-User Fetch Requests
 
-extension NSFetchRequest where ResultType == Trip {
+/// High-Performance Trip Queries
+struct TripFetchRequests {
     
     /// High-Performance User Trips Query mit Prefetching
     static func userTripsOptimized(for user: User, includeShared: Bool = true) -> NSFetchRequest<Trip> {
@@ -87,7 +88,8 @@ extension NSFetchRequest where ResultType == Trip {
     }
 }
 
-extension NSFetchRequest where ResultType == Memory {
+/// High-Performance Memory Queries
+struct MemoryFetchRequests {
     
     /// High-Performance User Memories mit Batch Fetching
     static func userMemoriesOptimized(for user: User, includeShared: Bool = true) -> NSFetchRequest<Memory> {
@@ -171,7 +173,8 @@ extension NSFetchRequest where ResultType == Memory {
     }
 }
 
-extension NSFetchRequest where ResultType == Tag {
+/// High-Performance Tag Queries
+struct TagFetchRequests {
     
     /// User Tags mit Usage-Based Sorting
     static func userTagsOptimized(for user: User) -> NSFetchRequest<Tag> {
@@ -226,7 +229,8 @@ extension NSFetchRequest where ResultType == Tag {
     }
 }
 
-extension NSFetchRequest where ResultType == MediaItem {
+/// High-Performance MediaItem Queries
+struct MediaItemFetchRequests {
     
     /// User Media Items mit Size-Based Optimization
     static func userMediaItemsOptimized(for user: User) -> NSFetchRequest<MediaItem> {
@@ -268,7 +272,8 @@ extension NSFetchRequest where ResultType == MediaItem {
     }
 }
 
-extension NSFetchRequest where ResultType == BucketListItem {
+/// High-Performance BucketListItem Queries
+struct BucketListItemFetchRequests {
     
     /// User Bucket List mit Completion Status
     static func userBucketListOptimized(for user: User) -> NSFetchRequest<BucketListItem> {
@@ -395,37 +400,38 @@ class CoreDataPerformanceMonitor {
 
 // MARK: - Performance Helper Extensions
 
-extension NSFetchRequest {
+/// Non-generic helper for NSFetchRequest optimization
+struct FetchRequestOptimizer {
     
     /// Optimiert FetchRequest für Production
-    func optimizeForProduction() {
-        self.returnsObjectsAsFaults = false
-        self.includesSubentities = false
+    static func optimizeForProduction<T>(_ request: NSFetchRequest<T>) {
+        request.returnsObjectsAsFaults = false
+        request.includesSubentities = false
         
-        if self.fetchBatchSize == 0 {
-            self.fetchBatchSize = 20 // Standard Batch Size
+        if request.fetchBatchSize == 0 {
+            request.fetchBatchSize = 20 // Standard Batch Size
         }
         
         // Include Property Values für bessere Performance
-        self.includesPropertyValues = true
-        self.includesPendingChanges = true
+        request.includesPropertyValues = true
+        request.includesPendingChanges = true
     }
     
     /// Fügt Standard Sort Descriptors hinzu falls keine vorhanden
-    func addDefaultSortDescriptors() {
-        if self.sortDescriptors?.isEmpty ?? true {
+    static func addDefaultSortDescriptors<T>(_ request: NSFetchRequest<T>) {
+        if request.sortDescriptors?.isEmpty ?? true {
             // Fallback Sort Descriptor basierend auf Entity Name
-            switch self.entityName {
+            switch request.entityName {
             case "Trip":
-                self.sortDescriptors = [NSSortDescriptor(key: "startDate", ascending: false)]
+                request.sortDescriptors = [NSSortDescriptor(key: "startDate", ascending: false)]
             case "Memory":
-                self.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
+                request.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
             case "Tag":
-                self.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
+                request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]
             case "BucketListItem":
-                self.sortDescriptors = [NSSortDescriptor(key: "isDone", ascending: true)]
+                request.sortDescriptors = [NSSortDescriptor(key: "isDone", ascending: true)]
             default:
-                self.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
+                request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: false)]
             }
         }
     }

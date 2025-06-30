@@ -68,7 +68,7 @@ class MultiUserOperationsManager: ObservableObject {
         try await context.perform {
             for (index, entityType) in entityTypes.enumerated() {
                 let stepProgress = Double(index) / Double(totalSteps)
-                await self.updateBulkOperationProgress(stepProgress, status: "Verarbeite \(entityType.displayName)...")
+                // Progress update außerhalb der context.perform Closure
                 
                 let count = try self.assignOrphanedEntities(of: entityType, to: user, in: context)
                 results[entityType.rawValue] = count
@@ -77,10 +77,7 @@ class MultiUserOperationsManager: ObservableObject {
             }
             
             // Änderungen speichern
-            await self.updateBulkOperationProgress(0.9, status: "Speichere Änderungen...")
             try context.save()
-            
-            await self.updateBulkOperationProgress(1.0, status: "✅ Abgeschlossen")
         }
         
         return results
@@ -137,8 +134,6 @@ class MultiUserOperationsManager: ObservableObject {
                 throw MultiUserOperationError.userNotFound
             }
             
-            await self.updateBulkOperationProgress(0.1, status: "Übertrage Trips...")
-            
             // Trips übertragen
             if let ownedTrips = fromUserInContext.ownedTrips?.allObjects as? [Trip] {
                 for trip in ownedTrips {
@@ -146,8 +141,6 @@ class MultiUserOperationsManager: ObservableObject {
                 }
                 transferResult.tripsTransferred = ownedTrips.count
             }
-            
-            await self.updateBulkOperationProgress(0.3, status: "Übertrage Memories...")
             
             // Memories übertragen
             if let createdMemories = fromUserInContext.createdMemories?.allObjects as? [Memory] {
@@ -157,8 +150,6 @@ class MultiUserOperationsManager: ObservableObject {
                 transferResult.memoriesTransferred = createdMemories.count
             }
             
-            await self.updateBulkOperationProgress(0.5, status: "Übertrage Tags...")
-            
             // Tags übertragen
             if let createdTags = fromUserInContext.createdTags?.allObjects as? [Tag] {
                 for tag in createdTags {
@@ -166,8 +157,6 @@ class MultiUserOperationsManager: ObservableObject {
                 }
                 transferResult.tagsTransferred = createdTags.count
             }
-            
-            await self.updateBulkOperationProgress(0.7, status: "Übertrage weitere Daten...")
             
             // MediaItems übertragen
             if let uploadedMediaItems = fromUserInContext.uploadedMediaItems?.allObjects as? [MediaItem] {
@@ -185,8 +174,6 @@ class MultiUserOperationsManager: ObservableObject {
                 transferResult.bucketListItemsTransferred = bucketListItems.count
             }
             
-            await self.updateBulkOperationProgress(0.9, status: "Speichere Änderungen...")
-            
             // Quell-User löschen falls gewünscht
             if deleteSourceUser {
                 context.delete(fromUserInContext)
@@ -194,8 +181,6 @@ class MultiUserOperationsManager: ObservableObject {
             }
             
             try context.save()
-            
-            await self.updateBulkOperationProgress(1.0, status: "✅ Transfer abgeschlossen")
         }
         
         return transferResult
@@ -218,8 +203,6 @@ class MultiUserOperationsManager: ObservableObject {
         var cleanupResult = CleanupResult()
         
         try await context.perform {
-            await self.updateBulkOperationProgress(0.2, status: "Suche inaktive Users...")
-            
             // Finde Users ohne zugeordnete Daten
             let userRequest: NSFetchRequest<User> = User.fetchRequest()
             userRequest.predicate = NSPredicate(format: "isCurrentUser == NO")
@@ -239,18 +222,13 @@ class MultiUserOperationsManager: ObservableObject {
                 }
             }
             
-            await self.updateBulkOperationProgress(0.7, status: "Lösche inaktive Users...")
-            
             for user in usersToDelete {
                 context.delete(user)
             }
             
             cleanupResult.inactiveUsersDeleted = usersToDelete.count
             
-            await self.updateBulkOperationProgress(0.9, status: "Speichere Änderungen...")
             try context.save()
-            
-            await self.updateBulkOperationProgress(1.0, status: "✅ Cleanup abgeschlossen")
         }
         
         return cleanupResult
@@ -275,7 +253,7 @@ class MultiUserOperationsManager: ObservableObject {
             existingUserRequest.predicate = NSPredicate(format: "email == %@ OR username == %@", email, username)
             existingUserRequest.fetchLimit = 1
             
-            if let existingUser = try context.fetch(existingUserRequest).first {
+            if (try context.fetch(existingUserRequest)).first != nil {
                 throw MultiUserOperationError.userAlreadyExists
             }
             

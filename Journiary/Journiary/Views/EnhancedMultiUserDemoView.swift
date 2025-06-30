@@ -19,7 +19,7 @@ struct EnhancedMultiUserDemoView: View {
     @State private var showingMigrationProgress = false
     @State private var selectedDemoSection: DemoSection = .overview
     @State private var performanceStats: [String: TimeInterval] = [:]
-    @State private var testResults: [TestResult] = []
+    @State private var testResults: [MultiUserTestResult] = []
     
     var body: some View {
         NavigationView {
@@ -247,7 +247,7 @@ struct EnhancedMultiUserDemoView: View {
             ) {
                 VStack(spacing: 12) {
                     Button("Führe alle Tests aus") {
-                        runAllTests()
+                        Task { await runAllTests() }
                     }
                     .buttonStyle(.borderedProminent)
                     
@@ -392,7 +392,7 @@ struct EnhancedMultiUserDemoView: View {
             ) {
                 VStack(spacing: 12) {
                     Button("Query Performance testen") {
-                        testQueryPerformance()
+                        Task { await testQueryPerformance() }
                     }
                     .buttonStyle(.borderedProminent)
                     
@@ -402,7 +402,7 @@ struct EnhancedMultiUserDemoView: View {
                     .buttonStyle(.bordered)
                     
                     Button("Batch Operations testen") {
-                        testBatchOperations()
+                        Task { await testBatchOperations() }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -465,17 +465,17 @@ struct EnhancedMultiUserDemoView: View {
             ) {
                 VStack(spacing: 12) {
                     Button("User Trips Query") {
-                        testUserTripsQuery()
+                        Task { await testUserTripsQuery() }
                     }
                     .buttonStyle(.borderedProminent)
                     
                     Button("Shared Content Query") {
-                        testSharedContentQuery()
+                        Task { await testSharedContentQuery() }
                     }
                     .buttonStyle(.bordered)
                     
                     Button("Performance Optimized Queries") {
-                        testOptimizedQueries()
+                        Task { await testOptimizedQueries() }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -520,17 +520,17 @@ struct EnhancedMultiUserDemoView: View {
             ) {
                 VStack(spacing: 12) {
                     Button("Alle Tests ausführen") {
-                        runAllTests()
+                        Task { await runAllTests() }
                     }
                     .buttonStyle(.borderedProminent)
                     
                     Button("Thread-Safety Tests") {
-                        runThreadSafetyTests()
+                        Task { await runThreadSafetyTests() }
                     }
                     .buttonStyle(.bordered)
                     
                     Button("Migration Tests") {
-                        runMigrationTests()
+                        Task { await runMigrationTests() }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -574,16 +574,15 @@ struct EnhancedMultiUserDemoView: View {
         }
     }
     
-    private func runAllTests() {
-        Task {
-            testResults.removeAll()
-            
-            await testUserTripsQuery()
-            await testSharedContentQuery()
-            await testOptimizedQueries()
-            await runThreadSafetyTests()
-            await testQueryPerformance()
-        }
+    @MainActor
+    private func runAllTests() async {
+        testResults.removeAll()
+        
+        await testUserTripsQuery()
+        await testSharedContentQuery()
+        await testOptimizedQueries()
+        await runThreadSafetyTests()
+        await testQueryPerformance()
     }
     
     @MainActor
@@ -591,11 +590,11 @@ struct EnhancedMultiUserDemoView: View {
         guard let user = userContextManager.currentUser else { return }
         
         let result = CoreDataPerformanceMonitor.shared.measureQuery("UserTrips") {
-            let request = NSFetchRequest<Trip>.userTripsOptimized(for: user)
+            let request = TripFetchRequests.userTripsOptimized(for: user)
             return (try? context.fetch(request)) ?? []
         }
         
-        testResults.append(TestResult(
+        testResults.append(MultiUserTestResult(
             name: "User Trips Query",
             count: result.count,
             status: .success
@@ -607,11 +606,11 @@ struct EnhancedMultiUserDemoView: View {
         guard let user = userContextManager.currentUser else { return }
         
         let result = CoreDataPerformanceMonitor.shared.measureQuery("SharedContent") {
-            let request = NSFetchRequest<Memory>.userMemoriesOptimized(for: user, includeShared: true)
+            let request = MemoryFetchRequests.userMemoriesOptimized(for: user, includeShared: true)
             return (try? context.fetch(request)) ?? []
         }
         
-        testResults.append(TestResult(
+        testResults.append(MultiUserTestResult(
             name: "Shared Content Query",
             count: result.count,
             status: .success
@@ -622,53 +621,70 @@ struct EnhancedMultiUserDemoView: View {
     private func testOptimizedQueries() async {
         guard let user = userContextManager.currentUser else { return }
         
-        // Test verschiedene optimierte Queries
-        let queries = [
-            ("Recent Trips", NSFetchRequest<Trip>.recentUserTrips(for: user)),
-            ("Active Trips", NSFetchRequest<Trip>.activeUserTrips(for: user)),
-            ("Popular Tags", NSFetchRequest<Tag>.popularTags(for: user)),
-            ("Recent Memories", NSFetchRequest<Memory>.recentMemories(for: user))
-        ]
-        
-        for (name, request) in queries {
-            let result = CoreDataPerformanceMonitor.shared.measureQuery(name) {
-                return (try? context.fetch(request)) ?? []
-            }
-            
-            testResults.append(TestResult(
-                name: name,
-                count: result.count,
-                status: .success
-            ))
+        // Test Trip Queries
+        let tripRequest = TripFetchRequests.recentUserTrips(for: user)
+        let tripResult = CoreDataPerformanceMonitor.shared.measureQuery("Recent Trips") {
+            return (try? context.fetch(tripRequest)) ?? []
         }
+        testResults.append(MultiUserTestResult(
+            name: "Recent Trips",
+            count: tripResult.count,
+            status: .success
+        ))
+        
+        // Test Tag Queries  
+        let tagRequest = TagFetchRequests.popularTags(for: user)
+        let tagResult = CoreDataPerformanceMonitor.shared.measureQuery("Popular Tags") {
+            return (try? context.fetch(tagRequest)) ?? []
+        }
+        testResults.append(MultiUserTestResult(
+            name: "Popular Tags",
+            count: tagResult.count,
+            status: .success
+        ))
+        
+        // Test Memory Queries
+        let memoryRequest = MemoryFetchRequests.recentMemories(for: user)
+        let memoryResult = CoreDataPerformanceMonitor.shared.measureQuery("Recent Memories") {
+            return (try? context.fetch(memoryRequest)) ?? []
+        }
+        testResults.append(MultiUserTestResult(
+            name: "Recent Memories",
+            count: memoryResult.count,
+            status: .success
+        ))
     }
     
     @MainActor
     private func runThreadSafetyTests() async {
-        // Simuliere concurrent operations
-        let group = DispatchGroup()
+        // Simuliere concurrent operations mit TaskGroup
         var success = true
         
-        for i in 0..<5 {
-            group.enter()
-            Task.detached {
-                do {
-                    try await multiUserOpsManager.createUser(
-                        email: "test\(i)@example.com",
-                        username: "test_user_\(i)",
-                        firstName: "Test",
-                        lastName: "User \(i)"
-                    )
-                } catch {
+        await withTaskGroup(of: Bool.self) { group in
+            for i in 0..<5 {
+                group.addTask {
+                    do {
+                        _ = try await self.multiUserOpsManager.createUser(
+                            email: "test\(i)@example.com",
+                            username: "test_user_\(i)",
+                            firstName: "Test",
+                            lastName: "User \(i)"
+                        )
+                        return true
+                    } catch {
+                        return false
+                    }
+                }
+            }
+            
+            for await result in group {
+                if !result {
                     success = false
                 }
-                group.leave()
             }
         }
         
-        group.wait()
-        
-        testResults.append(TestResult(
+        testResults.append(MultiUserTestResult(
             name: "Thread Safety Test",
             count: 5,
             status: success ? .success : .error
@@ -678,7 +694,7 @@ struct EnhancedMultiUserDemoView: View {
     @MainActor
     private func runMigrationTests() async {
         // Test Migration Logic
-        testResults.append(TestResult(
+        testResults.append(MultiUserTestResult(
             name: "Migration Test",
             count: 1,
             status: migrationManager.migrationCompleted ? .success : .warning
@@ -692,12 +708,12 @@ struct EnhancedMultiUserDemoView: View {
         // Test Query Performance
         let startTime = CFAbsoluteTimeGetCurrent()
         
-        let request = NSFetchRequest<Trip>.userTripsOptimized(for: user)
+        let request = TripFetchRequests.userTripsOptimized(for: user)
         _ = try? context.fetch(request)
         
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         
-        testResults.append(TestResult(
+        testResults.append(MultiUserTestResult(
             name: "Query Performance",
             count: Int(timeElapsed * 1000), // ms
             status: timeElapsed < 0.1 ? .success : .warning
@@ -761,7 +777,11 @@ struct EnhancedMultiUserDemoView: View {
     
     private func performLegacyMigration() {
         Task {
-            await migrationManager.performMigration(storeURL: URL(fileURLWithPath: ""))
+            do {
+                try await migrationManager.performMigration(storeURL: URL(fileURLWithPath: ""))
+            } catch {
+                print("❌ Migration fehlgeschlagen: \(error)")
+            }
         }
     }
     
@@ -976,7 +996,7 @@ enum TestStatus {
     }
 }
 
-struct TestResult {
+struct MultiUserTestResult {
     let id = UUID()
     let name: String
     let count: Int

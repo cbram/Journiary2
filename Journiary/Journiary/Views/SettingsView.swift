@@ -27,6 +27,8 @@ struct SettingsView: View {
     @State private var showingTripCrudTest = false
     @State private var showingAdminPanel = false
     @State private var showingErrorHandlingTest = false
+    @State private var showingSchemaMigrationTest = false
+    @State private var showingMultiUserQueryTest = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -116,6 +118,12 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingErrorHandlingTest) {
             ErrorHandlingTestView()
+        }
+        .sheet(isPresented: $showingSchemaMigrationTest) {
+            SchemaMigrationTestView()
+        }
+        .sheet(isPresented: $showingMultiUserQueryTest) {
+            MultiUserQueryTestView()
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
@@ -406,6 +414,28 @@ struct SettingsView: View {
                         title: "Error Handling Test",
                         icon: "exclamationmark.triangle",
                         status: "Fehlerbehandlung testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingSchemaMigrationTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "Schema Migration Test",
+                        icon: "externaldrive.fill.badge.checkmark",
+                        status: "Core Data Migration testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingMultiUserQueryTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "Multi-User Query Test",
+                        icon: "person.2.circle.fill",
+                        status: "User-Isolation & Sharing testen"
                     )
                 }
                 .buttonStyle(PlainButtonStyle())

@@ -93,7 +93,7 @@ class EnhancedPersistenceController: ObservableObject {
         let storeURL = container.persistentStoreDescriptions.first?.url
         
         // Migration Check
-        if let url = storeURL, migrationManager.isMigrationRequired(storeURL: url) {
+        if let url = storeURL, await migrationManager.isMigrationRequired(storeURL: url) {
             await MainActor.run {
                 requiresMigration = true
             }
@@ -261,7 +261,7 @@ class EnhancedPersistenceController: ObservableObject {
         // Merge Changes zwischen Contexts
         if context.parent == nil && context != viewContext {
             viewContext.perform {
-                self.viewContext.mergeChanges(from: notification)
+                self.viewContext.mergeChanges(fromContextDidSave: notification)
             }
         }
     }
@@ -310,8 +310,10 @@ class EnhancedPersistenceController: ObservableObject {
         
         try await contextToUse.perform {
             let entityName = String(describing: entityType)
-            let deleteRequest = NSBatchDeleteRequest(fetchRequest: NSFetchRequest(entityName: entityName))
-            deleteRequest.predicate = predicate
+            let fetchRequest = NSFetchRequest<NSFetchRequestResult>(entityName: entityName)
+            fetchRequest.predicate = predicate
+            
+            let deleteRequest = NSBatchDeleteRequest(fetchRequest: fetchRequest)
             deleteRequest.resultType = .resultTypeObjectIDs
             
             do {
