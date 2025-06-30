@@ -479,23 +479,39 @@ class GraphQLTripService: ObservableObject {
                 return
             }
             
-            let trip = Trip(context: self.context)
-            trip.id = UUID()
-            trip.name = name
-            trip.tripDescription = description
-            trip.startDate = startDate
-            trip.endDate = endDate
-            trip.isActive = true
-            
-            do {
-                try self.context.save()
-                if let tripDTO = TripDTO.from(coreData: trip) {
-                    promise(.success(tripDTO))
-                } else {
-                    promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
+            // Hole aktuellen User auf Main Thread
+            DispatchQueue.main.async {
+                guard let currentUser = UserContextManager.shared.currentUser else {
+                    promise(.failure(.unknown("Kein aktueller User gefunden - Trip kann nicht erstellt werden")))
+                    return
                 }
-            } catch {
-                promise(.failure(.cacheError(error.localizedDescription)))
+                
+                // Wechsle zurück zu Background für Core Data Operation
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let trip = Trip(context: self.context)
+                    trip.id = UUID()
+                    trip.name = name
+                    trip.tripDescription = description
+                    trip.startDate = startDate
+                    trip.endDate = endDate
+                    trip.isActive = true
+                    
+                    // WICHTIG: Owner zuweisen!
+                    trip.owner = currentUser
+                    
+                    print("✅ Trip '\(name)' wird erstellt mit Owner: \(currentUser.displayName)")
+                    
+                    do {
+                        try self.context.save()
+                        if let tripDTO = TripDTO.from(coreData: trip) {
+                            promise(.success(tripDTO))
+                        } else {
+                            promise(.failure(.unknown("Trip-Konvertierung fehlgeschlagen")))
+                        }
+                    } catch {
+                        promise(.failure(.cacheError(error.localizedDescription)))
+                    }
+                }
             }
         }
         .delay(for: .seconds(0.5), scheduler: DispatchQueue.main)

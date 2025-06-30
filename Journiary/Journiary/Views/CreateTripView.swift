@@ -372,6 +372,14 @@ struct CreateTripView: View {
         } else {
             // Neue Reise erstellen
             trip = Trip(context: viewContext)
+            
+            // WICHTIG: Owner zuweisen bei neuen Trips!
+            if let currentUser = UserContextManager.shared.currentUser {
+                trip.owner = currentUser
+                print("✅ Neue Reise mit Owner erstellt: \(currentUser.displayName)")
+            } else {
+                print("⚠️ Warnung: Neue Reise ohne Owner erstellt - kein aktueller User gefunden")
+            }
         }
         
         // Werte setzen

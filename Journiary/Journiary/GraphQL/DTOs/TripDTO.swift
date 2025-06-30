@@ -138,6 +138,10 @@ extension TripDTO {
         } else {
             trip = Trip(context: context)
             trip.id = UUID(uuidString: id) ?? UUID()
+            
+            // HINWEIS: Owner muss vom aufrufenden Service gesetzt werden!
+            // Da UserContextManager @MainActor isoliert ist, können wir hier nicht darauf zugreifen
+            print("⚠️ Neuer Trip erstellt - Owner muss vom Service gesetzt werden")
         }
         
         // Daten aktualisieren

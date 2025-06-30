@@ -176,6 +176,9 @@ class EnhancedPersistenceController: ObservableObject {
         
         // Initialize User Context
         initializeUserContext()
+        
+        // Perform Startup Check
+        performStartupCheck()
     }
     
     /// Initialisiert User Context
@@ -245,6 +248,32 @@ class EnhancedPersistenceController: ObservableObject {
             }
         } catch {
             print("❌ Temp File Cleanup fehlgeschlagen: \(error)")
+        }
+    }
+    
+    private func performStartupCheck() {
+        // Prüfe auf Data Integrity beim App-Start
+        performDataIntegrityCheck()
+    }
+    
+    /// 🔍 Data Integrity Check - sucht nach Problemen
+    private func performDataIntegrityCheck() {
+        let orphanedTripsCount = TripFetchRequestHelpers.countOrphanedTrips(in: container.viewContext)
+        
+        if orphanedTripsCount > 0 {
+            print("⚠️ DATA INTEGRITY WARNING: \(orphanedTripsCount) Trips ohne Owner gefunden!")
+            print("📋 Diese Trips sollten einem User zugewiesen werden:")
+            
+            let orphanRequest = TripFetchRequestHelpers.orphanedTrips()
+            if let orphanedTrips = try? container.viewContext.fetch(orphanRequest) {
+                for trip in orphanedTrips {
+                    print("   - '\(trip.name ?? "Unbekannt")' (ID: \(trip.id?.uuidString ?? "N/A"))")
+                }
+            }
+            
+            print("💡 Lösung: Nutzen Sie die 'Fix Legacy Trips' Funktion in den App-Einstellungen")
+        } else {
+            print("✅ Data Integrity Check: Alle Trips haben einen Owner")
         }
     }
     

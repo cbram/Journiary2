@@ -48,6 +48,16 @@ final class TripDTOMappingTests: XCTestCase {
         coreDataTrip.totalDistance = 2500.0 // in Metern
         coreDataTrip.gpsTrackingEnabled = false
         
+        // Owner hinzufügen für Multi-User Kompatibilität
+        let owner = User(context: context)
+        owner.id = UUID()
+        owner.username = "testuser"
+        owner.email = "test@example.com"
+        owner.firstName = "Test"
+        owner.lastName = "User"
+        owner.isCurrentUser = true
+        coreDataTrip.owner = owner
+        
         // When: Core Data → TripDTO
         let tripDTO = TripDTO.from(coreData: coreDataTrip)
         
@@ -73,6 +83,16 @@ final class TripDTOMappingTests: XCTestCase {
         let tripId = UUID()
         coreDataTrip.id = tripId
         coreDataTrip.name = "Minimal Trip"
+        
+        // Owner auch bei minimalen Tests hinzufügen
+        let owner = User(context: context)
+        owner.id = UUID()
+        owner.username = "minimal_user"
+        owner.email = "minimal@example.com"
+        owner.firstName = "Minimal"
+        owner.lastName = "User"
+        owner.isCurrentUser = true
+        coreDataTrip.owner = owner
         
         // When: Core Data → TripDTO
         let tripDTO = TripDTO.from(coreData: coreDataTrip)

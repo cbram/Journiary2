@@ -259,6 +259,23 @@ struct TripFetchRequestHelpers {
         ]
         return request
     }
+    
+    /// 🔍 DEBUGGING: Fetch Trips OHNE Owner (sollten nicht existieren!)
+    static func orphanedTrips() -> NSFetchRequest<Trip> {
+        let request = NSFetchRequest<Trip>(entityName: "Trip")
+        request.predicate = NSPredicate(format: "owner == nil")
+        request.sortDescriptors = [
+            NSSortDescriptor(keyPath: \Trip.startDate, ascending: false),
+            NSSortDescriptor(keyPath: \Trip.name, ascending: true)
+        ]
+        return request
+    }
+    
+    /// 🔧 Anzahl Trips ohne Owner ermitteln
+    static func countOrphanedTrips(in context: NSManagedObjectContext) -> Int {
+        let request = orphanedTrips()
+        return (try? context.count(for: request)) ?? 0
+    }
 }
 
 /// Memory Fetch Request Helpers
