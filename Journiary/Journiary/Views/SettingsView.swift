@@ -35,6 +35,11 @@ struct SettingsView: View {
     @State private var apiKeySavedMessage: String? = nil
     @State private var placeProvider: String = UserDefaults.standard.string(forKey: "PlaceProvider") ?? "Nominatim"
     
+    // Legacy Trip Fix States
+    @State private var isFixingLegacyTrips = false
+    @State private var showingFixResult = false
+    @State private var fixResultMessage = ""
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -136,6 +141,11 @@ struct SettingsView: View {
             Button("Abbrechen", role: .cancel) { }
         } message: {
             Text("Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Reisen und Erinnerungen werden permanent gelöscht.")
+        }
+        .alert("Legacy Trip Fix", isPresented: $showingFixResult) {
+            Button("OK") { }
+        } message: {
+            Text(fixResultMessage)
         }
     }
     
@@ -460,13 +470,33 @@ struct SettingsView: View {
                         await fixLegacyTripsWithoutOwner()
                     }
                 }) {
-                    SettingsRowNavigable(
-                        title: "🔧 Fix Legacy Trips ohne Owner",
-                        icon: "wrench.fill",
-                        status: "Repariert Trips ohne User-Zuordnung"
-                    )
+                    HStack {
+                        if isFixingLegacyTrips {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .frame(width: 24)
+                        } else {
+                            Image(systemName: "wrench.fill")
+                                .font(.title3)
+                                .foregroundColor(.blue)
+                                .frame(width: 24)
+                        }
+                        
+                        Text("🔧 Fix Legacy Trips ohne Owner")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Text(isFixingLegacyTrips ? "Wird repariert..." : "Repariert Trips ohne User-Zuordnung")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(isFixingLegacyTrips)
             }
             .padding()
             .background(Color(.systemBackground))
@@ -544,20 +574,24 @@ struct SettingsView: View {
     // MARK: - Legacy Data Fix
     
     private func fixLegacyTripsWithoutOwner() async {
+        // Start loading state
+        await MainActor.run {
+            isFixingLegacyTrips = true
+        }
+        
         print("🔧 Starte Legacy-Trip-Fix...")
         
         let context = viewContext
         
-        await context.perform {
-            do {
+        do {
+            let result = try await context.perform {
                 // Hole aktuellen User
                 let userRequest: NSFetchRequest<User> = User.fetchRequest()
                 userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
                 let currentUsers = try context.fetch(userRequest)
                 
                 guard let currentUser = currentUsers.first else {
-                    print("❌ Kein aktueller User gefunden")
-                    return
+                    throw LegacyFixError.noCurrentUser
                 }
                 
                 // Finde Trips ohne Owner
@@ -577,15 +611,41 @@ struct SettingsView: View {
                 try context.save()
                 print("✅ Legacy-Trip-Fix erfolgreich abgeschlossen: \(orphanTrips.count) Trips repariert")
                 
-                // Zeige Erfolg in UI
-                DispatchQueue.main.async {
-                    // TODO: Toast oder Alert zeigen
+                return (orphanTrips.count, currentUser.displayName)
+            }
+            
+            // Success - Show result
+            await MainActor.run {
+                isFixingLegacyTrips = false
+                if result.0 == 0 {
+                    fixResultMessage = "✅ Keine Trips ohne Owner gefunden.\nAlle Trips sind korrekt zugeordnet!"
+                } else {
+                    fixResultMessage = "✅ Erfolgreich repariert!\n\n\(result.0) Trip(s) wurden dem User '\(result.1)' zugewiesen."
                 }
-                
-            } catch {
-                print("❌ Fehler beim Legacy-Trip-Fix: \(error)")
+                showingFixResult = true
+            }
+            
+        } catch {
+            print("❌ Fehler beim Legacy-Trip-Fix: \(error)")
+            
+            // Error - Show error message
+            await MainActor.run {
+                isFixingLegacyTrips = false
+                if let legacyError = error as? LegacyFixError {
+                    switch legacyError {
+                    case .noCurrentUser:
+                        fixResultMessage = "❌ Fehler: Kein aktueller User gefunden.\n\nBitte stellen Sie sicher, dass ein User angemeldet ist."
+                    }
+                } else {
+                    fixResultMessage = "❌ Fehler beim Reparieren:\n\n\(error.localizedDescription)"
+                }
+                showingFixResult = true
             }
         }
+    }
+    
+    enum LegacyFixError: Error {
+        case noCurrentUser
     }
     
     // MARK: - Computed Properties
