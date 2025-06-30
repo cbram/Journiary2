@@ -40,6 +40,11 @@ struct SettingsView: View {
     @State private var showingFixResult = false
     @State private var fixResultMessage = ""
     
+    // Legacy Memory Fix States
+    @State private var isFixingLegacyMemories = false
+    @State private var showingMemoryFixResult = false
+    @State private var memoryFixResultMessage = ""
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -146,6 +151,11 @@ struct SettingsView: View {
             Button("OK") { }
         } message: {
             Text(fixResultMessage)
+        }
+        .alert("Legacy Memory Fix", isPresented: $showingMemoryFixResult) {
+            Button("OK") { }
+        } message: {
+            Text(memoryFixResultMessage)
         }
     }
     
@@ -497,6 +507,39 @@ struct SettingsView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 .disabled(isFixingLegacyTrips)
+                
+                Button(action: {
+                    Task {
+                        await fixLegacyMemoriesWithoutCreator()
+                    }
+                }) {
+                    HStack {
+                        if isFixingLegacyMemories {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .frame(width: 24)
+                        } else {
+                            Image(systemName: "brain.head.profile")
+                                .font(.title3)
+                                .foregroundColor(.orange)
+                                .frame(width: 24)
+                        }
+                        
+                        Text("🧠 Fix Legacy Memories ohne Creator")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        
+                        Spacer()
+                        
+                        Text(isFixingLegacyMemories ? "Wird repariert..." : "Repariert Memories ohne Creator-Zuordnung")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 12)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isFixingLegacyMemories)
             }
             .padding()
             .background(Color(.systemBackground))
@@ -640,6 +683,66 @@ struct SettingsView: View {
                     fixResultMessage = "❌ Fehler beim Reparieren:\n\n\(error.localizedDescription)"
                 }
                 showingFixResult = true
+            }
+        }
+    }
+    
+    private func fixLegacyMemoriesWithoutCreator() async {
+        // Start loading state
+        await MainActor.run {
+            isFixingLegacyMemories = true
+        }
+        
+        print("🧠 Starte Legacy-Memory-Fix...")
+        
+        let context = viewContext
+        
+        do {
+            let result = try await context.perform {
+                // Finde Memories ohne Creator
+                let orphanMemoriesRequest: NSFetchRequest<Memory> = Memory.fetchRequest()
+                orphanMemoriesRequest.predicate = NSPredicate(format: "creator == nil")
+                let orphanMemories = try context.fetch(orphanMemoriesRequest)
+                
+                print("🔍 Gefunden: \(orphanMemories.count) Memories ohne Creator")
+                
+                                 // Hole aktuellen User
+                 guard let currentUser = UserContextManager.shared.currentUser else {
+                     throw LegacyFixError.noCurrentUser
+                 }
+                 
+                 // Weise alle Memories dem aktuellen User zu
+                 for memory in orphanMemories {
+                     memory.creator = currentUser
+                     print("✅ Memory '\(memory.title ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
+                 }
+                
+                // Speichere Änderungen
+                try context.save()
+                print("✅ Legacy-Memory-Fix erfolgreich abgeschlossen: \(orphanMemories.count) Memories repariert")
+                
+                                 return (orphanMemories.count, currentUser.displayName)
+            }
+            
+            // Success - Show result
+            await MainActor.run {
+                isFixingLegacyMemories = false
+                if result.0 == 0 {
+                    memoryFixResultMessage = "✅ Keine Memories ohne Creator gefunden.\nAlle Memories sind korrekt zugeordnet!"
+                } else {
+                    memoryFixResultMessage = "✅ Erfolgreich repariert!\n\n\(result.0) Memory(ies) wurden dem User '\(result.1)' zugewiesen."
+                }
+                showingMemoryFixResult = true
+            }
+            
+        } catch {
+            print("❌ Fehler beim Legacy-Memory-Fix: \(error)")
+            
+            // Error - Show error message
+            await MainActor.run {
+                isFixingLegacyMemories = false
+                memoryFixResultMessage = "❌ Fehler beim Reparieren:\n\n\(error.localizedDescription)"
+                showingMemoryFixResult = true
             }
         }
     }

@@ -20,6 +20,7 @@ struct MemoryDTO {
     let userId: String
     let createdAt: Date?
     let updatedAt: Date?
+    let creatorId: String?
     
     // MARK: - Core Data to DTO
     
@@ -58,7 +59,8 @@ struct MemoryDTO {
             tripId: tripId,
             userId: userId,
             createdAt: memory.timestamp,
-            updatedAt: memory.timestamp
+            updatedAt: memory.timestamp,
+            creatorId: memory.creator?.id?.uuidString
         )
     }
     
@@ -96,6 +98,8 @@ struct MemoryDTO {
             updatedAt = ISO8601DateFormatter().date(from: updatedAtString)
         }
         
+        let creatorId = dict["creatorId"] as? String
+        
         return MemoryDTO(
             id: id,
             title: title,
@@ -104,7 +108,8 @@ struct MemoryDTO {
             tripId: tripId,
             userId: userId,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            creatorId: creatorId
         )
     }
     
@@ -138,6 +143,24 @@ struct MemoryDTO {
             if let trip = try? context.fetch(tripRequest).first {
                 memory.trip = trip
             }
+        }
+        
+        // WICHTIG: Bei neuen Memories aus Backend Creator zuweisen!
+        // Versuche User via UUID zu finden, falls vorhanden
+        if let creatorId = creatorId,
+           let creatorUUID = UUID(uuidString: creatorId) {
+            let userRequest: NSFetchRequest<User> = User.fetchRequest()
+            userRequest.predicate = NSPredicate(format: "id == %@", creatorUUID as CVarArg)
+            userRequest.fetchLimit = 1
+            
+            if let creator = try? context.fetch(userRequest).first {
+                memory.creator = creator
+                print("✅ Memory aus Backend mit bekanntem Creator zugewiesen: \(creator.displayName)")
+            } else {
+                print("⚠️ Warnung: Creator UUID \(creatorId) nicht in lokaler DB gefunden")
+            }
+        } else {
+            print("⚠️ Warnung: Memory aus Backend ohne Creator-Information")
         }
         
         return memory

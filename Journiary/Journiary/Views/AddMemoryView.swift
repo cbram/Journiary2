@@ -1753,6 +1753,14 @@ struct AddMemoryView: View {
         memory.text = text
         memory.timestamp = selectedDate
         
+        // WICHTIG: Creator zuweisen bei neuen Memories!
+        if let currentUser = UserContextManager.shared.currentUser {
+            memory.creator = currentUser
+            print("✅ Neue Memory mit Creator erstellt: \(currentUser.displayName)")
+        } else {
+            print("⚠️ Warnung: Neue Memory ohne Creator erstellt - kein aktueller User gefunden")
+        }
+        
         // Standort hinzufügen
         if let coordinate = finalCoordinate {
             memory.latitude = coordinate.latitude
@@ -1901,6 +1909,14 @@ struct AddMemoryView: View {
         tempMemory.text = text
         tempMemory.timestamp = selectedDate
         tempMemory.locationName = finalLocationName
+        
+        // WICHTIG: Auch temporäre Memories brauchen einen Creator!
+        if let currentUser = UserContextManager.shared.currentUser {
+            tempMemory.creator = currentUser
+            print("✅ Temporäre Memory mit Creator erstellt: \(currentUser.displayName)")
+        } else {
+            print("⚠️ Warnung: Temporäre Memory ohne Creator erstellt")
+        }
         
         if let coordinate = finalCoordinate {
             tempMemory.latitude = coordinate.latitude

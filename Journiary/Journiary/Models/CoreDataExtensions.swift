@@ -286,28 +286,51 @@ struct MemoryFetchRequestHelpers {
         let request = NSFetchRequest<Memory>(entityName: "Memory")
         request.predicate = NSPredicate(format: "creator == %@", user)
         request.sortDescriptors = [
-            NSSortDescriptor(keyPath: \Memory.timestamp, ascending: false)
+            NSSortDescriptor(keyPath: \Memory.timestamp, ascending: false),
+            NSSortDescriptor(keyPath: \Memory.title, ascending: true)
         ]
         return request
     }
     
-    /// Fetch Memories in accessible Trips für User
-    static func accessibleMemories(for user: User) -> NSFetchRequest<Memory> {
+    /// Fetch Memories ohne Creator (Orphaned Memories)
+    static func orphanedMemories() -> NSFetchRequest<Memory> {
         let request = NSFetchRequest<Memory>(entityName: "Memory")
-        request.predicate = NSPredicate(format: "trip.owner == %@ OR ANY trip.members == %@", user, user)
+        request.predicate = NSPredicate(format: "creator == nil")
         request.sortDescriptors = [
             NSSortDescriptor(keyPath: \Memory.timestamp, ascending: false)
         ]
         return request
     }
     
-    /// Fetch Memories für bestimmten Trip (mit User Access Check)
-    static func memories(for trip: Trip, user: User) -> NSFetchRequest<Memory> {
+    /// Count Orphaned Memories ohne Creator
+    static func countOrphanedMemories(in context: NSManagedObjectContext) -> Int {
+        let request = orphanedMemories()
+        
+        do {
+            return try context.count(for: request)
+        } catch {
+            print("❌ Fehler beim Zählen von Orphaned Memories: \(error)")
+            return 0
+        }
+    }
+    
+    /// Fetch optimized user memories mit Relationships
+    static func userMemoriesOptimized(for user: User, includeShared: Bool = false) -> NSFetchRequest<Memory> {
         let request = NSFetchRequest<Memory>(entityName: "Memory")
-        request.predicate = NSPredicate(format: "trip == %@ AND (trip.owner == %@ OR ANY trip.members == %@)", trip, user, user)
+        
+        if includeShared {
+            // Memories wo User Creator ist ODER Teil der Trip-Members
+            request.predicate = NSPredicate(format: "creator == %@ OR trip.members CONTAINS %@", user, user)
+        } else {
+            // Nur Memories wo User Creator ist
+            request.predicate = NSPredicate(format: "creator == %@", user)
+        }
+        
+        request.relationshipKeyPathsForPrefetching = ["creator", "trip", "tags", "mediaItems"]
         request.sortDescriptors = [
             NSSortDescriptor(keyPath: \Memory.timestamp, ascending: false)
         ]
+        
         return request
     }
 }

@@ -259,6 +259,7 @@ class EnhancedPersistenceController: ObservableObject {
     /// 🔍 Data Integrity Check - sucht nach Problemen
     private func performDataIntegrityCheck() {
         let orphanedTripsCount = TripFetchRequestHelpers.countOrphanedTrips(in: container.viewContext)
+        let orphanedMemoriesCount = MemoryFetchRequestHelpers.countOrphanedMemories(in: container.viewContext)
         
         if orphanedTripsCount > 0 {
             print("⚠️ DATA INTEGRITY WARNING: \(orphanedTripsCount) Trips ohne Owner gefunden!")
@@ -267,13 +268,27 @@ class EnhancedPersistenceController: ObservableObject {
             let orphanRequest = TripFetchRequestHelpers.orphanedTrips()
             if let orphanedTrips = try? container.viewContext.fetch(orphanRequest) {
                 for trip in orphanedTrips {
-                    print("   - '\(trip.name ?? "Unbekannt")' (ID: \(trip.id?.uuidString ?? "N/A"))")
+                    print("   - Trip: '\(trip.name ?? "Unbekannt")' (ID: \(trip.id?.uuidString ?? "nil"))")
                 }
             }
+        }
+        
+        if orphanedMemoriesCount > 0 {
+            print("⚠️ DATA INTEGRITY WARNING: \(orphanedMemoriesCount) Memories ohne Creator gefunden!")
+            print("📋 Diese Memories sollten einem User zugewiesen werden:")
             
-            print("💡 Lösung: Nutzen Sie die 'Fix Legacy Trips' Funktion in den App-Einstellungen")
+            let orphanRequest = MemoryFetchRequestHelpers.orphanedMemories()
+            if let orphanedMemories = try? container.viewContext.fetch(orphanRequest) {
+                for memory in orphanedMemories {
+                    print("   - Memory: '\(memory.title ?? "Unbekannt")' (Timestamp: \(memory.timestamp?.description ?? "nil"))")
+                }
+            }
+        }
+        
+        if orphanedTripsCount == 0 && orphanedMemoriesCount == 0 {
+            print("✅ DATA INTEGRITY CHECK: Alle Daten korrekt zugeordnet")
         } else {
-            print("✅ Data Integrity Check: Alle Trips haben einen Owner")
+            print("🔧 TIPP: Verwenden Sie die 'Fix Legacy Data' Buttons in den App-Einstellungen")
         }
     }
     
