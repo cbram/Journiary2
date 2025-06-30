@@ -579,4 +579,68 @@ class UserContextManager: ObservableObject {
     }
 }
 
-// User Extensions sind bereits in User+Extensions.swift definiert 
+// User Extensions sind bereits in User+Extensions.swift definiert
+
+// MARK: - CloudKit Sharing Extensions
+
+extension Trip {
+    /// CloudKit Share URL für geteilte Trips
+    var cloudKitShareURL: String? {
+        get {
+            return value(forKey: "cloudKitShareURL") as? String
+        }
+        set {
+            setValue(newValue, forKey: "cloudKitShareURL")
+        }
+    }
+    
+    /// Indikator ob Trip via CloudKit geteilt ist
+    var isSharedViaCloudKit: Bool {
+        get {
+            return value(forKey: "isSharedViaCloudKit") as? Bool ?? false
+        }
+        set {
+            setValue(newValue, forKey: "isSharedViaCloudKit")
+        }
+    }
+    
+    /// Prüft ob Trip sowohl über CloudKit als auch Backend geteilt ist
+    var isHybridShared: Bool {
+        return isSharedViaCloudKit && (members?.count ?? 0) > 0
+    }
+    
+    /// Sharing Status Display Text
+    var sharingStatusText: String {
+        if isHybridShared {
+            return "CloudKit + Backend"
+        } else if isSharedViaCloudKit {
+            return "CloudKit"
+        } else if (members?.count ?? 0) > 0 {
+            return "Backend"
+        } else {
+            return "Nicht geteilt"
+        }
+    }
+}
+
+extension Memory {
+    /// CloudKit Share URL für geteilte Memories
+    var cloudKitShareURL: String? {
+        get {
+            return value(forKey: "cloudKitShareURL") as? String
+        }
+        set {
+            setValue(newValue, forKey: "cloudKitShareURL")
+        }
+    }
+    
+    /// Indikator ob Memory via CloudKit geteilt ist
+    var isSharedViaCloudKit: Bool {
+        get {
+            return value(forKey: "isSharedViaCloudKit") as? Bool ?? false
+        }
+        set {
+            setValue(newValue, forKey: "isSharedViaCloudKit")
+        }
+    }
+}

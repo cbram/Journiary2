@@ -29,6 +29,7 @@ struct SettingsView: View {
     @State private var showingErrorHandlingTest = false
     @State private var showingSchemaMigrationTest = false
     @State private var showingMultiUserQueryTest = false
+    @State private var showingCloudKitCompatibilityTest = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -124,6 +125,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingMultiUserQueryTest) {
             MultiUserQueryTestView()
+        }
+        .sheet(isPresented: $showingCloudKitCompatibilityTest) {
+            CloudKitCompatibilityTestView()
         }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
@@ -436,6 +440,17 @@ struct SettingsView: View {
                         title: "Multi-User Query Test",
                         icon: "person.2.circle.fill",
                         status: "User-Isolation & Sharing testen"
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    showingCloudKitCompatibilityTest = true
+                }) {
+                    SettingsRowNavigable(
+                        title: "CloudKit Compatibility Test",
+                        icon: "icloud.fill",
+                        status: "CloudKit Sync & Schema testen"
                     )
                 }
                 .buttonStyle(PlainButtonStyle())
