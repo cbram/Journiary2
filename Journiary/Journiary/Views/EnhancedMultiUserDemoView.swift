@@ -569,7 +569,6 @@ struct EnhancedMultiUserDemoView: View {
     private func initializeDemo() {
         // Initialisiere Demo
         Task {
-            await persistenceController.initialize()
             updatePerformanceStats()
         }
     }

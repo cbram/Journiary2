@@ -33,7 +33,7 @@ struct POIView: View {
     
     init(appMode: Binding<AppMode>) {
         self._appMode = appMode
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         _filterManager = StateObject(wrappedValue: BucketListFilterManager(context: context))
     }
     

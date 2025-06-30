@@ -597,7 +597,7 @@ class UserService: ObservableObject {
         print("🎭 Demo-Mode: Anmeldung für \(email) simuliert")
         
         // WICHTIG: Prüfe ob Benutzer tatsächlich existiert
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         
         guard let user = User.findUser(byEmail: email, context: context) else {
             print("❌ Demo-Mode: Benutzer \(email) nicht gefunden")

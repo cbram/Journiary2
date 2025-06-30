@@ -21,7 +21,7 @@ class GraphQLUserService: ObservableObject {
     // MARK: - Private Properties
     
     private var cancellables = Set<AnyCancellable>()
-    private let context = PersistenceController.shared.container.viewContext
+    private let context = EnhancedPersistenceController.shared.container.viewContext
     
     // MARK: - Demo Mode
     

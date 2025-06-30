@@ -208,21 +208,17 @@ struct MultiUserQueryTestView: View {
         isTestingInProgress = true
         testResults.removeAll()
         
-        do {
-            switch selectedTestScenario {
-            case .userIsolation:
-                await testUserIsolation()
-            case .sharedContent:
-                await testSharedContent()
-            case .performanceOptimized:
-                await testPerformanceOptimizedQueries()
-            case .crossUserQueries:
-                await testCrossUserQueries()
-            case .batchOperations:
-                await testBatchOperations()
-            }
-        } catch {
-            addTestResult(name: "Test Error", success: false, details: error.localizedDescription, userContext: nil)
+        switch selectedTestScenario {
+        case .userIsolation:
+            await testUserIsolation()
+        case .sharedContent:
+            await testSharedContent()
+        case .performanceOptimized:
+            await testPerformanceOptimizedQueries()
+        case .crossUserQueries:
+            await testCrossUserQueries()
+        case .batchOperations:
+            await testBatchOperations()
         }
         
         isTestingInProgress = false

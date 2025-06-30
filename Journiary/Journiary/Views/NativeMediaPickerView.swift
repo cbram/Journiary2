@@ -378,7 +378,7 @@ struct NativeMediaPickerView: View {
         saveImageToPhotoLibrary(image)
         
         // Erstelle MediaItem für die App
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         if let mediaItem = MediaItem.createPhoto(from: image, in: context) {
             onMediaCaptured(mediaItem)
             print("📷 Neues Foto hinzugefügt (Native Kamera)")
@@ -403,7 +403,7 @@ struct NativeMediaPickerView: View {
                 let videoData = try Data(contentsOf: videoURL)
                 
                 await MainActor.run {
-                    let context = PersistenceController.shared.container.viewContext
+                    let context = EnhancedPersistenceController.shared.container.viewContext
                     if let mediaItem = MediaItem.createVideoAsync(from: videoData, in: context) {
                         onMediaCaptured(mediaItem)
                         print("📷 Neues Video hinzugefügt (Native Kamera)")

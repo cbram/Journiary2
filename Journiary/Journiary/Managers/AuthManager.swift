@@ -220,7 +220,7 @@ class AuthManager: ObservableObject {
         
         // Benutzer abmelden
         if let currentUser = currentUser {
-            let context = PersistenceController.shared.container.viewContext
+            let context = EnhancedPersistenceController.shared.container.viewContext
             currentUser.isCurrentUser = false
             
             do {
@@ -240,7 +240,7 @@ class AuthManager: ObservableObject {
     }
     
     private func loadCurrentUser() {
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         currentUser = User.fetchCurrentUser(context: context)
         
         if currentUser == nil {
@@ -262,7 +262,7 @@ class AuthManager: ObservableObject {
     }
     
     private func saveUserToCore(_ userData: GraphQL.User) {
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         
         // Prüfen ob Benutzer bereits existiert
         let existingUser = User.findUser(byEmail: userData.email, context: context)
@@ -429,7 +429,7 @@ class AuthManager: ObservableObject {
         
         // 2. Aktuellen Benutzer in Core Data deaktivieren
         if let currentUser = currentUser {
-            let context = PersistenceController.shared.container.viewContext
+            let context = EnhancedPersistenceController.shared.container.viewContext
             currentUser.isCurrentUser = false
             
             do {

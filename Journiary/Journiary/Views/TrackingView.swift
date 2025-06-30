@@ -15,7 +15,7 @@ struct TrackingView: View {
     @Binding var appMode: AppMode
     
     init(appMode: Binding<AppMode>) {
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         self._locationManager = StateObject(wrappedValue: LocationManager(context: context))
         self._appMode = appMode
     }

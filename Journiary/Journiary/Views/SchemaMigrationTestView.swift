@@ -172,19 +172,15 @@ struct SchemaMigrationTestView: View {
         isTestingInProgress = true
         testResults.removeAll()
         
-        do {
-            switch selectedTestScenario {
-            case .fullMigration:
-                await testFullMigration()
-            case .dataIntegrity:
-                await testDataIntegrity()
-            case .userAssignment:
-                await testUserAssignment()
-            case .relationshipValidation:
-                await testRelationshipValidation()
-            }
-        } catch {
-            addTestResult(name: "Test Error", success: false, details: error.localizedDescription)
+        switch selectedTestScenario {
+        case .fullMigration:
+            await testFullMigration()
+        case .dataIntegrity:
+            await testDataIntegrity()
+        case .userAssignment:
+            await testUserAssignment()
+        case .relationshipValidation:
+            await testRelationshipValidation()
         }
         
         isTestingInProgress = false

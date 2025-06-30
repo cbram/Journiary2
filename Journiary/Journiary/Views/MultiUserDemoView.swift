@@ -257,7 +257,7 @@ struct MultiUserDemoView: View {
         print("\n🧪 Multi-User Query Tests:")
         
         // Test 1: User Trips
-        let userTripsRequest = NSFetchRequest<Trip>.userTrips(for: currentUser)
+                    let userTripsRequest = TripFetchRequestHelpers.userTrips(for: currentUser)
         do {
             let userTrips = try context.fetch(userTripsRequest)
             print("✅ User Trips: \(userTrips.count)")
@@ -266,7 +266,7 @@ struct MultiUserDemoView: View {
         }
         
         // Test 2: User Memories
-        let userMemoriesRequest = NSFetchRequest<Memory>.userMemories(for: currentUser)
+                    let userMemoriesRequest = MemoryFetchRequestHelpers.userMemories(for: currentUser)
         do {
             let userMemories = try context.fetch(userMemoriesRequest)
             print("✅ User Memories: \(userMemories.count)")

@@ -22,35 +22,29 @@ class EnhancedPersistenceController: ObservableObject {
     
     // MARK: - Core Data Stack
     
-    lazy var container: NSPersistentCloudKitContainer = {
-        let container = NSPersistentCloudKitContainer(name: "Journiary")
-        
-        // CloudKit Configuration
-        configureCloudKitContainer(container)
-        
-        // Store Configuration
-        configureStoreDescription(container)
-        
-        return container
-    }()
+    private let _container: NSPersistentCloudKitContainer
+    
+    var container: NSPersistentCloudKitContainer {
+        return _container
+    }
     
     // MARK: - Contexts
     
     /// Main Context für UI Operations (ViewContext)
     var viewContext: NSManagedObjectContext {
-        return container.viewContext
+        return _container.viewContext
     }
     
     /// Background Context für Heavy Operations
     lazy var backgroundContext: NSManagedObjectContext = {
-        let context = container.newBackgroundContext()
+        let context = _container.newBackgroundContext()
         context.automaticallyMergesChangesFromParent = true
         return context
     }()
     
     /// Sync Context für CloudKit/Backend Sync
     lazy var syncContext: NSManagedObjectContext = {
-        let context = container.newBackgroundContext()
+        let context = _container.newBackgroundContext()
         context.automaticallyMergesChangesFromParent = true
         context.name = "SyncContext"
         return context
@@ -63,65 +57,64 @@ class EnhancedPersistenceController: ObservableObject {
     // MARK: - Initialization
     
     private init() {
-        setupNotifications()
-    }
-    
-    /// Initialisiert Core Data Stack mit Migration Support
-    func initialize() async {
-        await MainActor.run {
-            isInitialized = false
-            initializationError = nil
-        }
+        print("🔧 EnhancedPersistenceController wird initialisiert...")
         
-        do {
-            try await initializeCoreDataStack()
-            await MainActor.run {
-                isInitialized = true
-            }
-        } catch {
-            await MainActor.run {
-                initializationError = "Core Data Initialisierung fehlgeschlagen: \(error.localizedDescription)"
-            }
-            print("❌ Core Data Initialisierung fehlgeschlagen: \(error)")
-        }
+        // Container einmalig erstellen
+        _container = NSPersistentCloudKitContainer(name: "Journiary")
+        
+        // CloudKit Configuration
+        configureCloudKitContainer(_container)
+        
+        // Store Configuration
+        configureStoreDescription(_container)
+        
+        setupNotifications()
+        
+        // Synchronously load stores
+        loadPersistentStoresSync(_container)
+        
+        print("✅ EnhancedPersistenceController vollständig initialisiert")
     }
     
     // MARK: - Private Methods
     
-    /// Initialisiert Core Data Stack mit Migration Check
-    private func initializeCoreDataStack() async throws {
-        let storeURL = container.persistentStoreDescriptions.first?.url
+    /// Lädt Persistent Stores synchron (nur einmal!)
+    private func loadPersistentStoresSync(_ container: NSPersistentCloudKitContainer) {
+        var loadError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        var storeLoaded = false
         
-        // Migration Check
-        if let url = storeURL, await migrationManager.isMigrationRequired(storeURL: url) {
-            await MainActor.run {
-                requiresMigration = true
+        container.loadPersistentStores { [weak self] (storeDescription, error) in
+            guard !storeLoaded else {
+                print("⚠️ Store bereits geladen - überspringe doppelte Initialisierung")
+                semaphore.signal()
+                return
             }
+            storeLoaded = true
             
-            print("🔄 Migration erforderlich - starte Migration...")
-            try await migrationManager.performMigration(storeURL: url)
-            print("✅ Migration abgeschlossen")
+            if let error = error {
+                print("❌ Core Data Store Load Fehler: \(error)")
+                loadError = error
+            } else {
+                print("✅ Core Data Store geladen: \(storeDescription.url?.lastPathComponent ?? "Unknown")")
+                self?.configureMergePolicy()
+                DispatchQueue.main.async {
+                    self?.isInitialized = true
+                }
+            }
+            semaphore.signal()
         }
         
-        // Core Data Stack laden
-        try await loadPersistentStores()
+        semaphore.wait()
         
-        // Post-Initialization Setup
-        await performPostInitializationSetup()
-    }
-    
-    /// Lädt Persistent Stores
-    private func loadPersistentStores() async throws {
-        return try await withCheckedThrowingContinuation { continuation in
-            container.loadPersistentStores { [weak self] (storeDescription, error) in
-                if let error = error {
-                    print("❌ Core Data Store Load Fehler: \(error)")
-                    continuation.resume(throwing: error)
-                } else {
-                    print("✅ Core Data Store geladen: \(storeDescription.url?.lastPathComponent ?? "Unknown")")
-                    self?.configureMergePolicy()
-                    continuation.resume()
-                }
+        if let error = loadError {
+            DispatchQueue.main.async {
+                self.initializationError = "Core Data Initialisierung fehlgeschlagen: \(error.localizedDescription)"
+            }
+        } else {
+            // Post-Initialization Setup in Background
+            DispatchQueue.global(qos: .background).async {
+                self.performPostInitializationSetup()
             }
         }
     }
@@ -177,49 +170,19 @@ class EnhancedPersistenceController: ObservableObject {
     }
     
     /// Post-Initialization Setup
-    private func performPostInitializationSetup() async {
+    private func performPostInitializationSetup() {
         // Cleanup Temp Files
         cleanupTemporaryFiles()
         
-        // Index Optimization
-        await optimizeDatabaseIndexes()
-        
         // Initialize User Context
-        await initializeUserContext()
-    }
-    
-    /// Optimiert Database Indexes für Multi-User Queries
-    private func optimizeDatabaseIndexes() async {
-        await backgroundContext.perform {
-            do {
-                // Analyze Database für bessere Query Performance
-                let analyzeRequest = NSFetchRequest<NSFetchRequestResult>(entityName: "Trip")
-                analyzeRequest.resultType = .dictionaryResultType
-                
-                _ = try self.backgroundContext.execute(analyzeRequest)
-                print("✅ Database Indexes optimiert")
-            } catch {
-                print("❌ Database Optimization fehlgeschlagen: \(error)")
-            }
-        }
+        initializeUserContext()
     }
     
     /// Initialisiert User Context
-    private func initializeUserContext() async {
-        await viewContext.perform {
-            // Prüfe ob Current User existiert
-            let userRequest: NSFetchRequest<User> = User.fetchRequest()
-            userRequest.predicate = NSPredicate(format: "isCurrentUser == YES")
-            userRequest.fetchLimit = 1
-            
-            do {
-                let currentUsers = try self.viewContext.fetch(userRequest)
-                if currentUsers.isEmpty {
-                    print("⚠️ Kein Current User gefunden - UserContextManager wird initialisiert")
-                }
-            } catch {
-                print("❌ User Context Check fehlgeschlagen: \(error)")
-            }
+    private func initializeUserContext() {
+        // User Context wird async initialisiert
+        Task { @MainActor in
+            UserContextManager.shared.loadCurrentUser()
         }
     }
     

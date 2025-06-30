@@ -353,7 +353,7 @@ struct EditProfileView: View {
         
         // Hier würde normalerweise der UserService aufgerufen
         // Für jetzt aktualisieren wir nur lokal
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         
         if let user = authManager.currentUser {
             user.firstName = firstName.isEmpty ? nil : firstName

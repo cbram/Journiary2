@@ -83,7 +83,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct JourniaryApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    let persistenceController = PersistenceController.shared
+    let persistenceController = EnhancedPersistenceController.shared
     
     // MARK: - Managers
     @StateObject private var authManager = AuthManager.shared

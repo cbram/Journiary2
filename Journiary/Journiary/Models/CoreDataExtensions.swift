@@ -222,9 +222,10 @@ struct TagColor {
     }
 }
 
-// MARK: - Multi-User NSFetchRequest Extensions
+// MARK: - Multi-User Fetch Request Helpers (Fixed Generic Issues)
 
-extension NSFetchRequest where ResultType == Trip {
+/// Trip Fetch Request Helpers
+struct TripFetchRequestHelpers {
     
     /// Fetch Trips für einen bestimmten User (Owner)
     static func userTrips(for user: User) -> NSFetchRequest<Trip> {
@@ -260,7 +261,8 @@ extension NSFetchRequest where ResultType == Trip {
     }
 }
 
-extension NSFetchRequest where ResultType == Memory {
+/// Memory Fetch Request Helpers
+struct MemoryFetchRequestHelpers {
     
     /// Fetch Memories für einen bestimmten User (Creator)
     static func userMemories(for user: User) -> NSFetchRequest<Memory> {
@@ -293,7 +295,8 @@ extension NSFetchRequest where ResultType == Memory {
     }
 }
 
-extension NSFetchRequest where ResultType == Tag {
+/// Tag Fetch Request Helpers
+struct TagFetchRequestHelpers {
     
     /// Fetch Tags für einen bestimmten User
     static func userTags(for user: User) -> NSFetchRequest<Tag> {
@@ -318,7 +321,8 @@ extension NSFetchRequest where ResultType == Tag {
     }
 }
 
-extension NSFetchRequest where ResultType == TagCategory {
+/// TagCategory Fetch Request Helpers
+struct TagCategoryFetchRequestHelpers {
     
     /// Fetch Tag Categories für einen bestimmten User
     static func userTagCategories(for user: User) -> NSFetchRequest<TagCategory> {
@@ -332,7 +336,8 @@ extension NSFetchRequest where ResultType == TagCategory {
     }
 }
 
-extension NSFetchRequest where ResultType == BucketListItem {
+/// BucketListItem Fetch Request Helpers
+struct BucketListItemFetchRequestHelpers {
     
     /// Fetch Bucket List Items für einen bestimmten User
     static func userBucketListItems(for user: User) -> NSFetchRequest<BucketListItem> {
@@ -357,7 +362,8 @@ extension NSFetchRequest where ResultType == BucketListItem {
     }
 }
 
-extension NSFetchRequest where ResultType == User {
+/// User Fetch Request Helpers
+struct UserFetchRequestHelpers {
     
     /// Fetch Current User
     static func currentUser() -> NSFetchRequest<User> {
@@ -426,7 +432,7 @@ class UserContextManager: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     
-    private let context = PersistenceController.shared.container.viewContext
+    private let context = EnhancedPersistenceController.shared.container.viewContext
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
@@ -450,7 +456,7 @@ class UserContextManager: ObservableObject {
         errorMessage = nil
         
         do {
-            let users = try context.fetch(NSFetchRequest<User>.currentUser())
+            let users = try context.fetch(UserFetchRequestHelpers.currentUser())
             
             if let user = users.first {
                 currentUser = user

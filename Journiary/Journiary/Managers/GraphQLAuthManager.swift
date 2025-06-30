@@ -135,7 +135,7 @@ extension AuthManager {
                     currentUser.email = userDTO.email
                     currentUser.updatedAt = Date()
                     
-                    let context = PersistenceController.shared.container.viewContext
+                    let context = EnhancedPersistenceController.shared.container.viewContext
                     try? context.save()
                 }
             }
@@ -154,7 +154,7 @@ extension AuthManager {
     /// Simuliere erfolgreichen Login für Demo Mode
     /// Arbeitet direkt mit Core Data ohne private AuthManager Methoden
     private func simulateSuccessfulLogin(userData: GraphQL.User) {
-        let context = PersistenceController.shared.container.viewContext
+        let context = EnhancedPersistenceController.shared.container.viewContext
         
         // Prüfen ob Benutzer bereits existiert
         let request: NSFetchRequest<User> = User.fetchRequest()
