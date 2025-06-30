@@ -801,9 +801,11 @@ class CloudKitTestManager: ObservableObject {
                 let memories = try context.fetch(memoryRequest)
                 
                 if memories.count >= 10 {
-                    // Batch Update Test
+                    // Batch Update Test - verwende sicheres Predicate ohne problematische IDs
+                    let testDate = Date().addingTimeInterval(-86400) // 24 Stunden zurück
+                    
                     let batchUpdateRequest = NSBatchUpdateRequest(entityName: "Memory")
-                    batchUpdateRequest.predicate = NSPredicate(format: "id IN %@", memories.prefix(10).compactMap { $0.id })
+                    batchUpdateRequest.predicate = NSPredicate(format: "timestamp < %@", testDate as NSDate)
                     batchUpdateRequest.propertiesToUpdate = ["timestamp": Date()]
                     
                     try context.execute(batchUpdateRequest)
