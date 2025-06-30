@@ -67,8 +67,13 @@ class MultiUserOperationsManager: ObservableObject {
         
         try await context.perform {
             for (index, entityType) in entityTypes.enumerated() {
-                let stepProgress = Double(index) / Double(totalSteps)
                 // Progress update außerhalb der context.perform Closure
+                let progress = Double(index) / Double(totalSteps)
+                
+                Task { @MainActor in
+                    self.bulkOperationProgress = progress
+                    self.bulkOperationStatus = "Bearbeite \(entityType.displayName)..."
+                }
                 
                 let count = try self.assignOrphanedEntities(of: entityType, to: user, in: context)
                 results[entityType.rawValue] = count

@@ -52,7 +52,10 @@ class EnhancedPersistenceController: ObservableObject {
     
     // MARK: - Migration Manager
     
-    private let migrationManager = CoreDataMigrationManager.shared
+    @MainActor 
+    private func getMigrationManager() -> CoreDataMigrationManager {
+        return CoreDataMigrationManager.shared
+    }
     
     // MARK: - Initialization
     

@@ -112,7 +112,7 @@ class CloudKitSharingService: ObservableObject {
             
             // Speichere Share (vereinfachte API)
             let recordsToSave = [tripRecord, share]
-            try await database.modifyRecords(saving: recordsToSave, deleting: [])
+            let _ = try await database.modifyRecords(saving: recordsToSave, deleting: [])
             
             // Update Trip mit Share Information
             trip.cloudKitShareURL = share.url?.absoluteString
@@ -220,7 +220,7 @@ class CloudKitSharingService: ObservableObject {
             
             // Speichere Share (vereinfacht)
             let recordsToSave = [memoryRecord, share]
-            try await database.modifyRecords(saving: recordsToSave, deleting: [])
+            let _ = try await database.modifyRecords(saving: recordsToSave, deleting: [])
             
             // Update Memory mit Share Information
             memory.cloudKitShareURL = share.url?.absoluteString

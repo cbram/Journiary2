@@ -695,6 +695,16 @@ struct SettingsView: View {
         
         print("🧠 Starte Legacy-Memory-Fix...")
         
+        // Hole aktuellen User im Main Actor Kontext
+        guard let currentUser = await MainActor.run(body: { UserContextManager.shared.currentUser }) else {
+            await MainActor.run {
+                isFixingLegacyMemories = false
+                memoryFixResultMessage = "❌ Fehler: Kein aktueller User gefunden.\n\nBitte stellen Sie sicher, dass ein User angemeldet ist."
+                showingMemoryFixResult = true
+            }
+            return
+        }
+        
         let context = viewContext
         
         do {
@@ -706,22 +716,17 @@ struct SettingsView: View {
                 
                 print("🔍 Gefunden: \(orphanMemories.count) Memories ohne Creator")
                 
-                                 // Hole aktuellen User
-                 guard let currentUser = UserContextManager.shared.currentUser else {
-                     throw LegacyFixError.noCurrentUser
-                 }
-                 
-                 // Weise alle Memories dem aktuellen User zu
-                 for memory in orphanMemories {
-                     memory.creator = currentUser
-                     print("✅ Memory '\(memory.title ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
-                 }
+                // Weise alle Memories dem aktuellen User zu
+                for memory in orphanMemories {
+                    memory.creator = currentUser
+                    print("✅ Memory '\(memory.title ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
+                }
                 
                 // Speichere Änderungen
                 try context.save()
                 print("✅ Legacy-Memory-Fix erfolgreich abgeschlossen: \(orphanMemories.count) Memories repariert")
                 
-                                 return (orphanMemories.count, currentUser.displayName)
+                return (orphanMemories.count, currentUser.displayName)
             }
             
             // Success - Show result
