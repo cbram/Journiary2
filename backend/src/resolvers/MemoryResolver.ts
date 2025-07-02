@@ -1,4 +1,4 @@
-import { Resolver, Query, Mutation, Arg, FieldResolver, Root, Ctx } from 'type-graphql';
+import { Resolver, Query, Mutation, Arg, FieldResolver, Root, Ctx, ID } from 'type-graphql';
 import { Memory } from '../entities/Memory';
 import { MemoryInput } from '../entities/MemoryInput';
 import { UpdateMemoryInput } from '../entities/UpdateMemoryInput';
@@ -20,7 +20,7 @@ export class MemoryResolver {
     @Query(() => [Memory], { description: "Get all memories for trips the user is a member of" })
     async memories(
         @Ctx() { userId }: MyContext,
-        @Arg("tripId", () => String, { nullable: true }) tripId?: string
+        @Arg("tripId", () => ID, { nullable: true }) tripId?: string
     ): Promise<Memory[]> {
         if (!userId) {
             return [];
@@ -208,7 +208,7 @@ export class MemoryResolver {
     async searchMemories(
         @Arg("query") query: string,
         @Ctx() { userId }: MyContext,
-        @Arg("tripId", () => String, { nullable: true }) tripId?: string
+        @Arg("tripId", () => ID, { nullable: true }) tripId?: string
     ): Promise<Memory[]> {
         if (!userId) {
             return [];
