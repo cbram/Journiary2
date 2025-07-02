@@ -148,7 +148,45 @@ class GraphQLSyncService: ObservableObject {
                     .publisher
                     .flatMap { $0 }
                     .collect()
-                    .map { _ in true }
+                    .flatMap { _ -> AnyPublisher<Bool, GraphQLError> in
+                        // ===== MEMORY UPLOAD =====
+                        let memoryService = GraphQLMemoryService()
+
+                        // 1. Server-Memories holen IDs
+                        return ApolloClientManager.shared.fetch(query: GetMemoriesQuery.self, cachePolicy: .networkOnly)
+                            .map { $0.memories.map { $0.id } }
+                            .flatMap { serverMemoryIds -> AnyPublisher<Bool, GraphQLError> in
+                                var newMemories: [Memory] = []
+                                self.context.performAndWait {
+                                    let req: NSFetchRequest<Memory> = Memory.fetchRequest()
+                                    if let locals = try? self.context.fetch(req) {
+                                        for mem in locals {
+                                            if let mid = mem.id?.uuidString, !serverMemoryIds.contains(mid) {
+                                                newMemories.append(mem)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                guard !newMemories.isEmpty else {
+                                    return Just(true).setFailureType(to: GraphQLError.self).eraseToAnyPublisher()
+                                }
+
+                                let memPublishers = newMemories.compactMap { mem -> AnyPublisher<Bool, GraphQLError>? in
+                                    guard let dto = MemoryDTO.from(coreData: mem) else { return nil }
+                                    return memoryService.createMemory(input: dto)
+                                        .map { _ in true }
+                                        .eraseToAnyPublisher()
+                                }
+
+                                return memPublishers.publisher
+                                    .flatMap { $0 }
+                                    .collect()
+                                    .map { _ in true }
+                                    .eraseToAnyPublisher()
+                            }
+                            .eraseToAnyPublisher()
+                    }
                     .eraseToAnyPublisher()
             }
             .eraseToAnyPublisher()
