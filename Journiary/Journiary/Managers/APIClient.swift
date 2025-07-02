@@ -155,12 +155,7 @@ class APIClient: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
-        // Basic Authentication
-        let credentials = "\(username):\(password)"
-        if let credentialsData = credentials.data(using: .utf8) {
-            let base64Credentials = credentialsData.base64EncodedString()
-            request.setValue("Basic \(base64Credentials)", forHTTPHeaderField: "Authorization")
-        }
+        // Kein Authorization-Header nötig – hello Query ist öffentlich
         
         // GraphQL Query Body
         let graphqlQuery = ["query": "{ hello }"]
