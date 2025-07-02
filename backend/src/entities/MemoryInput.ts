@@ -1,5 +1,6 @@
 import { InputType, Field, ID, Float } from 'type-graphql';
 import { Memory } from './Memory';
+import { LocationInput } from './LocationInput';
 
 @InputType({ description: "New memory data" })
 export class MemoryInput implements Partial<Memory> {
@@ -10,17 +11,20 @@ export class MemoryInput implements Partial<Memory> {
     @Field({ name: "content", nullable: true })
     text?: string;
     
-    @Field({ name: "date" })
-    timestamp!: Date;
+    @Field({ name: "date", nullable: true })
+    timestamp?: Date;
 
-    @Field(() => Float)
-    latitude!: number;
+    @Field(() => Float, { nullable: true })
+    latitude?: number;
 
-    @Field(() => Float)
-    longitude!: number;
+    @Field(() => Float, { nullable: true })
+    longitude?: number;
 
     @Field({ name: "address", nullable: true })
     locationName?: string;
+
+    @Field(() => LocationInput, { nullable: true })
+    location?: LocationInput;
 
     @Field(() => ID, { description: "The ID of the trip this memory belongs to" })
     tripId!: string;

@@ -99,8 +99,24 @@ export class MemoryResolver {
 
         const creator = await AppDataSource.getRepository(User).findOneBy({ id: userId });
 
+        // Falls ein Location-Objekt geliefert wurde, extrahiere Koordinaten
+        let latitude = input.latitude;
+        let longitude = input.longitude;
+        let locationName = input.locationName;
+
+        if (input.location) {
+            latitude = input.location.latitude;
+            longitude = input.location.longitude;
+            if (input.location.name !== undefined) {
+                locationName = input.location.name;
+            }
+        }
+
         const newMemory = memoryRepository.create({
             ...input,
+            latitude,
+            longitude,
+            locationName,
             trip,
         });
 
@@ -151,6 +167,14 @@ export class MemoryResolver {
         if (input.title !== undefined) memory.title = input.title;
         if (input.text !== undefined) memory.text = input.text;
         if (input.timestamp !== undefined) memory.timestamp = input.timestamp;
+
+        // Koordinaten können einzeln oder über location-Objekt aktualisiert werden
+        if (input.location) {
+            memory.latitude = input.location.latitude;
+            memory.longitude = input.location.longitude;
+            memory.locationName = input.location.name ?? memory.locationName;
+        }
+
         if (input.latitude !== undefined) memory.latitude = input.latitude;
         if (input.longitude !== undefined) memory.longitude = input.longitude;
         if (input.locationName !== undefined) memory.locationName = input.locationName;

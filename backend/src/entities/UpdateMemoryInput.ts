@@ -1,4 +1,5 @@
 import { InputType, Field, Float } from 'type-graphql';
+import { LocationInput } from './LocationInput';
 
 @InputType({ description: "Update memory data" })
 export class UpdateMemoryInput {
@@ -17,6 +18,9 @@ export class UpdateMemoryInput {
 
     @Field(() => Float, { nullable: true })
     longitude?: number;
+
+    @Field(() => LocationInput, { nullable: true })
+    location?: LocationInput;
 
     @Field({ name: "address", nullable: true })
     locationName?: string;
