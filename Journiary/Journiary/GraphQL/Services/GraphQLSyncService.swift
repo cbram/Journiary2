@@ -78,8 +78,17 @@ class GraphQLSyncService: ObservableObject {
                     let request: NSFetchRequest<Trip> = Trip.fetchRequest()
                     if let localTrips = try? self.context.fetch(request) {
                         for trip in localTrips {
-                            guard let uuid = trip.id?.uuidString else { continue }
-                            if serverTripIds.contains(uuid) {
+                            var tripUUID: String
+                            if let uuid = trip.id?.uuidString {
+                                tripUUID = uuid
+                            } else {
+                                // Generiere neue UUID für Trip ohne Backend-ID
+                                let newId = UUID()
+                                trip.id = newId
+                                tripUUID = newId.uuidString
+                            }
+
+                            if serverTripIds.contains(tripUUID) {
                                 claimTrips.append(trip)
                             } else {
                                 createTrips.append(trip)
