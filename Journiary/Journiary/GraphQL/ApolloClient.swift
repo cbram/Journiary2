@@ -139,6 +139,9 @@ class ApolloClientManager: ObservableObject {
                 }
                 
                 print("✅ Mutation \(Mutation.operationName) erfolgreich")
+                #if DEBUG
+                print("🔄 Raw GraphQL:", jsonResult)
+                #endif
                 return data
             }
             .mapError { error -> GraphQLError in
