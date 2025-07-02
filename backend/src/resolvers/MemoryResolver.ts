@@ -13,6 +13,7 @@ import { AuthenticationError, UserInputError } from 'apollo-server-express';
 import { checkTripAccess } from '../utils/auth';
 import { TripRole } from '../entities/TripMembership';
 import { TripMembership } from '../entities/TripMembership';
+import { Location as GQLLocation } from './types/Location';
 
 @Resolver(() => Memory)
 export class MemoryResolver {
@@ -287,5 +288,17 @@ export class MemoryResolver {
             relations: ["mediaItems"],
         });
         return memoryWithMedia ? memoryWithMedia.mediaItems : [];
+    }
+
+    @FieldResolver(() => GQLLocation, { nullable: true })
+    location(@Root() memory: Memory): GQLLocation | null {
+        if (memory.latitude == null || memory.longitude == null) {
+            return null;
+        }
+        return {
+            latitude: memory.latitude,
+            longitude: memory.longitude,
+            name: memory.locationName ?? undefined,
+        } as GQLLocation;
     }
 } 
