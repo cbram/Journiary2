@@ -3,8 +3,10 @@ import { User } from '../entities/User';
 import { AppDataSource } from '../utils/database';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { UserInputError } from 'apollo-server-express';
-import { UserInput } from '../entities/UserInput'; // We'll create this next
+import { UserInputError, AuthenticationError } from 'apollo-server-express';
+import { UserInput } from '../entities/UserInput';
+import { UpdateUserInput } from '../entities/UpdateUserInput';
+import { MyContext } from '..';
 
 @ObjectType()
 class AuthResponse {
@@ -114,5 +116,39 @@ export class UserResolver {
             token,
             user,
         };
+    }
+
+    @Mutation(() => User, { description: "Update user profile" })
+    async updateUser(
+        @Arg("input") input: UpdateUserInput,
+        @Ctx() { userId }: MyContext
+    ): Promise<User> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to update your profile.");
+        }
+
+        const userRepository = AppDataSource.getRepository(User);
+        const user = await userRepository.findOneBy({ id: userId });
+
+        if (!user) {
+            throw new AuthenticationError("User not found.");
+        }
+
+        // Update only provided fields
+        if (input.username !== undefined) user.username = input.username;
+        if (input.email !== undefined) user.email = input.email;
+        if (input.firstName !== undefined) user.firstName = input.firstName;
+        if (input.lastName !== undefined) user.lastName = input.lastName;
+
+        return await userRepository.save(user);
+    }
+
+    @Query(() => User, { nullable: true, description: "Get current user profile" })
+    async getCurrentUser(@Ctx() { userId }: MyContext): Promise<User | null> {
+        if (!userId) {
+            return null;
+        }
+
+        return await AppDataSource.getRepository(User).findOneBy({ id: userId });
     }
 } 

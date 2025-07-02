@@ -1,6 +1,7 @@
 import { Resolver, Mutation, Arg, Ctx, Query } from "type-graphql";
 import { TagCategory } from "../entities/TagCategory";
 import { TagCategoryInput } from "../entities/TagCategoryInput";
+import { UpdateTagCategoryInput } from "../entities/UpdateTagCategoryInput";
 import { AppDataSource } from "../utils/database";
 import { MyContext } from "..";
 import { AuthenticationError } from "apollo-server-express";
@@ -27,7 +28,7 @@ export class TagCategoryResolver {
     @Mutation(() => TagCategory, { nullable: true })
     async updateTagCategory(
         @Arg("id") id: string,
-        @Arg("input") input: TagCategoryInput,
+        @Arg("input") input: UpdateTagCategoryInput,
         @Ctx() { userId }: MyContext
     ): Promise<TagCategory | null> {
         if (!userId) throw new AuthenticationError("You must be logged in to update a tag category.");
@@ -39,7 +40,11 @@ export class TagCategoryResolver {
             return null;
         }
 
-        Object.assign(category, input);
+        // Update properties from input (only update provided fields)
+        if (input.name !== undefined) category.name = input.name;
+        if (input.color !== undefined) category.color = input.color;
+        if (input.icon !== undefined) category.emoji = input.icon;
+
         return await categoryRepo.save(category);
     }
 

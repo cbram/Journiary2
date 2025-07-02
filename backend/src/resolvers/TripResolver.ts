@@ -16,6 +16,7 @@ import { MediaItem } from '../entities/MediaItem';
 import { RoutePoint } from '../entities/RoutePoint';
 import { TrackSegment } from '../entities/TrackSegment';
 import { GPXTrack } from '../entities/GPXTrack';
+import { Permission } from '../entities/Permission';
 
 @Resolver(Trip)
 export class TripResolver {
@@ -53,6 +54,27 @@ export class TripResolver {
         const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
         // Wenn die Reise nicht existiert, null zurückgeben (GraphQL-Konvention)
         return trip;
+    }
+
+    @Query(() => [TripMembership], { description: "Get all members of a trip" })
+    async getTripMembers(
+        @Arg("tripId", () => ID) tripId: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembership[]> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to view trip members.");
+        }
+
+        // Check if the user has at least VIEWER rights for this trip
+        const hasAccess = await checkTripAccess(userId, tripId, TripRole.VIEWER);
+        if (!hasAccess) {
+            throw new AuthenticationError("You don't have permission to view members of this trip.");
+        }
+
+        return await AppDataSource.getRepository(TripMembership).find({
+            where: { trip: { id: tripId } },
+            relations: ["user", "trip"]
+        });
     }
 
     @Mutation(() => Trip, { description: "Create a new trip" })
@@ -239,6 +261,73 @@ export class TripResolver {
             console.error(`Error fetching memories for trip ${trip.id}:`, error);
             throw new Error("Could not fetch memories for the trip.");
         }
+    }
+
+    @Mutation(() => TripMembership, { description: "Share a trip with another user" })
+    async shareTrip(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("email") email: string,
+        @Arg("permission", () => Permission) permission: Permission,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembership> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to share a trip.");
+        }
+
+        // Check if the user has at least EDITOR rights for this trip
+        const hasAccess = await checkTripAccess(userId, tripId, TripRole.EDITOR);
+        if (!hasAccess) {
+            throw new AuthenticationError("You don't have permission to share this trip.");
+        }
+
+        // Find the trip
+        const trip = await AppDataSource.getRepository(Trip).findOneBy({ id: tripId });
+        if (!trip) {
+            throw new UserInputError(`Trip with ID ${tripId} not found.`);
+        }
+
+        // Find the user to share with
+        const userToShareWith = await AppDataSource.getRepository(User).findOneBy({ email });
+        if (!userToShareWith) {
+            throw new UserInputError(`User with email ${email} not found.`);
+        }
+
+        // Check if user is already a member
+        const existingMembership = await AppDataSource.getRepository(TripMembership).findOne({
+            where: {
+                user: { id: userToShareWith.id },
+                trip: { id: tripId }
+            }
+        });
+
+        if (existingMembership) {
+            throw new UserInputError(`User ${email} is already a member of this trip.`);
+        }
+
+        // Convert Permission to TripRole
+        let tripRole: TripRole;
+        switch (permission) {
+            case Permission.READ:
+                tripRole = TripRole.VIEWER;
+                break;
+            case Permission.WRITE:
+                tripRole = TripRole.EDITOR;
+                break;
+            case Permission.ADMIN:
+                tripRole = TripRole.OWNER;
+                break;
+            default:
+                tripRole = TripRole.VIEWER;
+        }
+
+        // Create membership
+        const membership = AppDataSource.getRepository(TripMembership).create({
+            user: userToShareWith,
+            trip: trip,
+            role: tripRole,
+        });
+
+        return await AppDataSource.getRepository(TripMembership).save(membership);
     }
 
     @FieldResolver(() => String, { nullable: true })

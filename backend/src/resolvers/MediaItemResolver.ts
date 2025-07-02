@@ -5,6 +5,7 @@ import {
   FieldResolver,
   Mutation,
   ObjectType,
+  Query,
   Resolver,
   Root,
 } from "type-graphql";
@@ -22,6 +23,42 @@ import { TripRole } from '../entities/TripMembership';
 
 @Resolver(MediaItem)
 export class MediaItemResolver {
+  @Query(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to upload a file" })
+  async getPresignedUploadUrl(
+    @Arg("filename") filename: string,
+    @Arg("contentType") contentType: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<PresignedUrlResponse> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+
+    const fileExtension = filename.split(".").pop() || "unknown";
+    const objectName = `media/${randomUUID()}.${fileExtension}`;
+
+    try {
+      const uploadUrl = await generatePresignedPutUrl(objectName, contentType);
+      return { uploadUrl, objectName };
+    } catch (error) {
+      console.error("Error creating presigned URL:", error);
+      throw new Error("Could not create upload URL.");
+    }
+  }
+
+  @Query(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to download a file" })
+  async getPresignedDownloadUrl(
+    @Arg("key") key: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<PresignedUrlResponse> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+
+    try {
+      const downloadUrl = await generatePresignedGetUrl(key);
+      return { uploadUrl: downloadUrl, objectName: key };
+    } catch (error) {
+      console.error("Error creating download URL:", error);
+      throw new Error("Could not create download URL.");
+    }
+  }
+
   @FieldResolver(() => String, { nullable: true, description: "A temporary URL to download the full media file." })
   async downloadUrl(@Root() mediaItem: MediaItem): Promise<string | null> {
     if (!mediaItem.objectName) return null;
@@ -96,5 +133,33 @@ export class MediaItemResolver {
     });
 
     return await mediaItemRepository.save(mediaItem);
+  }
+
+  @Mutation(() => Boolean, { description: "Delete a media item" })
+  async deleteMediaItem(
+    @Arg("id", () => String) id: string,
+    @Ctx() { userId }: MyContext
+  ): Promise<boolean> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+
+    const mediaItemRepository = AppDataSource.getRepository(MediaItem);
+    const mediaItem = await mediaItemRepository.findOne({
+      where: { id },
+      relations: ["memory", "memory.trip"]
+    });
+
+    if (!mediaItem) {
+      throw new UserInputError(`Media item with ID ${id} not found.`);
+    }
+
+    // Check if the user has at least EDITOR rights for the trip this media item belongs to
+    const hasAccess = await checkTripAccess(userId, mediaItem.memory.trip.id, TripRole.EDITOR);
+    if (!hasAccess) {
+      throw new AuthenticationError("You don't have permission to delete this media item.");
+    }
+
+    // Delete the media item
+    await mediaItemRepository.remove(mediaItem);
+    return true;
   }
 } 

@@ -1,6 +1,7 @@
 import { Resolver, Mutation, Arg, Query, Ctx } from "type-graphql";
 import { Tag } from "../entities/Tag";
 import { TagInput } from "../entities/TagInput";
+import { UpdateTagInput } from "../entities/UpdateTagInput";
 import { AppDataSource } from "../utils/database";
 import { TagCategory } from "../entities/TagCategory";
 import { MyContext } from "..";
@@ -39,7 +40,7 @@ export class TagResolver {
     @Mutation(() => Tag, { nullable: true })
     async updateTag(
         @Arg("id") id: string,
-        @Arg("input") input: TagInput,
+        @Arg("input") input: UpdateTagInput,
         @Ctx() { userId }: MyContext
     ): Promise<Tag | null> {
         if (!userId) throw new AuthenticationError("You must be logged in to update a tag.");
@@ -51,19 +52,21 @@ export class TagResolver {
             return null;
         }
 
-        // Update properties from input
-        tag.name = input.name;
-        tag.tagDescription = input.tagDescription;
+        // Update properties from input (only update provided fields)
+        if (input.name !== undefined) tag.name = input.name;
+        if (input.color !== undefined) tag.color = input.color;
 
         // Handle category change
-        if (input.categoryId) {
-            const category = await AppDataSource.getRepository(TagCategory).findOneBy({ id: input.categoryId });
-            if (!category) {
-                throw new Error(`Category with ID ${input.categoryId} not found.`);
+        if (input.categoryId !== undefined) {
+            if (input.categoryId) {
+                const category = await AppDataSource.getRepository(TagCategory).findOneBy({ id: input.categoryId });
+                if (!category) {
+                    throw new Error(`Category with ID ${input.categoryId} not found.`);
+                }
+                tag.category = category;
+            } else {
+                tag.category = null; // Allow removing category
             }
-            tag.category = category;
-        } else {
-            tag.category = null; // Allow removing category
         }
 
         return await tagRepo.save(tag);
