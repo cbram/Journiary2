@@ -113,6 +113,31 @@ struct MemoryDTO {
         )
     }
     
+    /// Erstellt MemoryDTO aus typisiertem GraphQL.Memory Struct
+    /// - Parameter mem: GraphQL.Memory
+    static func from(graphQLStruct mem: GraphQL.Memory) -> MemoryDTO {
+        // Location aus Einzelkoordinaten zusammensetzen
+        var location: LocationDTO?
+        if let lat = mem.latitude, let lon = mem.longitude {
+            location = LocationDTO(latitude: lat, longitude: lon, name: mem.address)
+        }
+        let iso = ISO8601DateFormatter()
+        let created = iso.date(from: mem.createdAt)
+        let updated = iso.date(from: mem.updatedAt)
+
+        return MemoryDTO(
+            id: mem.id,
+            title: mem.title,
+            content: mem.content,
+            location: location,
+            tripId: mem.tripId,
+            userId: mem.userId,
+            createdAt: created,
+            updatedAt: updated,
+            creatorId: mem.userId
+        )
+    }
+    
     // MARK: - DTO to Core Data
     
     /// Aktualisiert oder erstellt Core Data Memory aus DTO
