@@ -347,10 +347,8 @@ export class TripResolver {
                 tripRole = TripRole.VIEWER;
                 break;
             case Permission.WRITE:
+            case Permission.ADMIN: // ADMIN erhält EDITOR-Rechte, nicht OWNER!
                 tripRole = TripRole.EDITOR;
-                break;
-            case Permission.ADMIN:
-                tripRole = TripRole.OWNER;
                 break;
             default:
                 tripRole = TripRole.VIEWER;
