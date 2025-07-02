@@ -670,6 +670,11 @@ class GraphQLNetworkClient {
                     throw GraphQLError.invalidInput("Ungültige JSON Antwort")
                 }
                 
+                // 🔄 Rohdaten-Logging für Debug-Zwecke
+                #if DEBUG
+                print("🔄 Raw GraphQL:", json)
+                #endif
+                
                 // GraphQL Errors prüfen
                 if let errors = json["errors"] as? [[String: Any]], !errors.isEmpty {
                     let errorMessage = errors.compactMap { $0["message"] as? String }.joined(separator: ", ")
