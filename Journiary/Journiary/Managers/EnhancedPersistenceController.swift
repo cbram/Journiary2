@@ -65,8 +65,12 @@ class EnhancedPersistenceController: ObservableObject {
         // Container einmalig erstellen
         _container = NSPersistentCloudKitContainer(name: "Journiary")
         
-        // CloudKit Configuration
-        configureCloudKitContainer(_container)
+        // CloudKit Configuration nur, wenn aktiviert
+        if AppSettings.shared.shouldUseCloudKit {
+            configureCloudKitContainer(_container)
+        } else {
+            print("ℹ️ CloudKit wird übersprungen – Backend/SQLite Mode")
+        }
         
         // Store Configuration
         configureStoreDescription(_container)
@@ -137,10 +141,11 @@ class EnhancedPersistenceController: ObservableObject {
         description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
         description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
         
-        // CloudKit Container Options
+        // Nur konfigurieren, wenn CloudKit aktiv ist
+        guard AppSettings.shared.shouldUseCloudKit else { return }
+
         let containerOptions = NSPersistentCloudKitContainerOptions(containerIdentifier: "iCloud.CHJB.Journiary")
         description.cloudKitContainerOptions = containerOptions
-        
         print("✅ CloudKit Container konfiguriert")
     }
     
