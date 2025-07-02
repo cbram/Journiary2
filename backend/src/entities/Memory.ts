@@ -19,19 +19,31 @@ export class Memory {
     title!: string;
 
     /**
-     * Inhalt des Eintrags. Im ursprünglichen iOS-Schema heißt dieses Feld `content`.
-     * Wir behalten die Spaltenbezeichnung als `text`, exposen aber nach außen den GraphQL-Feldnamen `content`.
+     * Inhalt des Eintrags.
+     * Legacy-Feldname: `text`  – Neuer Alias: `content`
      */
-    @Field({ name: "content", nullable: true })
+    @Field({ nullable: true })
     @Column("text", { nullable: true })
     text?: string;
-    
+
+    // Alias-Feld `content` für neue iOS-Versionen
+    @Field({ name: "content", nullable: true })
+    get content(): string | undefined {
+        return this.text;
+    }
+
     /**
-     * Zeitpunkt des Memories. Wird im iOS-Schema als `date` bezeichnet.
+     * Zeitpunkt des Memories.
+     * Legacy-Feldname: `timestamp` – Neuer Alias: `date`
      */
-    @Field({ name: "date" })
+    @Field()
     @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
     timestamp!: Date;
+
+    @Field({ name: "date" })
+    get date(): Date {
+        return this.timestamp;
+    }
 
     @Field(() => Float)
     @Column("double precision")
@@ -42,11 +54,17 @@ export class Memory {
     longitude!: number;
 
     /**
-     * Name/Adresse des Standorts. Im iOS-Schema als `address` bekannt.
+     * Name/Adresse des Standorts.
+     * Legacy-Feldname: `locationName` – Neuer Alias: `address`
      */
-    @Field({ name: "address", nullable: true })
+    @Field({ nullable: true })
     @Column({ nullable: true })
     locationName?: string;
+
+    @Field({ name: "address", nullable: true })
+    get address(): string | undefined {
+        return this.locationName;
+    }
 
     @Field({ nullable: true, description: "JSON string containing weather data" })
     @Column("text", { nullable: true })
