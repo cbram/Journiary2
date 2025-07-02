@@ -251,12 +251,40 @@ class ErrorHandler: ObservableObject {
             )
             
         case .serverError(let code):
+            let title: String
+            let message: String
+            let severity: ErrorSeverity
+            let canRetry: Bool
+            
+            switch code {
+            case 502:
+                title = "Server nicht erreichbar"
+                message = "Der Server ist momentan nicht verfügbar (502 Bad Gateway). Bitte versuchen Sie es in einigen Minuten erneut."
+                severity = .high
+                canRetry = true
+            case 503:
+                title = "Server überlastet"
+                message = "Der Server ist momentan überlastet (503 Service Unavailable). Bitte versuchen Sie es später erneut."
+                severity = .medium
+                canRetry = true
+            case 500:
+                title = "Server-Fehler"
+                message = "Es ist ein interner Server-Fehler aufgetreten (500 Internal Server Error). Bitte versuchen Sie es erneut."
+                severity = .high
+                canRetry = true
+            default:
+                title = "Server-Problem"
+                message = "Der Server hat einen Fehler zurückgegeben (Code: \(code)). Bitte versuchen Sie es später erneut."
+                severity = .high
+                canRetry = true
+            }
+            
             return UserFriendlyError(
-                title: "Server-Problem",
-                message: "Der Server hat einen Fehler zurückgegeben (Code: \(code)). Bitte versuchen Sie es später erneut.",
+                title: title,
+                message: message,
                 category: .server,
-                severity: .high,
-                canRetry: true
+                severity: severity,
+                canRetry: canRetry
             )
             
         case .graphqlError(let message):

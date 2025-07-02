@@ -12,6 +12,10 @@ import { User } from '../entities/User';
 import { AuthenticationError, UserInputError } from 'apollo-server-express';
 import { TripMembership, TripRole } from '../entities/TripMembership';
 import { checkTripAccess } from '../utils/auth';
+import { MediaItem } from '../entities/MediaItem';
+import { RoutePoint } from '../entities/RoutePoint';
+import { TrackSegment } from '../entities/TrackSegment';
+import { GPXTrack } from '../entities/GPXTrack';
 
 @Resolver(Trip)
 export class TripResolver {
@@ -40,10 +44,14 @@ export class TripResolver {
             throw new AuthenticationError("You must be logged in to view this trip.");
         }
         
-        const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
-        if (!trip) {
-            return null;
+        // Prüfe, ob der eingeloggte Benutzer mindestens VIEWER-Rechte für diese Reise hat
+        const hasAccess = await checkTripAccess(userId, id, TripRole.VIEWER);
+        if (!hasAccess) {
+            throw new AuthenticationError("You don't have permission to view this trip.");
         }
+
+        const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
+        // Wenn die Reise nicht existiert, null zurückgeben (GraphQL-Konvention)
         return trip;
     }
 
@@ -176,10 +184,34 @@ export class TripResolver {
         // Use transaction to ensure proper cleanup order
         try {
             await AppDataSource.transaction(async (transactionalEntityManager) => {
-                // First delete all trip memberships
+                // 1. First delete all MediaItems (they reference Memory)
+                const memories = await transactionalEntityManager.find(Memory, { 
+                    where: { trip: { id } },
+                    relations: ["mediaItems"]
+                });
+                
+                for (const memory of memories) {
+                    if (memory.mediaItems && memory.mediaItems.length > 0) {
+                        await transactionalEntityManager.remove(MediaItem, memory.mediaItems);
+                    }
+                }
+                
+                // 2. Delete all Memories (they reference Trip)
+                await transactionalEntityManager.delete(Memory, { trip: { id } });
+                
+                // 3. Delete all RoutePoints (they reference Trip and TrackSegment)
+                await transactionalEntityManager.delete(RoutePoint, { trip: { id } });
+                
+                // 4. Delete all TrackSegments (they reference Trip and GPXTrack)
+                await transactionalEntityManager.delete(TrackSegment, { trip: { id } });
+                
+                // 5. Delete all GPXTracks (they reference Trip)
+                await transactionalEntityManager.delete(GPXTrack, { trip: { id } });
+                
+                // 6. Delete all trip memberships
                 await transactionalEntityManager.delete(TripMembership, { trip: { id } });
                 
-                // Then delete the trip itself
+                // 7. Finally delete the trip itself
                 await transactionalEntityManager.delete(Trip, { id });
             });
             
@@ -191,7 +223,15 @@ export class TripResolver {
     }
 
     @FieldResolver(() => [Memory])
-    async memories(@Root() trip: Trip): Promise<Memory[]> {
+    async memories(
+        @Root() trip: Trip,
+        @Ctx() { userId }: MyContext
+    ): Promise<Memory[]> {
+        // Benutzer muss Zugriff auf die Reise haben, um Erinnerungen sehen zu dürfen
+        if (!userId || !(await checkTripAccess(userId, trip.id, TripRole.VIEWER))) {
+            throw new AuthenticationError("You don't have permission to access memories for this trip.");
+        }
+
         try {
             const memoryRepository = AppDataSource.getRepository(Memory);
             return await memoryRepository.find({ where: { trip: { id: trip.id } } });

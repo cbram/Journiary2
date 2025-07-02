@@ -17,6 +17,9 @@ struct ErrorAlertView: View {
     @StateObject private var errorHandler = ErrorHandler.shared
     @State private var showingTechnicalDetails = false
     
+    // Auto-dismiss Timer für kritische Fehler
+    @State private var autoDismissTimer: Timer?
+    
     var body: some View {
         VStack(spacing: 0) {
             // Error Content
@@ -33,6 +36,31 @@ struct ErrorAlertView: View {
                 .stroke(error.category.color.opacity(0.3), lineWidth: 2)
         )
         .padding(.horizontal, 20)
+        // Zusätzliche Dismiss-Funktionalität: Tap außerhalb schließt den Dialog
+        .onTapGesture {
+            // Verhindert, dass Taps innerhalb des Dialogs ihn schließen
+        }
+        .background(
+            // Hintergrund-Overlay für Tap-to-Dismiss
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    onDismiss()
+                }
+        )
+        .onAppear {
+            // Auto-dismiss nach 30 Sekunden für kritische Server-Fehler
+            if error.category == .server && error.severity == .high {
+                autoDismissTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+                    onDismiss()
+                }
+            }
+        }
+        .onDisappear {
+            // Timer aufräumen
+            autoDismissTimer?.invalidate()
+            autoDismissTimer = nil
+        }
     }
     
     // MARK: - Error Content
@@ -210,6 +238,16 @@ struct ErrorAlertView: View {
                     onDismiss()
                 }
                 .foregroundColor(.secondary)
+                .buttonStyle(.borderless)
+                
+                // Zusätzlicher "Abbrechen" Button für kritische Fehler
+                if error.severity == .critical || error.category == .server {
+                    Button("Abbrechen") {
+                        onDismiss()
+                    }
+                    .foregroundColor(.red)
+                    .buttonStyle(.borderless)
+                }
                 
                 // Retry Button (if available)
                 if error.canRetry, let onRetry = onRetry {

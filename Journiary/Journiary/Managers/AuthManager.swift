@@ -156,6 +156,9 @@ class AuthManager: ObservableObject {
         isLoading = true
         authenticationError = nil
         
+        // Merke das aktuell verwendete Passwort, um es bei Erfolg speichern zu können
+        let usedPassword = password
+        
         userService.login(email: email, password: password)
             .receive(on: DispatchQueue.main)
             .sink(
@@ -167,6 +170,11 @@ class AuthManager: ObservableObject {
                     }
                 },
                 receiveValue: { [weak self] (response: LoginResponse) in
+                    // Persistiere die Zugangsdaten in den AppSettings für spätere Verwendungen (z.B. Verbindungstest)
+                    let settings = AppSettings.shared
+                    settings.username = response.user.email // Email wird als eindeutige User-ID verwendet
+                    settings.password = usedPassword
+                    
                     self?.handleSuccessfulLogin(response)
                 }
             )
@@ -179,6 +187,8 @@ class AuthManager: ObservableObject {
         isLoading = true
         authenticationError = nil
         
+        let usedPassword = password
+        
         userService.register(email: email, username: username, password: password, firstName: firstName, lastName: lastName)
             .receive(on: DispatchQueue.main)
             .sink(
@@ -190,6 +200,11 @@ class AuthManager: ObservableObject {
                     }
                 },
                 receiveValue: { [weak self] (response: LoginResponse) in
+                    // Zugangsdaten speichern (siehe Kommentar oben)
+                    let settings = AppSettings.shared
+                    settings.username = response.user.email
+                    settings.password = usedPassword
+                    
                     self?.handleSuccessfulLogin(response)
                 }
             )
@@ -217,6 +232,12 @@ class AuthManager: ObservableObject {
         // Token löschen
         deleteJWTToken()
         deleteRefreshToken()
+        
+        // AppSettings bereinigen, damit alte Zugangsdaten nirgendwo mehr angezeigt oder verwendet werden
+        let settings = AppSettings.shared
+        settings.username = ""
+        settings.password = ""
+        settings.deletePasswordFromKeychain()
         
         // Benutzer abmelden
         if let currentUser = currentUser {

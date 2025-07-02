@@ -299,10 +299,18 @@ struct MultiUserQueryTestView: View {
         let userATags = TagFetchRequests.userTagsOptimized(for: userA)
         let userATagResults = (try? viewContext.fetch(userATags)) ?? []
         
+        // Als isoliert gelten Tags, die entweder dem User gehören ODER System-Tags sind (creator == nil, isSystemTag == true)
+        let tagIsolationSuccess = userATagResults.allSatisfy { tag in
+            if tag.isSystemTag {
+                return true // System-Tags sind global erlaubt
+            }
+            return tag.creator == userA
+        }
+        
         addTestResult(
             name: "Tag Isolation User A",
-            success: userATagResults.allSatisfy { $0.creator == userA },
-            details: "\(userATagResults.count) Tags gehören User A",
+            success: tagIsolationSuccess,
+            details: "\(userATagResults.count) Tags geprüft (inkl. System-Tags)",
             userContext: userA.displayName
         )
     }

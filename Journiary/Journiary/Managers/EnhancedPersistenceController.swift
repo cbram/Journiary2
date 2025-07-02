@@ -71,7 +71,10 @@ class EnhancedPersistenceController: ObservableObject {
         // Store Configuration
         configureStoreDescription(_container)
         
-        setupNotifications()
+        // Nur CloudKit-Listener aktivieren, wenn CloudKit oder Hybrid genutzt wird
+        if AppSettings.shared.shouldUseCloudKit {
+            setupNotifications()
+        }
         
         // Synchronously load stores
         loadPersistentStoresSync(_container)

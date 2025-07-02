@@ -150,29 +150,7 @@ struct BackendSettingsView: View {
                         .accessibilityLabel("Backend Server URL")
                 }
                 
-                // Username
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Benutzername")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    TextField("Benutzername", text: $appSettings.username)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .accessibilityLabel("Backend Benutzername")
-                }
-                
-                // Password
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Passwort")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                    
-                    SecureField("Passwort", text: $tempPassword)
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .accessibilityLabel("Backend Passwort")
-                }
+                // Username- und Passwortfelder wurden entfernt, da sie nicht mehr editier- oder sichtbar sein sollen.
                 
                 // Delete Credentials Button
                 if appSettings.isBackendConfigured {
@@ -341,13 +319,13 @@ struct BackendSettingsView: View {
     // MARK: - Helper Properties
     
     private var canTestConnection: Bool {
-        return !appSettings.backendURL.isEmpty && !appSettings.username.isEmpty && !tempPassword.isEmpty
+        return appSettings.isBackendConfigured
     }
     
     // MARK: - Helper Methods
     
     private func saveSettings() {
-        appSettings.password = tempPassword
+        // Passwort kann hier nicht geändert werden – lediglich Backend-URL wird live via Binding gespeichert.
     }
     
     private func testConnection() {
