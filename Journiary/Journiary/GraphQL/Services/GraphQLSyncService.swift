@@ -160,11 +160,7 @@ class GraphQLSyncService: ObservableObject {
                                 self.context.performAndWait {
                                     let req: NSFetchRequest<Memory> = Memory.fetchRequest()
                                     if let locals = try? self.context.fetch(req) {
-                                        for mem in locals {
-                                            if let mid = mem.id?.uuidString, !serverMemoryIds.contains(mid) {
-                                                newMemories.append(mem)
-                                            }
-                                        }
+                                        newMemories.append(contentsOf: locals)
                                     }
                                 }
 

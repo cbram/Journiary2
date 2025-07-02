@@ -25,9 +25,7 @@ class GraphQLMemoryService {
         let variables: [String: Any] = ["input": dto.toGraphQLInput()]
         return client.perform(mutation: CreateMemoryMutation.self, variables: variables)
             .tryMap { resp -> MemoryDTO in
-                guard let mem = resp.createMemory else {
-                    throw GraphQLError.serverError("Leere createMemory Response")
-                }
+                let mem = resp.createMemory
                 guard let dto = MemoryDTO.from(graphQL: mem) else {
                     throw GraphQLError.serverError("Parsing-Fehler createMemory")
                 }
