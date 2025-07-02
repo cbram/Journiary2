@@ -1,5 +1,5 @@
 import { ObjectType, Field, ID, Int } from 'type-graphql';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Memory } from './Memory';
 import { User } from './User';
 
@@ -10,7 +10,10 @@ export class MediaItem {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @Field({ description: "The type of media, e.g., 'photo', 'video'." })
+    /**
+     * MIME Type des Mediums. Wird im iOS-Schema als `mimeType` abgefragt.
+     */
+    @Field({ name: "mimeType" })
     @Column()
     mediaType!: string;
 
@@ -22,11 +25,15 @@ export class MediaItem {
     @Column()
     order!: number;
 
-    @Field({ description: "The name of the object in the storage (e.g., MinIO)" })
+    /**
+     * Name/Key des Objekts im Storage (z. B. MinIO). In der iOS-App wird dieses Feld als `s3Key` abgefragt.
+     * Ein zusätzliches Alias‐Feld `filename` wird in der Resolver-Schicht bereitgestellt, um doppelte Dekoratoren zu vermeiden.
+     */
+    @Field({ name: "s3Key" })
     @Column()
     objectName!: string;
 
-    @Field(() => Int, { description: "File size in bytes" })
+    @Field(() => Int, { name: "fileSize", description: "File size in bytes" })
     @Column()
     filesize!: number;
 
@@ -34,7 +41,7 @@ export class MediaItem {
     @Column({ nullable: true })
     duration?: number;
 
-    @Field({ nullable: true, description: "The name of the thumbnail object in the storage (e.g., MinIO)" })
+    @Field({ name: "thumbnailS3Key", nullable: true, description: "The name of the thumbnail object in the storage (e.g., MinIO)" })
     @Column({ nullable: true })
     thumbnailObjectName?: string;
 
@@ -44,4 +51,15 @@ export class MediaItem {
     @Field(() => Memory)
     @ManyToOne(() => Memory, (memory: Memory) => memory.mediaItems)
     memory!: Memory;
+
+    /**
+     * Automatische Zeitstempel zur Kompatibilität mit iOS-Schema
+     */
+    @Field()
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @Field()
+    @UpdateDateColumn()
+    updatedAt!: Date;
 } 

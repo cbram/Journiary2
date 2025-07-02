@@ -42,7 +42,7 @@ mkdir -p Journiary/GraphQL/Operations
 echo "✅ Verzeichnisse erstellt"
 
 # Schema herunterladen (falls Backend verfügbar)
-BACKEND_URL="${BACKEND_URL:-http://localhost:4001/graphql}"
+BACKEND_URL="${BACKEND_URL:-https://travelcompanion.sky-lab.org/graphql}"
 echo "📡 Versuche Schema von $BACKEND_URL herunterzuladen..."
 
 if curl -f -s -o /dev/null "$BACKEND_URL"; then

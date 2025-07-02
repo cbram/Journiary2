@@ -1,5 +1,5 @@
 import { ObjectType, Field, ID, Float } from 'type-graphql';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMany, JoinTable, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, ManyToMany, JoinTable, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Trip } from './Trip';
 import { MediaItem } from './MediaItem';
 import { Tag } from './Tag';
@@ -18,11 +18,18 @@ export class Memory {
     @Column()
     title!: string;
 
-    @Field({ nullable: true })
+    /**
+     * Inhalt des Eintrags. Im ursprünglichen iOS-Schema heißt dieses Feld `content`.
+     * Wir behalten die Spaltenbezeichnung als `text`, exposen aber nach außen den GraphQL-Feldnamen `content`.
+     */
+    @Field({ name: "content", nullable: true })
     @Column("text", { nullable: true })
     text?: string;
     
-    @Field()
+    /**
+     * Zeitpunkt des Memories. Wird im iOS-Schema als `date` bezeichnet.
+     */
+    @Field({ name: "date" })
     @Column()
     timestamp!: Date;
 
@@ -34,7 +41,10 @@ export class Memory {
     @Column("double precision")
     longitude!: number;
 
-    @Field({ nullable: true })
+    /**
+     * Name/Adresse des Standorts. Im iOS-Schema als `address` bekannt.
+     */
+    @Field({ name: "address", nullable: true })
     @Column({ nullable: true })
     locationName?: string;
 
@@ -68,4 +78,26 @@ export class Memory {
 
     @ManyToOne(() => BucketListItem, item => item.memories, { nullable: true })
     bucketListItem?: BucketListItem;
+
+    /**
+     * Automatische Zeitstempel – werden von TypeORM gesetzt. Benötigt für iOS-Felder `createdAt`, `updatedAt`.
+     */
+    @Field()
+    @CreateDateColumn()
+    createdAt!: Date;
+
+    @Field()
+    @UpdateDateColumn()
+    updatedAt!: Date;
+
+    /**
+     * Alias-Feld – liefert die ID des Erstellers als `userId`, wie im iOS-Schema erwartet.
+     * Wird mittels Getter bereitgestellt, ohne ein eigenes DB-Feld anzulegen.
+     */
+    @Field(() => ID, { name: "userId", nullable: true })
+    get userId(): string | undefined {
+        // creator kann optional sein
+        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
+        return this.creator?.id;
+    }
 } 

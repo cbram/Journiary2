@@ -15,6 +15,7 @@ struct LoginView: View {
     @State private var showingRegister = false
     @State private var showingServerConfig = false
     @State private var rememberMe = false
+    @State private var inlineErrorMessage: String? = nil
     
     // Animation und Fokus
     @FocusState private var focusedField: Field?
@@ -53,11 +54,9 @@ struct LoginView: View {
         .handleErrors()
         .onReceive(authManager.$authenticationError) { error in
             if let error = error {
-                errorHandler.handle(error) {
-                    // Retry login with same credentials
-                    performLogin()
-                }
-                // Clear the auth manager error to avoid duplicate handling
+                inlineErrorMessage = error.localizedDescription
+                password = ""
+                focusedField = .password
                 authManager.authenticationError = nil
             }
         }
@@ -143,6 +142,14 @@ struct LoginView: View {
             .opacity(animateFields ? 1.0 : 0.0)
             .offset(x: animateFields ? 0 : -50)
             .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.4), value: animateFields)
+            
+            if let inlineErrorMessage = inlineErrorMessage {
+                Text(inlineErrorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+            }
             
             // Remember Me Toggle
             HStack {

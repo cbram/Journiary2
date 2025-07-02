@@ -20,13 +20,14 @@ import { MyContext } from "..";
 import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { checkTripAccess } from '../utils/auth';
 import { TripRole } from '../entities/TripMembership';
+import { Int } from "type-graphql";
 
 @Resolver(MediaItem)
 export class MediaItemResolver {
   @Query(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to upload a file" })
   async getPresignedUploadUrl(
     @Arg("filename") filename: string,
-    @Arg("contentType") contentType: string,
+    @Arg("mimeType") contentType: string,
     @Ctx() { userId }: MyContext
   ): Promise<PresignedUrlResponse> {
     if (!userId) throw new AuthenticationError("You must be logged in.");
@@ -36,7 +37,7 @@ export class MediaItemResolver {
 
     try {
       const uploadUrl = await generatePresignedPutUrl(objectName, contentType);
-      return { uploadUrl, objectName };
+      return { uploadUrl, objectName, downloadUrl: undefined, expiresIn: 3600 };
     } catch (error) {
       console.error("Error creating presigned URL:", error);
       throw new Error("Could not create upload URL.");
@@ -45,14 +46,14 @@ export class MediaItemResolver {
 
   @Query(() => PresignedUrlResponse, { description: "Generate a pre-signed URL to download a file" })
   async getPresignedDownloadUrl(
-    @Arg("key") key: string,
+    @Arg("objectKey") key: string,
     @Ctx() { userId }: MyContext
   ): Promise<PresignedUrlResponse> {
     if (!userId) throw new AuthenticationError("You must be logged in.");
 
     try {
       const downloadUrl = await generatePresignedGetUrl(key);
-      return { uploadUrl: downloadUrl, objectName: key };
+      return { uploadUrl: downloadUrl, objectName: key, downloadUrl, expiresIn: 3600 };
     } catch (error) {
       console.error("Error creating download URL:", error);
       throw new Error("Could not create download URL.");
@@ -87,7 +88,7 @@ export class MediaItemResolver {
   })
   async createUploadUrl(
     @Arg("filename") filename: string,
-    @Arg("contentType", { nullable: true }) contentType: string = "application/octet-stream",
+    @Arg("mimeType", { nullable: true }) contentType: string = "application/octet-stream",
     @Ctx() { userId }: MyContext
   ): Promise<PresignedUrlResponse> {
     if (!userId) throw new AuthenticationError("You must be logged in.");
@@ -97,7 +98,7 @@ export class MediaItemResolver {
 
     try {
       const uploadUrl = await generatePresignedPutUrl(objectName, contentType);
-      return { uploadUrl, objectName };
+      return { uploadUrl, objectName, downloadUrl: undefined, expiresIn: 3600 };
     } catch (error) {
       console.error("Error creating presigned URL:", error);
       throw new Error("Could not create upload URL.");
@@ -162,4 +163,26 @@ export class MediaItemResolver {
     await mediaItemRepository.remove(mediaItem);
     return true;
   }
+
+  // ---------------------------------------------------------------------------
+  // Kompatibilitäts-Resolver für Legacy-iOS-Feldnamen
+  // ---------------------------------------------------------------------------
+
+  @FieldResolver(() => String, { name: "filename" })
+  filename(@Root() mediaItem: MediaItem): string {
+    return mediaItem.objectName;
+  }
+
+  @FieldResolver(() => String, { name: "originalFilename", nullable: true })
+  originalFilename(): string | null {
+    // Originaler Dateiname wird aktuell nicht gespeichert
+    return null;
+  }
+
+  @FieldResolver(() => Int, { name: "fileSize" })
+  fileSize(@Root() mediaItem: MediaItem): number {
+    return mediaItem.filesize;
+  }
+
+  // s3Key und thumbnailS3Key werden bereits durch Aliase im Entity abgedeckt.
 } 

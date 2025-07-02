@@ -1,4 +1,4 @@
-import { Resolver, Mutation, Arg, Query, Ctx } from "type-graphql";
+import { Resolver, Mutation, Arg, Query, Ctx, FieldResolver, Root } from "type-graphql";
 import { Tag } from "../entities/Tag";
 import { TagInput } from "../entities/TagInput";
 import { UpdateTagInput } from "../entities/UpdateTagInput";
@@ -82,5 +82,14 @@ export class TagResolver {
         const deleteResult = await AppDataSource.getRepository(Tag).delete(id);
         
         return deleteResult.affected === 1;
+    }
+
+    // ---------------------------------------------------------------------------
+    // Kompatibilitäts-Resolver für Legacy-iOS-Feldnamen
+    // ---------------------------------------------------------------------------
+
+    @FieldResolver(() => String, { name: "categoryId", nullable: true })
+    categoryId(@Root() tag: Tag): string | null | undefined {
+        return tag.category?.id;
     }
 } 

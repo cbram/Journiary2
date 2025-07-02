@@ -6,10 +6,10 @@ export class UpdateMemoryInput {
     @Field({ nullable: true })
     title?: string;
 
-    @Field({ nullable: true })
+    @Field({ name: "content", nullable: true })
     text?: string;
     
-    @Field({ nullable: true })
+    @Field({ name: "date", nullable: true })
     timestamp?: Date;
 
     @Field(() => Float, { nullable: true })
@@ -18,7 +18,7 @@ export class UpdateMemoryInput {
     @Field(() => Float, { nullable: true })
     longitude?: number;
 
-    @Field({ nullable: true })
+    @Field({ name: "address", nullable: true })
     locationName?: string;
 
     @Field(() => [String], { nullable: true, description: "A list of Tag IDs to associate with this memory" })

@@ -5,6 +5,7 @@ import { UpdateMemoryInput } from '../entities/UpdateMemoryInput';
 import { AppDataSource } from '../utils/database';
 import { MediaItem } from '../entities/MediaItem';
 import { Trip } from '../entities/Trip';
+import { User } from '../entities/User';
 import { Tag } from "../entities/Tag";
 import { In, Like } from "typeorm";
 import { MyContext } from '../index';
@@ -17,7 +18,10 @@ import { TripMembership } from '../entities/TripMembership';
 export class MemoryResolver {
 
     @Query(() => [Memory], { description: "Get all memories for trips the user is a member of" })
-    async memories(@Ctx() { userId }: MyContext): Promise<Memory[]> {
+    async memories(
+        @Ctx() { userId }: MyContext,
+        @Arg("tripId", () => String, { nullable: true }) tripId?: string
+    ): Promise<Memory[]> {
         if (!userId) {
             return [];
         }
@@ -32,9 +36,14 @@ export class MemoryResolver {
             return [];
         }
         
+        const whereCondition: any = { trip: { id: In(tripIds) } };
+        if (tripId && tripIds.includes(tripId)) {
+            whereCondition.trip = { id: tripId };
+        }
+
         return AppDataSource.getRepository(Memory).find({
-            where: { trip: { id: In(tripIds) } },
-            relations: ["mediaItems", "trip"]
+            where: whereCondition,
+            relations: ["mediaItems", "trip", "tags"]
         });
     }
 
@@ -88,10 +97,16 @@ export class MemoryResolver {
             throw new UserInputError(`Trip with ID ${input.tripId} not found.`);
         }
 
+        const creator = await AppDataSource.getRepository(User).findOneBy({ id: userId });
+
         const newMemory = memoryRepository.create({
             ...input,
             trip,
         });
+
+        if (creator) {
+            newMemory.creator = creator;
+        }
 
         if (input.tagIds && input.tagIds.length > 0) {
             const tags = await AppDataSource.getRepository(Tag).findBy({

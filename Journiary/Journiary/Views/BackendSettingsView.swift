@@ -13,6 +13,7 @@ struct BackendSettingsView: View {
     @StateObject private var appSettings = AppSettings.shared
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var apiClient = APIClient.shared
+    @StateObject private var syncService = GraphQLSyncService()
     
     @State private var showingConnectionAlert = false
     @State private var connectionAlertTitle = ""
@@ -275,6 +276,37 @@ struct BackendSettingsView: View {
                     Toggle("Nur über WLAN synchronisieren", isOn: $appSettings.wifiOnlySyncEnabled)
                         .accessibilityLabel("Synchronisation nur über WLAN")
                 }
+
+                // Manuelle Synchronisation
+                VStack(spacing: 12) {
+                    if syncService.isSyncing {
+                        ProgressView(value: syncService.syncProgress)
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .accessibilityLabel("Fortschritt der Synchronisation")
+
+                        if let lastDate = syncService.lastSyncDate {
+                            Text("Letzte Sync: \(lastDate.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Button {
+                        syncNow()
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.clockwise.circle")
+                            Text(syncService.isSyncing ? "Synchronisiere..." : "Jetzt synchronisieren")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(syncService.isSyncing ? Color.gray : Color.blue)
+                        .foregroundColor(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .disabled(syncService.isSyncing)
+                    .accessibilityLabel("Jetzt synchronisieren")
+                }
             }
             .padding()
             .background(Color(.systemBackground))
@@ -354,6 +386,25 @@ struct BackendSettingsView: View {
         appSettings.password = ""
         tempPassword = ""
         appSettings.deletePasswordFromKeychain()
+    }
+
+    // MARK: - Sync Handling
+
+    private func syncNow() {
+        syncService.performFullSync()
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                if case .failure(let error) = completion {
+                    connectionAlertTitle = "Synchronisation fehlgeschlagen"
+                    connectionAlertMessage = error.localizedDescription
+                    showingConnectionAlert = true
+                }
+            } receiveValue: { _ in
+                connectionAlertTitle = "Synchronisation erfolgreich"
+                connectionAlertMessage = "Alle Daten sind aktuell."
+                showingConnectionAlert = true
+            }
+            .store(in: &cancellables)
     }
 }
 

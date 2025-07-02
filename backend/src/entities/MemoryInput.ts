@@ -7,10 +7,10 @@ export class MemoryInput implements Partial<Memory> {
     @Field()
     title!: string;
 
-    @Field({ nullable: true })
+    @Field({ name: "content", nullable: true })
     text?: string;
     
-    @Field()
+    @Field({ name: "date" })
     timestamp!: Date;
 
     @Field(() => Float)
@@ -19,7 +19,7 @@ export class MemoryInput implements Partial<Memory> {
     @Field(() => Float)
     longitude!: number;
 
-    @Field({ nullable: true })
+    @Field({ name: "address", nullable: true })
     locationName?: string;
 
     @Field(() => ID, { description: "The ID of the trip this memory belongs to" })
