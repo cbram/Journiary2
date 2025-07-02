@@ -204,11 +204,13 @@ struct LoginView: View {
             .font(.subheadline)
             
             // Server Config Link
-            Button("Server-URL einstellen") {
-                showingServerConfig = true
+            Button(action: { showingServerConfig = true }) {
+                Text("Server-URL einstellen")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .underline()
+                    .foregroundColor(.blue)
             }
-            .font(.footnote)
-            .foregroundColor(.secondary)
         }
         .padding(.top, 32)
     }
