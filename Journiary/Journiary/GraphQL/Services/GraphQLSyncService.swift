@@ -42,36 +42,290 @@ class GraphQLSyncService: ObservableObject {
     /// Vollständige Synchronisation durchführen
     /// - Returns: Publisher mit Bool (Erfolg)
     func performFullSync() -> AnyPublisher<Bool, GraphQLError> {
-        
         if isDemoMode {
             return performDemoSync()
         }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+
+        // Produktionsmodus: Erst Upload, dann Download
+        return uploadChanges()
+            .flatMap { _ in self.downloadChanges() }
             .eraseToAnyPublisher()
     }
     
     /// Nur Upload durchführen (lokale Änderungen zum Server)
     /// - Returns: Publisher mit Bool (Erfolg)
     func uploadChanges() -> AnyPublisher<Bool, GraphQLError> {
-        
         if isDemoMode {
             return simulateUpload()
         }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+
+        // 1) Aktuelle Trips vom Server holen
+        return ApolloClientManager.shared.fetch(query: GetTripsQuery.self, cachePolicy: .networkOnly)
+            .map { response -> Set<String> in
+                let ids = response.trips.map { $0.id }
+                return Set(ids)
+            }
+            .flatMap { [weak self] serverTripIds -> AnyPublisher<Bool, GraphQLError> in
+                guard let self = self else {
+                    return Fail(error: GraphQLError.unknown("Service deinitiert"))
+                        .eraseToAnyPublisher()
+                }
+
+                // Trips, die bereits am Server existieren, aber evtl. keine Membership haben
+                var claimTrips: [Trip] = []
+                var createTrips: [Trip] = []
+                self.context.performAndWait {
+                    let request: NSFetchRequest<Trip> = Trip.fetchRequest()
+                    if let localTrips = try? self.context.fetch(request) {
+                        for trip in localTrips {
+                            guard let uuid = trip.id?.uuidString else { continue }
+                            if serverTripIds.contains(uuid) {
+                                claimTrips.append(trip)
+                            } else {
+                                createTrips.append(trip)
+                            }
+                        }
+                    }
+                }
+
+                print("🚀 UploadChanges: createTrips=\(createTrips.count), claimTrips=\(claimTrips.count)")
+
+                // 3a) Upload neue Trips
+                let uploadPublishers = createTrips.compactMap { trip -> AnyPublisher<Bool, GraphQLError>? in
+                    guard let dto = TripDTO.from(coreData: trip) else { return nil }
+
+                    return self.tripService.createTrip(
+                        name: dto.name,
+                        description: dto.tripDescription,
+                        startDate: dto.startDate,
+                        endDate: dto.endDate
+                    )
+                    .tryMap { createdDTO -> Bool in
+                        // Backend-ID in Core Data Trip übernehmen
+                        self.context.performAndWait {
+                            if let newUUID = UUID(uuidString: createdDTO.id) {
+                                trip.id = newUUID
+                                try? self.context.save()
+                            }
+                        }
+                        print("✅ Trip '\(dto.name)' hochgeladen (Server-ID: \(createdDTO.id))")
+                        return true
+                    }
+                    .mapError { error -> GraphQLError in
+                        if let gError = error as? GraphQLError { return gError }
+                        return GraphQLError.serverError(error.localizedDescription)
+                    }
+                    .eraseToAnyPublisher()
+                }
+
+                // 3b) Claim bestehende Trips
+                let claimPublishers = claimTrips.compactMap { trip -> AnyPublisher<Bool, GraphQLError>? in
+                    guard let idStr = trip.id?.uuidString else { return nil }
+                    return self.tripService.claimTrip(id: idStr)
+                        .map { _ in true }
+                        .eraseToAnyPublisher()
+                }
+
+                let allPublishers = uploadPublishers + claimPublishers
+
+                guard !allPublishers.isEmpty else {
+                    return Just(true)
+                        .setFailureType(to: GraphQLError.self)
+                        .eraseToAnyPublisher()
+                }
+
+                // 4) Sequenziell ausführen und Ergebnis zusammenführen
+                return allPublishers
+                    .publisher
+                    .flatMap { $0 }
+                    .collect()
+                    .map { _ in true }
+                    .eraseToAnyPublisher()
+            }
             .eraseToAnyPublisher()
     }
     
     /// Nur Download durchführen (Server-Änderungen zu lokal)
     /// - Returns: Publisher mit Bool (Erfolg)
     func downloadChanges() -> AnyPublisher<Bool, GraphQLError> {
-        
         if isDemoMode {
             return simulateDownload()
         }
-        
-        return Fail(error: GraphQLError.networkError("Backend nicht verfügbar"))
+
+        DispatchQueue.main.async {
+            self.isSyncing = true
+            self.syncProgress = 0.0
+            self.syncError = nil
+        }
+
+        // Trips abrufen
+        return ApolloClientManager.shared.fetch(query: GetTripsQuery.self, cachePolicy: .networkOnly)
+            .tryMap { [weak self] tripsData -> Bool in
+                guard let self = self else { throw GraphQLError.unknown("Service deinitiert") }
+
+                self.syncProgress = 0.3
+
+                // Trips verarbeiten
+                self.context.performAndWait {
+                    print("🔄 Starte Trip-Import – empfangene Trips: \(tripsData.trips.count)")
+                    if let cu = AuthManager.shared.currentUser {
+                        print("👤 currentUser.backendId = \(cu.backendUserId ?? "nil")  email = \(cu.email ?? "nil")")
+                    } else {
+                        print("⚠️ currentUser ist NIL während Trip-Import")
+                    }
+                    for trip in tripsData.trips {
+                        print("➡️ Verarbeite Trip #\(trip.id) – \(trip.name)")
+                        var tripDict: [String: Any] = [
+                            "id": trip.id,
+                            "name": trip.name,
+                            "isActive": trip.isActive,
+                            "totalDistance": trip.totalDistance,
+                            "gpsTrackingEnabled": trip.gpsTrackingEnabled,
+                            "tripDescription": trip.tripDescription as Any,
+                            "coverImageObjectName": trip.coverImageObjectName as Any,
+                            "coverImageUrl": trip.coverImageUrl as Any,
+                            "travelCompanions": trip.travelCompanions as Any,
+                            "visitedCountries": trip.visitedCountries as Any,
+                            "startDate": trip.startDate as Any,
+                            "endDate": trip.endDate as Any,
+                            "createdAt": trip.createdAt,
+                            "updatedAt": trip.updatedAt
+                        ]
+
+                        if let dto = TripDTO.from(graphQL: tripDict) {
+                            let tripCD = dto.toCoreData(context: self.context)
+                            print("📝 Trip \(tripCD.name ?? "?") (id: \(tripCD.id?.uuidString ?? "nil")) in Core Data aktualisiert/erstellt")
+                            // Owner und Membership setzen
+                            if let currentUser = AuthManager.shared.currentUser {
+                                // Owner setzen, falls noch nicht vorhanden
+                                if tripCD.owner == nil {
+                                    tripCD.owner = currentUser
+                                }
+
+                                // Prüfen, ob bereits ein Membership-Eintrag existiert
+                                let membershipRequest: NSFetchRequest<TripMembership> = TripMembership.fetchRequest()
+                                if let backendId = currentUser.backendUserId {
+                                    membershipRequest.predicate = NSPredicate(format: "trip == %@ AND user.backendUserId == %@", tripCD, backendId)
+                                } else {
+                                    membershipRequest.predicate = NSPredicate(format: "trip == %@ AND user == %@", tripCD, currentUser)
+                                }
+
+                                if (try? self.context.fetch(membershipRequest).first) == nil {
+                                    _ = TripMembership(
+                                        context: self.context,
+                                        trip: tripCD,
+                                        user: currentUser,
+                                        permission: .admin,
+                                        invitedBy: nil,
+                                        invitedAt: nil,
+                                        joinedAt: Date(),
+                                        status: .accepted
+                                    )
+                                    print("✅ Membership für Trip \(trip.id) und User \(currentUser.email ?? currentUser.backendUserId ?? "?") angelegt")
+                                } else {
+                                    print("ℹ️ Membership für Trip \(trip.id) existiert bereits")
+                                }
+                            }
+                        }
+                    }
+                    if self.context.hasChanges {
+                        try? self.context.save()
+                    }
+                }
+
+                // DEBUG: Core Data Status nach Import
+                if let currentUser = AuthManager.shared.currentUser {
+                    let tripRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
+                    let totalTrips = (try? self.context.count(for: tripRequest)) ?? -1
+
+                    let orphanTripsRequest = NSFetchRequest<Trip>(entityName: "Trip")
+                    orphanTripsRequest.predicate = NSPredicate(format: "owner == nil")
+                    let orphanTrips = (try? self.context.count(for: orphanTripsRequest)) ?? -1
+
+                    let membershipRequest: NSFetchRequest<TripMembership> = TripMembership.fetchRequest()
+                    if let backendId = currentUser.backendUserId {
+                        membershipRequest.predicate = NSPredicate(format: "user.backendUserId == %@", backendId)
+                    } else {
+                        membershipRequest.predicate = NSPredicate(format: "user == %@", currentUser)
+                    }
+                    let memberships = (try? self.context.count(for: membershipRequest)) ?? -1
+
+                    print("🔍 Debug Sync: TotalTrips=\(totalTrips), OrphanTrips=\(orphanTrips), MembershipsForUser=\(memberships)")
+                } else {
+                    print("⚠️ Debug Sync: Kein currentUser gesetzt – Eigentümerzuordnung nicht möglich")
+                }
+
+                return true
+            }
+            .mapError { error -> GraphQLError in
+                if let graphError = error as? GraphQLError {
+                    return graphError
+                }
+                return GraphQLError.networkError(error.localizedDescription)
+            }
+            .flatMap { _ in
+                // Memories abrufen
+                ApolloClientManager.shared.fetch(query: MemoryListQuery.self, cachePolicy: .networkOnly)
+            }
+            .tryMap { [weak self] memoriesData -> Bool in
+                guard let self = self else { throw GraphQLError.unknown("Service deinitiert") }
+
+                self.syncProgress = 0.7
+
+                self.context.performAndWait {
+                    for memory in memoriesData.memories {
+                        var memDict: [String: Any] = [
+                            "id": memory.id,
+                            "title": memory.title,
+                            "content": memory.text as Any,
+                            "tripId": memory.tripId,
+                            "userId": AuthManager.shared.currentUser?.backendUserId ?? "unknown",
+                            "latitude": memory.latitude as Any,
+                            "longitude": memory.longitude as Any,
+                            "address": memory.locationName as Any,
+                            "createdAt": memory.timestamp,
+                            "updatedAt": memory.timestamp,
+                            "location": [
+                                "latitude": memory.latitude as Any,
+                                "longitude": memory.longitude as Any,
+                                "name": memory.locationName as Any
+                            ]
+                        ]
+
+                        if let dto = MemoryDTO.from(graphQL: memDict) {
+                            _ = dto.toCoreData(context: self.context)
+                        }
+                    }
+                    if self.context.hasChanges {
+                        try? self.context.save()
+                    }
+                }
+
+                return true
+            }
+            .map { _ -> Bool in
+                // Datenmodelle aktualisieren
+                self.tripService.getTrips()
+                    .sink(receiveCompletion: { _ in }, receiveValue: { trips in
+                        DispatchQueue.main.async {
+                            self.tripService.trips = trips
+                        }
+                    })
+                    .store(in: &self.cancellables)
+
+                DispatchQueue.main.async {
+                    self.isSyncing = false
+                    self.syncProgress = 1.0
+                    self.lastSyncDate = Date()
+                }
+                return true
+            }
+            .mapError { error -> GraphQLError in
+                if let graphError = error as? GraphQLError {
+                    return graphError
+                }
+                return GraphQLError.networkError(error.localizedDescription)
+            }
             .eraseToAnyPublisher()
     }
     
@@ -265,5 +519,44 @@ struct SyncStatus {
     
     var hasError: Bool {
         return error != nil
+    }
+}
+
+// MARK: - Helper Response Types
+
+// Kein separater Response-Typ mehr nötig – MemoryListQuery.Data wird verwendet
+
+// MARK: - Helper GraphQL Query for Memories
+
+fileprivate struct MemoryRaw: Codable {
+    let id: String
+    let title: String
+    let text: String?
+    let timestamp: String
+    let latitude: Double?
+    let longitude: Double?
+    let locationName: String?
+    let tripId: String
+}
+
+fileprivate struct MemoryListQuery: GraphQLQuery {
+    static let operationName = "GetMemories"
+    static let document = """
+    query GetMemories {
+      memories {
+        id
+        title
+        text
+        timestamp
+        latitude
+        longitude
+        locationName
+        tripId
+      }
+    }
+    """
+
+    struct Data: Codable {
+        let memories: [MemoryRaw]
     }
 } 

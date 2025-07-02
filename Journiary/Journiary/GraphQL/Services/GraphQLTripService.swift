@@ -411,6 +411,29 @@ class GraphQLTripService: ObservableObject {
             .eraseToAnyPublisher()
     }
     
+    /// Trip für aktuellen User claimen (Membership anlegen)
+    func claimTrip(id: String) -> AnyPublisher<TripDTO, GraphQLError> {
+        ApolloClientManager.shared.mutate(
+            mutation: ClaimTripMutation.self,
+            variables: ["tripId": id]
+        )
+        .tryMap { response -> TripDTO in
+            guard let data = response.claimTrip else {
+                throw GraphQLError.serverError("Leere Antwort")
+            }
+            var dict: [String: Any] = ["id": data.id, "name": data.name]
+            guard let dto = TripDTO.from(graphQL: dict) else {
+                throw GraphQLError.serverError("Parsing-Fehler")
+            }
+            return dto
+        }
+        .mapError { error in
+            if let g = error as? GraphQLError { return g }
+            return GraphQLError.networkError(error.localizedDescription)
+        }
+        .eraseToAnyPublisher()
+    }
+    
     // MARK: - Demo Mode Core Data Operations
     
     private func loadTripsFromCoreData() -> AnyPublisher<[TripDTO], GraphQLError> {
@@ -428,6 +451,15 @@ class GraphQLTripService: ObservableObject {
             do {
                 let trips = try self.context.fetch(request)
                 let tripDTOs = trips.compactMap { TripDTO.from(coreData: $0) }
+
+                // DEBUG: Ausgabe der Trips nach CoreData-Ladevorgang
+                if let currentUser = AuthManager.shared.currentUser {
+                    let owned = trips.filter { $0.owner == currentUser }
+                    print("🔍 Debug TripService: FetchedTrips=\(trips.count), OwnedByCurrent=\(owned.count)")
+                } else {
+                    print("⚠️ Debug TripService: currentUser ist nil beim Laden von Trips")
+                }
+
                 promise(.success(tripDTOs))
             } catch {
                 promise(.failure(.cacheError(error.localizedDescription)))

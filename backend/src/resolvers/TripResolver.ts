@@ -374,4 +374,45 @@ export class TripResolver {
             return null;
         }
     }
+
+    @Mutation(() => Trip, { description: "Claim an existing trip for the current user (adds OWNER membership if missing)" })
+    async claimTrip(
+        @Arg("tripId", () => ID) tripId: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<Trip> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to claim a trip.");
+        }
+
+        const tripRepository = AppDataSource.getRepository(Trip);
+        const membershipRepository = AppDataSource.getRepository(TripMembership);
+        const userRepository = AppDataSource.getRepository(User);
+
+        const trip = await tripRepository.findOneBy({ id: tripId });
+        if (!trip) {
+            throw new UserInputError(`Trip with ID ${tripId} not found.`);
+        }
+
+        // Prüfen, ob bereits Membership existiert
+        const existingMembership = await membershipRepository.findOne({
+            where: { trip: { id: tripId }, user: { id: userId } },
+        });
+
+        if (!existingMembership) {
+            const user = await userRepository.findOneBy({ id: userId });
+            if (!user) {
+                throw new Error("User not found.");
+            }
+
+            const membership = membershipRepository.create({
+                trip: trip,
+                user: user,
+                role: TripRole.OWNER,
+            });
+
+            await membershipRepository.save(membership);
+        }
+
+        return trip;
+    }
 } 
