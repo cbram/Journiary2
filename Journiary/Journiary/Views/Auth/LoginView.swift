@@ -13,6 +13,7 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showingRegister = false
+    @State private var showingServerConfig = false
     @State private var rememberMe = false
     
     // Animation und Fokus
@@ -45,6 +46,9 @@ struct LoginView: View {
         }
         .sheet(isPresented: $showingRegister) {
             RegisterView()
+        }
+        .sheet(isPresented: $showingServerConfig) {
+            ServerConfigurationView()
         }
         .handleErrors()
         .onReceive(authManager.$authenticationError) { error in
@@ -198,10 +202,13 @@ struct LoginView: View {
                 showingRegister = true
             }
             .font(.subheadline)
-            .foregroundColor(.blue)
-            .opacity(animateFields ? 1.0 : 0.0)
-            .offset(y: animateFields ? 0 : 20)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.7), value: animateFields)
+            
+            // Server Config Link
+            Button("Server-URL einstellen") {
+                showingServerConfig = true
+            }
+            .font(.footnote)
+            .foregroundColor(.secondary)
         }
         .padding(.top, 32)
     }
