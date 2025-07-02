@@ -94,10 +94,8 @@ export class Memory {
      * Alias-Feld – liefert die ID des Erstellers als `userId`, wie im iOS-Schema erwartet.
      * Wird mittels Getter bereitgestellt, ohne ein eigenes DB-Feld anzulegen.
      */
-    @Field(() => ID, { name: "userId", nullable: true })
-    get userId(): string | undefined {
-        // creator kann optional sein
-        // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-        return this.creator?.id;
+    @Field(() => ID, { name: "userId" })
+    get userId(): string {
+        return this.creator?.id ?? "unknown";
     }
 } 
