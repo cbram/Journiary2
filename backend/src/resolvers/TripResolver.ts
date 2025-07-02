@@ -12,10 +12,34 @@ import { User } from '../entities/User';
 import { AuthenticationError, UserInputError } from 'apollo-server-express';
 import { TripMembership, TripRole } from '../entities/TripMembership';
 import { checkTripAccess } from '../utils/auth';
-import { MediaItem } from '../entities/MediaItem';
-import { RoutePoint } from '../entities/RoutePoint';
-import { TrackSegment } from '../entities/TrackSegment';
-import { GPXTrack } from '../entities/GPXTrack';
+import { Not } from 'typeorm';
+
+@ObjectType()
+class TripMembershipResponse {
+    @Field(() => ID)
+    id!: string;
+
+    @Field(() => String)
+    tripId!: string;
+
+    @Field(() => String)
+    userId!: string;
+
+    @Field(() => TripRole)
+    role!: TripRole;
+
+    @Field(() => String)
+    status!: string;
+
+    @Field(() => User)
+    user!: User;
+
+    @Field(() => Trip, { nullable: true })
+    trip?: Trip;
+
+    @Field(() => Date)
+    createdAt!: Date;
+}
 
 @Resolver(Trip)
 export class TripResolver {
@@ -44,15 +68,197 @@ export class TripResolver {
             throw new AuthenticationError("You must be logged in to view this trip.");
         }
         
-        // Prüfe, ob der eingeloggte Benutzer mindestens VIEWER-Rechte für diese Reise hat
-        const hasAccess = await checkTripAccess(userId, id, TripRole.VIEWER);
-        if (!hasAccess) {
+        // 🔐 SECURITY: Check if user has access to this trip
+        if (!(await checkTripAccess(userId, id, TripRole.VIEWER))) {
             throw new AuthenticationError("You don't have permission to view this trip.");
         }
-
+        
         const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
-        // Wenn die Reise nicht existiert, null zurückgeben (GraphQL-Konvention)
+        if (!trip) {
+            return null;
+        }
         return trip;
+    }
+
+    @Query(() => [TripMembershipResponse], { description: "Get all members of a trip" })
+    async getTripMembers(
+        @Arg("tripId", () => ID) tripId: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembershipResponse[]> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to view trip members.");
+        }
+
+        // Check if user has access to this trip
+        if (!(await checkTripAccess(userId, tripId, TripRole.VIEWER))) {
+            throw new AuthenticationError("You don't have permission to view this trip's members.");
+        }
+
+        const memberships = await AppDataSource.getRepository(TripMembership).find({
+            where: { trip: { id: tripId } },
+            relations: ["user"],
+        });
+
+        return memberships.map(membership => ({
+            id: membership.id,
+            tripId: tripId,
+            userId: membership.user.id,
+            role: membership.role,
+            status: "accepted", // Default status for existing memberships
+            user: membership.user,
+            trip: undefined, // Not needed for this query
+            createdAt: membership.createdAt
+        }));
+    }
+
+    @Mutation(() => TripMembershipResponse, { description: "Invite a user to a trip by email" })
+    async inviteUserToTrip(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("email") email: string,
+        @Arg("role", () => TripRole, { defaultValue: TripRole.VIEWER }) role: TripRole,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembershipResponse> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to invite users.");
+        }
+
+        // Check if user has permission to invite (must be at least EDITOR)
+        if (!(await checkTripAccess(userId, tripId, TripRole.EDITOR))) {
+            throw new AuthenticationError("You don't have permission to invite users to this trip.");
+        }
+
+        // Find the user by email
+        const userToInvite = await AppDataSource.getRepository(User).findOne({
+            where: { email: email.toLowerCase() }
+        });
+
+        if (!userToInvite) {
+            throw new UserInputError("User with this email not found.");
+        }
+
+        // Check if user is already a member
+        const existingMembership = await AppDataSource.getRepository(TripMembership).findOne({
+            where: {
+                user: { id: userToInvite.id },
+                trip: { id: tripId }
+            }
+        });
+
+        if (existingMembership) {
+            throw new UserInputError("User is already a member of this trip.");
+        }
+
+        // Get the trip
+        const trip = await AppDataSource.getRepository(Trip).findOne({
+            where: { id: tripId }
+        });
+
+        if (!trip) {
+            throw new UserInputError("Trip not found.");
+        }
+
+        // Create membership with PENDING status (user needs to accept first)
+        const membership = AppDataSource.getRepository(TripMembership).create({
+            user: userToInvite,
+            trip: trip,
+            role: TripRole.PENDING // All invitations start as pending
+        });
+
+        const savedMembership = await AppDataSource.getRepository(TripMembership).save(membership);
+
+        return {
+            id: savedMembership.id,
+            tripId: tripId,
+            userId: userToInvite.id,
+            role: role,
+            status: "pending",
+            user: userToInvite,
+            trip: undefined, // Not needed for this mutation
+            createdAt: savedMembership.createdAt
+        };
+    }
+
+    @Mutation(() => Boolean, { description: "Remove a user from a trip" })
+    async removeUserFromTrip(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("userId", () => ID) userIdToRemove: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to remove users.");
+        }
+
+        // Check if user has permission to remove members (must be at least EDITOR)
+        if (!(await checkTripAccess(userId, tripId, TripRole.EDITOR))) {
+            throw new AuthenticationError("You don't have permission to remove users from this trip.");
+        }
+
+        // Cannot remove the owner
+        const membershipToRemove = await AppDataSource.getRepository(TripMembership).findOne({
+            where: {
+                user: { id: userIdToRemove },
+                trip: { id: tripId }
+            }
+        });
+
+        if (!membershipToRemove) {
+            throw new UserInputError("User is not a member of this trip.");
+        }
+
+        if (membershipToRemove.role === TripRole.OWNER) {
+            throw new UserInputError("Cannot remove the owner of the trip.");
+        }
+
+        await AppDataSource.getRepository(TripMembership).remove(membershipToRemove);
+        return true;
+    }
+
+    @Mutation(() => TripMembershipResponse, { description: "Update a user's role in a trip" })
+    async updateUserRole(
+        @Arg("tripId", () => ID) tripId: string,
+        @Arg("userId", () => ID) userIdToUpdate: string,
+        @Arg("newRole", () => TripRole) newRole: TripRole,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembershipResponse> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to update user roles.");
+        }
+
+        // Check if user has permission to update roles (must be OWNER)
+        if (!(await checkTripAccess(userId, tripId, TripRole.OWNER))) {
+            throw new AuthenticationError("You must be the owner to update user roles.");
+        }
+
+        const membershipToUpdate = await AppDataSource.getRepository(TripMembership).findOne({
+            where: {
+                user: { id: userIdToUpdate },
+                trip: { id: tripId }
+            },
+            relations: ["user"]
+        });
+
+        if (!membershipToUpdate) {
+            throw new UserInputError("User is not a member of this trip.");
+        }
+
+        // Cannot change owner role
+        if (membershipToUpdate.role === TripRole.OWNER) {
+            throw new UserInputError("Cannot change the owner's role.");
+        }
+
+        membershipToUpdate.role = newRole;
+        const updatedMembership = await AppDataSource.getRepository(TripMembership).save(membershipToUpdate);
+
+        return {
+            id: updatedMembership.id,
+            tripId: tripId,
+            userId: userIdToUpdate,
+            role: newRole,
+            status: "accepted",
+            user: membershipToUpdate.user,
+            trip: undefined, // Not needed for this mutation
+            createdAt: updatedMembership.createdAt
+        };
     }
 
     @Mutation(() => Trip, { description: "Create a new trip" })
@@ -184,34 +390,10 @@ export class TripResolver {
         // Use transaction to ensure proper cleanup order
         try {
             await AppDataSource.transaction(async (transactionalEntityManager) => {
-                // 1. First delete all MediaItems (they reference Memory)
-                const memories = await transactionalEntityManager.find(Memory, { 
-                    where: { trip: { id } },
-                    relations: ["mediaItems"]
-                });
-                
-                for (const memory of memories) {
-                    if (memory.mediaItems && memory.mediaItems.length > 0) {
-                        await transactionalEntityManager.remove(MediaItem, memory.mediaItems);
-                    }
-                }
-                
-                // 2. Delete all Memories (they reference Trip)
-                await transactionalEntityManager.delete(Memory, { trip: { id } });
-                
-                // 3. Delete all RoutePoints (they reference Trip and TrackSegment)
-                await transactionalEntityManager.delete(RoutePoint, { trip: { id } });
-                
-                // 4. Delete all TrackSegments (they reference Trip and GPXTrack)
-                await transactionalEntityManager.delete(TrackSegment, { trip: { id } });
-                
-                // 5. Delete all GPXTracks (they reference Trip)
-                await transactionalEntityManager.delete(GPXTrack, { trip: { id } });
-                
-                // 6. Delete all trip memberships
+                // First delete all trip memberships
                 await transactionalEntityManager.delete(TripMembership, { trip: { id } });
                 
-                // 7. Finally delete the trip itself
+                // Then delete the trip itself
                 await transactionalEntityManager.delete(Trip, { id });
             });
             
@@ -223,15 +405,7 @@ export class TripResolver {
     }
 
     @FieldResolver(() => [Memory])
-    async memories(
-        @Root() trip: Trip,
-        @Ctx() { userId }: MyContext
-    ): Promise<Memory[]> {
-        // Benutzer muss Zugriff auf die Reise haben, um Erinnerungen sehen zu dürfen
-        if (!userId || !(await checkTripAccess(userId, trip.id, TripRole.VIEWER))) {
-            throw new AuthenticationError("You don't have permission to access memories for this trip.");
-        }
-
+    async memories(@Root() trip: Trip): Promise<Memory[]> {
         try {
             const memoryRepository = AppDataSource.getRepository(Memory);
             return await memoryRepository.find({ where: { trip: { id: trip.id } } });
@@ -250,5 +424,112 @@ export class TripResolver {
             console.error(`Failed to get cover image URL for ${trip.coverImageObjectName}`, error);
             return null;
         }
+    }
+
+    @Query(() => [TripMembershipResponse], { description: "Get pending invitations for current user" })
+    async getPendingInvitations(
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembershipResponse[]> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to view invitations.");
+        }
+
+        const pendingMemberships = await AppDataSource.getRepository(TripMembership).find({
+            where: {
+                user: { id: userId },
+                role: TripRole.PENDING // We need to add this status
+            },
+            relations: ['user', 'trip']
+        });
+
+        return pendingMemberships.map(membership => ({
+            id: membership.id,
+            tripId: membership.trip.id,
+            userId: membership.user.id,
+            role: membership.role,
+            status: "pending",
+            user: membership.user,
+            trip: membership.trip,
+            createdAt: membership.createdAt
+        }));
+    }
+
+    @Mutation(() => TripMembershipResponse, { description: "Accept a pending trip invitation" })
+    async acceptInvitation(
+        @Arg("tripId", () => ID) tripId: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<TripMembershipResponse> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to accept invitations.");
+        }
+
+        // Find pending membership
+        const membership = await AppDataSource.getRepository(TripMembership).findOne({
+            where: {
+                user: { id: userId },
+                trip: { id: tripId },
+                role: TripRole.PENDING
+            },
+            relations: ['user', 'trip']
+        });
+
+        if (!membership) {
+            throw new UserInputError("No pending invitation found for this trip.");
+        }
+
+        // Update membership to VIEWER (default after acceptance)
+        membership.role = TripRole.VIEWER;
+        const updatedMembership = await AppDataSource.getRepository(TripMembership).save(membership);
+
+        return {
+            id: updatedMembership.id,
+            tripId: updatedMembership.trip.id,
+            userId: updatedMembership.user.id,
+            role: updatedMembership.role,
+            status: "accepted",
+            user: updatedMembership.user,
+            trip: updatedMembership.trip,
+            createdAt: updatedMembership.createdAt
+        };
+    }
+
+    @Mutation(() => Boolean, { description: "Decline a pending trip invitation" })
+    async declineInvitation(
+        @Arg("tripId", () => ID) tripId: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to decline invitations.");
+        }
+
+        // Find and delete pending membership
+        const result = await AppDataSource.getRepository(TripMembership).delete({
+            user: { id: userId },
+            trip: { id: tripId },
+            role: TripRole.PENDING
+        });
+
+        return result.affected ? result.affected > 0 : false;
+    }
+
+    @Query(() => [Trip], { description: "Get all trips the user has access to (owned + shared)" })
+    async getAccessibleTrips(
+        @Ctx() { userId }: MyContext
+    ): Promise<Trip[]> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in to view trips.");
+        }
+
+        // Get all trips where user is either owner or member (not pending)
+        const memberships = await AppDataSource.getRepository(TripMembership).find({
+            where: {
+                user: { id: userId },
+                // Exclude pending invitations
+                role: Not(TripRole.PENDING)
+            },
+            relations: ['trip']
+        });
+
+        return memberships.map(membership => membership.trip);
     }
 } 
