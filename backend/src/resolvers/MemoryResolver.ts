@@ -112,8 +112,13 @@ export class MemoryResolver {
             }
         }
 
+        // Standard-Timestamp setzen, falls nicht übergeben
+        const timestamp = input.timestamp ?? new Date();
+
         const newMemory = memoryRepository.create({
-            ...input,
+            title: input.title,
+            text: input.text,
+            timestamp,
             latitude,
             longitude,
             locationName,
