@@ -27,7 +27,7 @@ export class Memory {
     text?: string;
 
     // Alias-Feld `content` für neue iOS-Versionen
-    @Field({ name: "content", nullable: true })
+    @Field(() => String, { name: "content", nullable: true })
     get content(): string | undefined {
         return this.text;
     }
@@ -40,7 +40,7 @@ export class Memory {
     @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
     timestamp!: Date;
 
-    @Field({ name: "date" })
+    @Field(() => Date, { name: "date" })
     get date(): Date {
         return this.timestamp;
     }
@@ -61,7 +61,7 @@ export class Memory {
     @Column({ nullable: true })
     locationName?: string;
 
-    @Field({ name: "address", nullable: true })
+    @Field(() => String, { name: "address", nullable: true })
     get address(): string | undefined {
         return this.locationName;
     }
