@@ -17,6 +17,34 @@ import { RoutePoint } from '../entities/RoutePoint';
 import { TrackSegment } from '../entities/TrackSegment';
 import { GPXTrack } from '../entities/GPXTrack';
 import { Permission } from '../entities/Permission';
+import { Not } from 'typeorm';
+
+@ObjectType()
+class TripMembershipResponse {
+    @Field(() => ID)
+    id!: string;
+
+    @Field(() => String)
+    tripId!: string;
+
+    @Field(() => String)
+    userId!: string;
+
+    @Field(() => TripRole)
+    role!: TripRole;
+
+    @Field(() => String)
+    status!: string;
+
+    @Field(() => User)
+    user!: User;
+
+    @Field(() => Trip, { nullable: true })
+    trip?: Trip;
+
+    @Field(() => Date)
+    createdAt!: Date;
+}
 
 @Resolver(Trip)
 export class TripResolver {
@@ -45,22 +73,21 @@ export class TripResolver {
             throw new AuthenticationError("You must be logged in to view this trip.");
         }
         
-        // Prüfe, ob der eingeloggte Benutzer mindestens VIEWER-Rechte für diese Reise hat
+        // Check if the user has at least VIEWER rights for this trip
         const hasAccess = await checkTripAccess(userId, id, TripRole.VIEWER);
         if (!hasAccess) {
             throw new AuthenticationError("You don't have permission to view this trip.");
         }
 
         const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
-        // Wenn die Reise nicht existiert, null zurückgeben (GraphQL-Konvention)
         return trip;
     }
 
-    @Query(() => [TripMembership], { description: "Get all members of a trip" })
+    @Query(() => [TripMembershipResponse], { description: "Get all members of a trip" })
     async getTripMembers(
         @Arg("tripId", () => ID) tripId: string,
         @Ctx() { userId }: MyContext
-    ): Promise<TripMembership[]> {
+    ): Promise<TripMembershipResponse[]> {
         if (!userId) {
             throw new AuthenticationError("You must be logged in to view trip members.");
         }
@@ -71,10 +98,21 @@ export class TripResolver {
             throw new AuthenticationError("You don't have permission to view members of this trip.");
         }
 
-        return await AppDataSource.getRepository(TripMembership).find({
+        const memberships = await AppDataSource.getRepository(TripMembership).find({
             where: { trip: { id: tripId } },
-            relations: ["user", "trip"]
+            relations: ["user"],
         });
+
+        return memberships.map(membership => ({
+            id: membership.id,
+            tripId: tripId,
+            userId: membership.user.id,
+            role: membership.role,
+            status: "accepted", // Default status for existing memberships
+            user: membership.user,
+            trip: undefined,
+            createdAt: new Date() // TripMembership doesn't have createdAt, so use current date
+        }));
     }
 
     @Mutation(() => Trip, { description: "Create a new trip" })
@@ -138,7 +176,7 @@ export class TripResolver {
 
         const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id } });
         if (!trip) {
-            return null; // Or throw a NotFoundError
+            return null;
         }
 
         Object.assign(trip, input);
@@ -179,8 +217,6 @@ export class TripResolver {
             if (!trip) {
                 throw new Error("Trip not found.");
             }
-
-            // Optional: Check if the object actually exists in Minio before assigning
 
             trip.coverImageObjectName = objectName;
             await tripRepository.save(trip);
