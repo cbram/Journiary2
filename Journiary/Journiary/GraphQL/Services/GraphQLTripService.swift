@@ -418,10 +418,8 @@ class GraphQLTripService: ObservableObject {
             variables: ["tripId": id]
         )
         .tryMap { response -> TripDTO in
-            guard let data = response.claimTrip else {
-                throw GraphQLError.serverError("Leere Antwort")
-            }
-            var dict: [String: Any] = ["id": data.id, "name": data.name]
+            let data = response.claimTrip
+            let dict: [String: Any] = ["id": data.id, "name": data.name]
             guard let dto = TripDTO.from(graphQL: dict) else {
                 throw GraphQLError.serverError("Parsing-Fehler")
             }
