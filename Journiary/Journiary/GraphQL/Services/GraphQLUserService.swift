@@ -76,9 +76,13 @@ class GraphQLUserService: ObservableObject {
                       let login = data["login"] as? [String: Any],
                       let user = login["user"] as? [String: Any],
                       let id = user["id"] as? String,
-                      let email = user["email"] as? String else {
+                      let email = user["email"] as? String,
+                      let token = login["token"] as? String else {
                     throw GraphQLError.invalidInput("Ungültige Login-Antwort")
                 }
+                
+                // JWT im AuthManager speichern
+                AuthManager.shared.setJWTToken(token)
                 
                 // Backend User hat kein username - verwende email als username
                 return UserDTO(
