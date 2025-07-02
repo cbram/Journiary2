@@ -139,6 +139,7 @@ export class MemoryResolver {
             newMemory.tags = tags;
         }
 
+        console.log("Saving memory with timestamp", newMemory.timestamp);
         return await memoryRepository.save(newMemory);
     }
 

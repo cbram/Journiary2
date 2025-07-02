@@ -30,7 +30,7 @@ export class Memory {
      * Zeitpunkt des Memories. Wird im iOS-Schema als `date` bezeichnet.
      */
     @Field({ name: "date" })
-    @Column()
+    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
     timestamp!: Date;
 
     @Field(() => Float)
