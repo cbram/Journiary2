@@ -413,7 +413,7 @@ class GraphQLTripService: ObservableObject {
     
     /// Trip für aktuellen User claimen (Membership anlegen)
     func claimTrip(id: String) -> AnyPublisher<TripDTO, GraphQLError> {
-        ApolloClientManager.shared.mutate(
+        ApolloClientManager.shared.perform(
             mutation: ClaimTripMutation.self,
             variables: ["tripId": id]
         )
@@ -659,5 +659,28 @@ struct TripMembershipDTO {
             user: user,
             createdAt: createdAt
         )
+    }
+}
+
+// MARK: - Fallback ClaimTripMutation (wenn Codegen noch nicht gelaufen ist)
+
+fileprivate struct ClaimTripMutation: GraphQLMutation {
+    static let operationName = "ClaimTrip"
+    static let document = """
+    mutation ClaimTrip($tripId: ID!) {
+      claimTrip(tripId: $tripId) {
+        id
+        name
+      }
+    }
+    """
+
+    struct Data: Codable {
+        let claimTrip: ClaimTrip
+
+        struct ClaimTrip: Codable {
+            let id: String
+            let name: String
+        }
     }
 } 
