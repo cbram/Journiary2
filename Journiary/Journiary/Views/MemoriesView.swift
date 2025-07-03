@@ -11,8 +11,7 @@ import Foundation
 import AVFoundation
 import AVKit
 
-// Kompatibilität: alter Name → neuer View
-typealias ImprovedFullScreenPhotoView = FullScreenPhotoView
+// Kompatibilitätsalias entfernt – FullScreenPhotoView wird direkt verwendet
 
 struct MemoriesView: View {
     @Environment(\.managedObjectContext) private var viewContext
@@ -573,7 +572,7 @@ struct MemoryDetailView: View {
                 .alert("Erinnerung löschen", isPresented: $showingDeleteAlert) { deleteAlertButtons } message: { Text("Möchtest du diese Erinnerung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.") }
                 .onAppear { loadPhotosAsync() }
                 .fullScreenCover(isPresented: $showingFullScreenPhotos) {
-                    ImprovedFullScreenPhotoView(allPhotoData: allPhotoData, selectedPhotoIndex: $selectedPhotoIndex)
+                    FullScreenPhotoView(photos: photos, loadedImages: loadedImages, selectedPhotoIndex: $selectedPhotoIndex)
                 }
                 .sheet(isPresented: $showingPOIDetail) {
                     if let bucketListItem = memory.bucketListItem {
@@ -1747,28 +1746,30 @@ struct MediaThumbnailPreview: View {
         .environment(\.managedObjectContext, context)
 }
 
-// MARK: - Toolbar & Alerts
+// MARK: - Toolbar & Alerts (Extension)
 
-@ToolbarContentBuilder
-private var toolbarContent: some ToolbarContent {
-    ToolbarItem(placement: .navigationBarLeading) {
-        Menu {
-            Button("Teilen", systemImage: "square.and.arrow.up") { shareCurrentPhoto() }
-                .disabled(allPhotoData.isEmpty)
-            Button("Bearbeiten", systemImage: "pencil") { showingEditView = true }
-            Button("Löschen", systemImage: "trash", role: .destructive) { showingDeleteAlert = true }
-        } label: {
-            Image(systemName: "ellipsis.circle")
+extension MemoryDetailView {
+    @ToolbarContentBuilder
+    fileprivate var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Menu {
+                Button("Teilen", systemImage: "square.and.arrow.up") { shareCurrentPhoto() }
+                    .disabled(allPhotoData.isEmpty)
+                Button("Bearbeiten", systemImage: "pencil") { showingEditView = true }
+                Button("Löschen", systemImage: "trash", role: .destructive) { showingDeleteAlert = true }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button("Fertig") { dismiss() }
         }
     }
-    ToolbarItem(placement: .navigationBarTrailing) {
-        Button("Fertig") { dismiss() }
-    }
-}
 
-private var deleteAlertButtons: some View {
-    Group {
-        Button("Löschen", role: .destructive) { deleteMemory() }
-        Button("Abbrechen", role: .cancel) { }
+    fileprivate var deleteAlertButtons: some View {
+        Group {
+            Button("Löschen", role: .destructive) { deleteMemory() }
+            Button("Abbrechen", role: .cancel) { }
+        }
     }
 } 
