@@ -127,7 +127,7 @@ class PlacesManager: ObservableObject {
         guard !query.isEmpty else { return }
         
         print("[PlacesManager] Starte Suche: query=\(query), country=\(country ?? "-")")
-        let provider = UserDefaults.standard.string(forKey: "PlaceProvider") ?? "Google"
+        let provider = UserDefaults.standard.string(forKey: "PlaceProvider") ?? "Nominatim"
         isSearching = true
         errorMessage = nil
         
