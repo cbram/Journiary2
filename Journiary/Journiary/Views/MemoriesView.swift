@@ -39,6 +39,10 @@ struct MemoriesView: View {
     @State private var showingShareSheet = false
     @State private var shareImage: UIImage?
     
+    // MARK: - Add Memory Sheet
+    @State private var showingAddMemorySheet = false
+    @State private var addMemoryTabIndex = 0
+    
     var oldestFirst: Bool = false
     
     // Initializer, um den FetchRequest basierend auf dem Trip zu konfigurieren
@@ -139,6 +143,11 @@ struct MemoriesView: View {
             SettingsView()
                 .environmentObject(LocationManager(context: viewContext))
         }
+        // Sheet zum Hinzufügen einer Erinnerung, falls kein Tab-Wechsel möglich ist
+        .sheet(isPresented: $showingAddMemorySheet) {
+            AddMemoryView(selectedTab: $addMemoryTabIndex)
+                .environmentObject(LocationManager(context: viewContext))
+        }
     }
     
     private var emptyStateView: some View {
@@ -160,7 +169,7 @@ struct MemoriesView: View {
             
             if trip == nil {
                 Button("Erinnerung hinzufügen") {
-                    // Tab wechseln würde hier implementiert werden
+                    showingAddMemorySheet = true
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -1683,7 +1692,7 @@ struct FullScreenPhotoView: View {
     private func photoView(for index: Int) -> some View {
         ZStack {
             if let image = loadedImages[index] {
-                ZoomableImageView(
+                ImprovedZoomableImageView(
                     image: image,
                     photoState: Binding(
                         get: { currentPhotoStates[index] ?? PhotoState() },

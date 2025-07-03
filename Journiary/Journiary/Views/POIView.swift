@@ -357,6 +357,7 @@ struct POIView: View {
             
             Button(action: {
                 selectedTab = 2 // Wechsel zum Add-Tab
+                showingAddBucketListItem = true // Sheet direkt öffnen
             }) {
                 HStack {
                     Image(systemName: "plus.circle.fill")
