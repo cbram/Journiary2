@@ -1609,8 +1609,13 @@ struct FullScreenPhotoView: View {
     @State private var currentPhotoStates: [Int: PhotoState] = [:]
     @State private var showingToolbar = true
     
-    // Nutze denselben PhotoState wie im klassischen FullScreenPhotoView
-    typealias PhotoState = FullScreenPhotoView.PhotoState
+    // PhotoState beschreibt Zoom- & Pan-Zustand pro Bild
+    struct PhotoState {
+        var scale: CGFloat = 1.0
+        var offset: CGSize = .zero
+        var lastScale: CGFloat = 1.0
+        var lastOffset: CGSize = .zero
+    }
     
     var body: some View {
         NavigationView {
