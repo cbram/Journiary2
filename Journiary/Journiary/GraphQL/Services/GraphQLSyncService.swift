@@ -208,7 +208,8 @@ class GraphQLSyncService: ObservableObject {
 
                 self.syncProgress = 0.3
 
-                // Trips verarbeiten
+                // Trips verarbeiten und lokale Löschungen feststellen
+                let remoteTripIds = Set(tripsData.trips.map { $0.id })
                 self.context.performAndWait {
                     print("🔄 Starte Trip-Import – empfangene Trips: \(tripsData.trips.count)")
                     if let cu = AuthManager.shared.currentUser {
@@ -271,6 +272,19 @@ class GraphQLSyncService: ObservableObject {
                             }
                         }
                     }
+
+                    // MARK: – Entferne lokale Trips, die auf dem Server nicht mehr vorhanden sind
+                    let allTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
+                    if let localTrips = try? self.context.fetch(allTripsRequest) {
+                        for localTrip in localTrips {
+                            guard let localId = localTrip.id?.uuidString else { continue }
+                            if !remoteTripIds.contains(localId) {
+                                print("🗑️ Lösche lokalen Trip, da er auf dem Server fehlt: \(localTrip.name ?? "?") (id: \(localId))")
+                                self.context.delete(localTrip)
+                            }
+                        }
+                    }
+
                     if self.context.hasChanges {
                         try? self.context.save()
                     }

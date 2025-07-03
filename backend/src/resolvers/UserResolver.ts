@@ -44,6 +44,7 @@ export class UserResolver {
         // 4. Create and save user
         const user = AppDataSource.getRepository(User).create({
             email,
+            username: email,
             password: hashedPassword,
         });
 
