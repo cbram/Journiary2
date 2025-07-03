@@ -11,6 +11,9 @@ import Foundation
 import AVFoundation
 import AVKit
 
+// Kompatibilität: alter Name → neuer View
+typealias ImprovedFullScreenPhotoView = FullScreenPhotoView
+
 struct MemoriesView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
@@ -562,92 +565,46 @@ struct MemoryDetailView: View {
     
     var body: some View {
         NavigationView {
-            Group {
-                if memory.isFault || memory.managedObjectContext == nil {
-                    // Memory-Objekt ist nicht verfügbar
-                    VStack(spacing: 20) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-                        
-                        Text("Erinnerung nicht verfügbar")
-                            .font(.headline)
-                        
-                        Text("Diese Erinnerung konnte nicht geladen werden. Möglicherweise wurde sie von einem anderen Gerät gelöscht oder geändert.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        
-                        Button("Schließen") {
-                            dismiss()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    .padding()
-                } else {
-                    memoryContentView
+            mainContent
+                .navigationTitle("Erinnerung")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { toolbarContent }
+                .sheet(isPresented: $showingEditView) { EditMemoryView(memory: memory) }
+                .alert("Erinnerung löschen", isPresented: $showingDeleteAlert) { deleteAlertButtons } message: { Text("Möchtest du diese Erinnerung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.") }
+                .onAppear { loadPhotosAsync() }
+                .fullScreenCover(isPresented: $showingFullScreenPhotos) {
+                    ImprovedFullScreenPhotoView(allPhotoData: allPhotoData, selectedPhotoIndex: $selectedPhotoIndex)
                 }
-            }
-            .navigationTitle("Erinnerung")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Menu {
-                        Button("Teilen", systemImage: "square.and.arrow.up") {
-                            shareCurrentPhoto()
-                        }
-                        .disabled(allPhotoData.isEmpty)
-                        
-                        Button("Bearbeiten", systemImage: "pencil") {
-                            showingEditView = true
-                        }
-                        
-                        Button("Löschen", systemImage: "trash", role: .destructive) {
-                            showingDeleteAlert = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
+                .sheet(isPresented: $showingPOIDetail) {
+                    if let bucketListItem = memory.bucketListItem {
+                        BucketListItemDetailCompactView(item: bucketListItem, selectedTab: .constant(0))
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Fertig") {
-                        dismiss()
+                .sheet(isPresented: $showingGPXTrackDetail) {
+                    if let gpxTrack = memory.gpxTrack {
+                        GPXTrackDetailView(gpxTrack: gpxTrack)
                     }
                 }
-            }
-            .sheet(isPresented: $showingEditView) {
-                EditMemoryView(memory: memory)
-            }
-            .alert("Erinnerung löschen", isPresented: $showingDeleteAlert) {
-                Button("Löschen", role: .destructive) {
-                    deleteMemory()
-                }
-                Button("Abbrechen", role: .cancel) { }
-            } message: {
-                Text("Möchtest du diese Erinnerung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")
-            }
-            .onAppear {
-                loadPhotosAsync()
-            }
-            .fullScreenCover(isPresented: $showingFullScreenPhotos) {
-                ImprovedFullScreenPhotoView(
-                    allPhotoData: allPhotoData,
-                    selectedPhotoIndex: $selectedPhotoIndex
-                )
-            }
-            .sheet(isPresented: $showingPOIDetail) {
-                if let bucketListItem = memory.bucketListItem {
-                    BucketListItemDetailCompactView(item: bucketListItem, selectedTab: .constant(0))
-                }
-            }
-            .sheet(isPresented: $showingGPXTrackDetail) {
-                if let gpxTrack = memory.gpxTrack {
-                    GPXTrackDetailView(gpxTrack: gpxTrack)
-                }
-            }
         }
+    }
+    
+    @ViewBuilder
+    private var mainContent: some View {
+        if memory.isFault || memory.managedObjectContext == nil {
+            unavailableView
+        } else {
+            memoryContentView
+        }
+    }
+    
+    private var unavailableView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle").font(.system(size: 50)).foregroundColor(.orange)
+            Text("Erinnerung nicht verfügbar").font(.headline)
+            Text("Diese Erinnerung konnte nicht geladen werden. Möglicherweise wurde sie von einem anderen Gerät gelöscht oder geändert.")
+                .font(.body).foregroundColor(.secondary).multilineTextAlignment(.center).padding(.horizontal)
+            Button("Schließen") { dismiss() }.buttonStyle(.borderedProminent)
+        }.padding()
     }
     
     private var memoryContentView: some View {
@@ -1735,9 +1692,6 @@ struct ZoomableImageView: View {
 
 // MARK: - Kompatibilitäts-Typalias / Placeholder
 
-// Ältere Aufrufe verwenden noch ImprovedFullScreenPhotoView – leite auf FullScreenPhotoView um
-typealias ImprovedFullScreenPhotoView = FullScreenPhotoView
-
 // Minimalversion von MediaThumbnailPreview (Thumbnail + Tap)
 struct MediaThumbnailPreview: View {
     let mediaItem: MediaItem
@@ -1791,4 +1745,30 @@ struct MediaThumbnailPreview: View {
     
     return MemoriesView()
         .environment(\.managedObjectContext, context)
+}
+
+// MARK: - Toolbar & Alerts
+
+@ToolbarContentBuilder
+private var toolbarContent: some ToolbarContent {
+    ToolbarItem(placement: .navigationBarLeading) {
+        Menu {
+            Button("Teilen", systemImage: "square.and.arrow.up") { shareCurrentPhoto() }
+                .disabled(allPhotoData.isEmpty)
+            Button("Bearbeiten", systemImage: "pencil") { showingEditView = true }
+            Button("Löschen", systemImage: "trash", role: .destructive) { showingDeleteAlert = true }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+    }
+    ToolbarItem(placement: .navigationBarTrailing) {
+        Button("Fertig") { dismiss() }
+    }
+}
+
+private var deleteAlertButtons: some View {
+    Group {
+        Button("Löschen", role: .destructive) { deleteMemory() }
+        Button("Abbrechen", role: .cancel) { }
+    }
 } 
