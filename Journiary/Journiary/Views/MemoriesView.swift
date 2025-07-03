@@ -1733,6 +1733,41 @@ struct ZoomableImageView: View {
     }
 }
 
+// MARK: - Kompatibilitäts-Typalias / Placeholder
+
+// Ältere Aufrufe verwenden noch ImprovedFullScreenPhotoView – leite auf FullScreenPhotoView um
+typealias ImprovedFullScreenPhotoView = FullScreenPhotoView
+
+// Minimalversion von MediaThumbnailPreview (Thumbnail + Tap)
+struct MediaThumbnailPreview: View {
+    let mediaItem: MediaItem
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            if let thumb = mediaItem.thumbnail {
+                Image(uiImage: thumb)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 100)
+                    .clipped()
+            } else {
+                Rectangle()
+                    .fill(Color(.systemGray4))
+                    .frame(height: 100)
+                    .overlay(
+                        Image(systemName: mediaItem.isVideo ? "video" : "photo")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    )
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .cornerRadius(12)
+        .clipped()
+    }
+}
+
 #Preview {
     let context = PersistenceController.preview.container.viewContext
     
