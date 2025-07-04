@@ -33,7 +33,7 @@ struct POIView: View {
     
     init(appMode: Binding<AppMode>) {
         self._appMode = appMode
-        let context = EnhancedPersistenceController.shared.container.viewContext
+        let context = PersistenceController.shared.container.viewContext
         _filterManager = StateObject(wrappedValue: BucketListFilterManager(context: context))
     }
     
@@ -357,7 +357,6 @@ struct POIView: View {
             
             Button(action: {
                 selectedTab = 2 // Wechsel zum Add-Tab
-                showingAddBucketListItem = true // Sheet direkt öffnen
             }) {
                 HStack {
                     Image(systemName: "plus.circle.fill")

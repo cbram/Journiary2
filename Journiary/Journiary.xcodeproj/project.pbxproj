@@ -112,9 +112,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 761954FC2DF57EB7003E92C7 /* Build configuration list for PBXNativeTarget "Journiary" */;
 			buildPhases = (
-				761954D22DF57EB6003E92C7 /* Frameworks */,
-				76225FD92E15A01700A7758C /* Apollo iOS Code Generation Build Phase */,
 				761954D12DF57EB6003E92C7 /* Sources */,
+				761954D22DF57EB6003E92C7 /* Frameworks */,
 				761954D32DF57EB6003E92C7 /* Resources */,
 			);
 			buildRules = (
@@ -209,8 +208,6 @@
 			);
 			mainGroup = 761954CC2DF57EB6003E92C7;
 			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 761954D62DF57EB6003E92C7 /* Products */;
 			projectDirPath = "";
@@ -246,27 +243,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		76225FD92E15A01700A7758C /* Apollo iOS Code Generation Build Phase */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Apollo iOS Code Generation Build Phase";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#!/bin/bash\n\n# Apollo iOS Code Generation Build Phase\n# Füge dieses Script als \"Run Script Phase\" in Xcode hinzu\n\n# Nur bei Clean Build oder wenn GraphQL Dateien geändert wurden\nif [ \"${CONFIGURATION}\" = \"Debug\" ] || [ \"${ACTION}\" = \"clean\" ]; then\n    cd \"${SRCROOT}\"\n    \n    # Überprüfe ob Schema existiert\n    if [ -f \"schema.graphqls\" ]; then\n        # Code-Generation erfolgt über Swift Package Manager\n        echo \"Code-Generation via Swift Package Manager beim Build\"\n        \n        echo \"Apollo Code erfolgreich generiert\"\n    else\n        echo \"Warnung: schema.graphqls nicht gefunden\"\n    fi\nfi\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		761954D12DF57EB6003E92C7 /* Sources */ = {
@@ -372,7 +348,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -436,7 +412,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";

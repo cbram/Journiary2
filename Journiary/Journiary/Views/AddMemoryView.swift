@@ -1753,23 +1753,6 @@ struct AddMemoryView: View {
         memory.text = text
         memory.timestamp = selectedDate
         
-        // WICHTIG: Creator zuweisen bei neuen Memories!
-        // User im GLEICHEN Context finden wie die Memory
-        let userRequest: NSFetchRequest<User> = User.fetchRequest()
-        userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
-        userRequest.fetchLimit = 1
-        
-        do {
-            if let currentUser = try viewContext.fetch(userRequest).first {
-                memory.creator = currentUser
-                print("✅ Neue Memory mit Creator erstellt: \(currentUser.displayName)")
-            } else {
-                print("⚠️ Warnung: Neue Memory ohne Creator erstellt - kein aktueller User im Context gefunden")
-            }
-        } catch {
-            print("❌ Fehler beim Laden des aktuellen Users: \(error)")
-        }
-        
         // Standort hinzufügen
         if let coordinate = finalCoordinate {
             memory.latitude = coordinate.latitude
@@ -1918,23 +1901,6 @@ struct AddMemoryView: View {
         tempMemory.text = text
         tempMemory.timestamp = selectedDate
         tempMemory.locationName = finalLocationName
-        
-        // WICHTIG: Auch temporäre Memories brauchen einen Creator!
-        // User im GLEICHEN Context finden wie die temporäre Memory
-        let userRequest: NSFetchRequest<User> = User.fetchRequest()
-        userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
-        userRequest.fetchLimit = 1
-        
-        do {
-            if let currentUser = try viewContext.fetch(userRequest).first {
-                tempMemory.creator = currentUser
-                print("✅ Temporäre Memory mit Creator erstellt: \(currentUser.displayName)")
-            } else {
-                print("⚠️ Warnung: Temporäre Memory ohne Creator erstellt - kein aktueller User im Context gefunden")
-            }
-        } catch {
-            print("❌ Fehler beim Laden des aktuellen Users für temporäre Memory: \(error)")
-        }
         
         if let coordinate = finalCoordinate {
             tempMemory.latitude = coordinate.latitude

@@ -11,8 +11,6 @@ import Foundation
 import AVFoundation
 import AVKit
 
-// Kompatibilitätsalias entfernt – FullScreenPhotoView wird direkt verwendet
-
 struct MemoriesView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
@@ -40,10 +38,6 @@ struct MemoriesView: View {
     // MARK: - Teilen/Exportieren
     @State private var showingShareSheet = false
     @State private var shareImage: UIImage?
-    
-    // MARK: - Add Memory Sheet
-    @State private var showingAddMemorySheet = false
-    @State private var addMemoryTabIndex = 0
     
     var oldestFirst: Bool = false
     
@@ -145,11 +139,6 @@ struct MemoriesView: View {
             SettingsView()
                 .environmentObject(LocationManager(context: viewContext))
         }
-        // Sheet zum Hinzufügen einer Erinnerung, falls kein Tab-Wechsel möglich ist
-        .sheet(isPresented: $showingAddMemorySheet) {
-            AddMemoryView(selectedTab: $addMemoryTabIndex)
-                .environmentObject(LocationManager(context: viewContext))
-        }
     }
     
     private var emptyStateView: some View {
@@ -171,7 +160,7 @@ struct MemoriesView: View {
             
             if trip == nil {
                 Button("Erinnerung hinzufügen") {
-                    showingAddMemorySheet = true
+                    // Tab wechseln würde hier implementiert werden
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -564,46 +553,92 @@ struct MemoryDetailView: View {
     
     var body: some View {
         NavigationView {
-            mainContent
-                .navigationTitle("Erinnerung")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar { toolbarContent }
-                .sheet(isPresented: $showingEditView) { EditMemoryView(memory: memory) }
-                .alert("Erinnerung löschen", isPresented: $showingDeleteAlert) { deleteAlertButtons } message: { Text("Möchtest du diese Erinnerung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.") }
-                .onAppear { loadPhotosAsync() }
-                .fullScreenCover(isPresented: $showingFullScreenPhotos) {
-                    FullScreenPhotoView(photos: photos, loadedImages: loadedImages, selectedPhotoIndex: $selectedPhotoIndex)
+            Group {
+                if memory.isFault || memory.managedObjectContext == nil {
+                    // Memory-Objekt ist nicht verfügbar
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                        
+                        Text("Erinnerung nicht verfügbar")
+                            .font(.headline)
+                        
+                        Text("Diese Erinnerung konnte nicht geladen werden. Möglicherweise wurde sie von einem anderen Gerät gelöscht oder geändert.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button("Schließen") {
+                            dismiss()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                } else {
+                    memoryContentView
                 }
-                .sheet(isPresented: $showingPOIDetail) {
-                    if let bucketListItem = memory.bucketListItem {
-                        BucketListItemDetailCompactView(item: bucketListItem, selectedTab: .constant(0))
+            }
+            .navigationTitle("Erinnerung")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Menu {
+                        Button("Teilen", systemImage: "square.and.arrow.up") {
+                            shareCurrentPhoto()
+                        }
+                        .disabled(allPhotoData.isEmpty)
+                        
+                        Button("Bearbeiten", systemImage: "pencil") {
+                            showingEditView = true
+                        }
+                        
+                        Button("Löschen", systemImage: "trash", role: .destructive) {
+                            showingDeleteAlert = true
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
-                .sheet(isPresented: $showingGPXTrackDetail) {
-                    if let gpxTrack = memory.gpxTrack {
-                        GPXTrackDetailView(gpxTrack: gpxTrack)
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fertig") {
+                        dismiss()
                     }
                 }
+            }
+            .sheet(isPresented: $showingEditView) {
+                EditMemoryView(memory: memory)
+            }
+            .alert("Erinnerung löschen", isPresented: $showingDeleteAlert) {
+                Button("Löschen", role: .destructive) {
+                    deleteMemory()
+                }
+                Button("Abbrechen", role: .cancel) { }
+            } message: {
+                Text("Möchtest du diese Erinnerung wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")
+            }
+            .onAppear {
+                loadPhotosAsync()
+            }
+            .fullScreenCover(isPresented: $showingFullScreenPhotos) {
+                ImprovedFullScreenPhotoView(
+                    allPhotoData: allPhotoData,
+                    selectedPhotoIndex: $selectedPhotoIndex
+                )
+            }
+            .sheet(isPresented: $showingPOIDetail) {
+                if let bucketListItem = memory.bucketListItem {
+                    BucketListItemDetailCompactView(item: bucketListItem, selectedTab: .constant(0))
+                }
+            }
+            .sheet(isPresented: $showingGPXTrackDetail) {
+                if let gpxTrack = memory.gpxTrack {
+                    GPXTrackDetailView(gpxTrack: gpxTrack)
+                }
+            }
         }
-    }
-    
-    @ViewBuilder
-    private var mainContent: some View {
-        if memory.isFault || memory.managedObjectContext == nil {
-            unavailableView
-        } else {
-            memoryContentView
-        }
-    }
-    
-    private var unavailableView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "exclamationmark.triangle").font(.system(size: 50)).foregroundColor(.orange)
-            Text("Erinnerung nicht verfügbar").font(.headline)
-            Text("Diese Erinnerung konnte nicht geladen werden. Möglicherweise wurde sie von einem anderen Gerät gelöscht oder geändert.")
-                .font(.body).foregroundColor(.secondary).multilineTextAlignment(.center).padding(.horizontal)
-            Button("Schließen") { dismiss() }.buttonStyle(.borderedProminent)
-        }.padding()
     }
     
     private var memoryContentView: some View {
@@ -1565,7 +1600,7 @@ struct FullScreenPhotoView: View {
     @State private var currentPhotoStates: [Int: PhotoState] = [:]
     @State private var showingToolbar = true
     
-    // PhotoState beschreibt Zoom- & Pan-Zustand pro Bild
+    // Einzelner Photo State
     struct PhotoState {
         var scale: CGFloat = 1.0
         var offset: CGSize = .zero
@@ -1683,41 +1718,469 @@ struct ZoomableImageView: View {
     let isCurrentPhoto: Bool
     let onResetZoom: () -> Void
     
+    @State private var imageSize: CGSize = .zero
+    @State private var containerSize: CGSize = .zero
+    
     var body: some View {
-        // Verwende die neue Apple-Style Implementation
-        AppleStyleZoomableImageViewMemories(image: image)
+        GeometryReader { geometry in
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .scaleEffect(photoState.scale)
+                .offset(constrainedOffset(photoState.offset, in: geometry.size))
+                .gesture(zoomGestures(in: geometry.size))
+                .onAppear {
+                    containerSize = geometry.size
+                    let imageAspect = image.size.width / image.size.height
+                    let containerAspect = geometry.size.width / geometry.size.height
+                    
+                    if imageAspect > containerAspect {
+                        // Image is wider - fit to width
+                        imageSize = CGSize(
+                            width: geometry.size.width,
+                            height: geometry.size.width / imageAspect
+                        )
+                    } else {
+                        // Image is taller - fit to height
+                        imageSize = CGSize(
+                            width: geometry.size.height * imageAspect,
+                            height: geometry.size.height
+                        )
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: photoState.scale)
+                .animation(.easeInOut(duration: 0.2), value: photoState.offset)
+        }
+    }
+    
+    private func constrainedOffset(_ offset: CGSize, in containerSize: CGSize) -> CGSize {
+        guard photoState.scale > 1.0 else { return .zero }
+        
+        let scaledImageSize = CGSize(
+            width: imageSize.width * photoState.scale,
+            height: imageSize.height * photoState.scale
+        )
+        
+        let maxOffsetX = max(0, (scaledImageSize.width - containerSize.width) / 2)
+        let maxOffsetY = max(0, (scaledImageSize.height - containerSize.height) / 2)
+        
+        return CGSize(
+            width: min(max(offset.width, -maxOffsetX), maxOffsetX),
+            height: min(max(offset.height, -maxOffsetY), maxOffsetY)
+        )
+    }
+    
+    private func zoomGestures(in containerSize: CGSize) -> some Gesture {
+        let doubleTapGesture = TapGesture(count: 2)
+            .onEnded {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    if photoState.scale > 1.0 {
+                        // Zoom zurück zu 1.0
+                        onResetZoom()
+                    } else {
+                        // Zoom zu 2.0
+                        photoState.scale = 2.0
+                        photoState.lastScale = 2.0
+                        photoState.offset = .zero
+                        photoState.lastOffset = .zero
+                    }
+                }
+            }
+        
+        let magnificationGesture = MagnificationGesture()
+            .onChanged { value in
+                let newScale = photoState.lastScale * value
+                photoState.scale = min(max(newScale, 1.0), 5.0)
+            }
+            .onEnded { _ in
+                photoState.lastScale = photoState.scale
+                if photoState.scale == 1.0 {
+                    photoState.offset = .zero
+                    photoState.lastOffset = .zero
+                }
+            }
+        
+        let panGesture = DragGesture()
+            .onChanged { value in
+                guard photoState.scale > 1.0 else { return }
+                let newOffset = CGSize(
+                    width: photoState.lastOffset.width + value.translation.width,
+                    height: photoState.lastOffset.height + value.translation.height
+                )
+                photoState.offset = constrainedOffset(newOffset, in: containerSize)
+            }
+            .onEnded { _ in
+                photoState.lastOffset = photoState.offset
+            }
+        
+        return doubleTapGesture
+            .simultaneously(with: magnificationGesture)
+            .simultaneously(with: panGesture)
     }
 }
 
-// MARK: - Kompatibilitäts-Typalias / Placeholder
+// MARK: - MediaThumbnailPreview
 
-// Minimalversion von MediaThumbnailPreview (Thumbnail + Tap)
 struct MediaThumbnailPreview: View {
     let mediaItem: MediaItem
     let onTap: () -> Void
-
+    
     var body: some View {
-        Button(action: onTap) {
-            if let thumb = mediaItem.thumbnail {
-                Image(uiImage: thumb)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 100)
-                    .clipped()
-            } else {
-                Rectangle()
-                    .fill(Color(.systemGray4))
-                    .frame(height: 100)
-                    .overlay(
-                        Image(systemName: mediaItem.isVideo ? "video" : "photo")
-                            .font(.title2)
+        if mediaItem.isVideo {
+            // Für Videos: Inline Player anzeigen
+            InlineVideoPlayerView(mediaItem: mediaItem)
+        } else {
+            // Für Fotos: Standard Thumbnail mit Tap
+            Button(action: onTap) {
+                ZStack {
+                    // Thumbnail
+                    if let thumbnail = mediaItem.thumbnail {
+                        Image(uiImage: thumbnail)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 100)
+                            .clipped()
+                    } else {
+                        // Fallback für MediaItems ohne Thumbnail
+                        Rectangle()
+                            .fill(Color(.systemGray4))
+                            .frame(height: 100)
+                            .overlay(
+                                VStack {
+                                    Image(systemName: "photo")
+                                        .font(.title2)
+                                        .foregroundColor(.white)
+                                    
+                                    Text("Foto")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                }
+                            )
+                    }
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .cornerRadius(12)
+            .clipped()
+        }
+    }
+}
+
+// MARK: - InlineVideoPlayerView
+
+struct InlineVideoPlayerView: View {
+    let mediaItem: MediaItem
+    @State private var showingFullScreen = false
+    
+    var body: some View {
+        Button(action: {
+            print("🎬 Video-Thumbnail angeklickt: \(mediaItem.filename ?? "Unbekannt")")
+            print("   Hat Videodaten: \(mediaItem.mediaData != nil)")
+            print("   Dauer: \(mediaItem.duration)s")
+            showingFullScreen = true
+        }) {
+            ZStack {
+                // Video Thumbnail Hintergrund
+                if let thumbnail = mediaItem.thumbnail {
+                    Image(uiImage: thumbnail)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 100)
+                        .clipped()
+                } else {
+                    Rectangle()
+                        .fill(Color(.systemGray4))
+                        .frame(height: 100)
+                        .overlay(
+                            VStack {
+                                Image(systemName: "video")
+                                    .font(.title2)
+                                    .foregroundColor(.white)
+                                
+                                Text("Video")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            }
+                        )
+                }
+                
+                // Play-Button Overlay (prominenter)
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: "play.circle.fill")
                             .foregroundColor(.white)
-                    )
+                            .background(Color.black.opacity(0.6), in: Circle())
+                            .font(.title2)
+                        Spacer()
+                    }
+                    .padding(8)
+                }
+                
+                // Video-Info (Dauer)
+                if let duration = mediaItem.formattedDuration {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Text(duration)
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(4)
+                        }
+                        .padding(6)
+                        Spacer()
+                    }
+                }
             }
         }
         .buttonStyle(PlainButtonStyle())
         .cornerRadius(12)
         .clipped()
+        .fullScreenCover(isPresented: $showingFullScreen) {
+            if let videoData = mediaItem.mediaData {
+                FullScreenVideoPlayerView(videoData: videoData)
+                    .onAppear {
+                        print("✅ FullScreenVideoPlayerView wird angezeigt")
+                    }
+            } else {
+                // Fallback für fehlende Videodaten
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.video")
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
+                    
+                    Text("Video nicht verfügbar")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                    
+                    Text("Die Videodaten konnten nicht geladen werden.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    
+                    Button("Schließen") {
+                        showingFullScreen = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+                .preferredColorScheme(.dark)
+            }
+        }
+    }
+}
+
+
+// MARK: - FullScreenVideoPlayerView
+
+struct FullScreenVideoPlayerView: View {
+    let videoData: Data
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                VideoPlayerView(videoData: videoData)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fertig") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - ImprovedFullScreenPhotoView (für MediaItems und Photos)
+
+struct ImprovedFullScreenPhotoView: View {
+    let allPhotoData: [(data: Data, order: Int)]
+    @Binding var selectedPhotoIndex: Int
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var currentPhotoStates: [Int: PhotoState] = [:]
+    @State private var showingToolbar = true
+    @State private var loadedImages: [Int: UIImage] = [:]
+    @State private var isLoadingImages = false
+    
+    // Einzelner Photo State
+    struct PhotoState {
+        var scale: CGFloat = 1.0
+        var offset: CGSize = .zero
+        var lastScale: CGFloat = 1.0
+        var lastOffset: CGSize = .zero
+    }
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black
+                    .ignoresSafeArea()
+                
+                if !allPhotoData.isEmpty {
+                    VStack {
+                        ZStack {
+                            TabView(selection: $selectedPhotoIndex) {
+                                ForEach(allPhotoData.indices, id: \.self) { index in
+                                    photoView(for: index)
+                                        .tag(index)
+                                }
+                            }
+                            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+                            .gesture(
+                                // Globale Tap-Geste für Toolbar Toggle
+                                TapGesture()
+                                    .onEnded {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            showingToolbar.toggle()
+                                        }
+                                    }
+                            )
+                        }
+                        
+                        // Punkte (PageControl) unter dem Bild
+                        if allPhotoData.count > 1 && showingToolbar {
+                            HStack(spacing: 8) {
+                                ForEach(0..<allPhotoData.count, id: \.self) { idx in
+                                    Circle()
+                                        .fill(idx == selectedPhotoIndex ? Color.white : Color.gray.opacity(0.5))
+                                        .frame(width: 8, height: 8)
+                                }
+                            }
+                            .padding(.top, 8)
+                            .transition(.opacity)
+                        }
+                    }
+                } else {
+                    VStack(spacing: 20) {
+                        Image(systemName: "photo.slash")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        Text("Keine Bilder verfügbar")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if showingToolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Schließen") {
+                            dismiss()
+                        }
+                        .foregroundColor(.white)
+                    }
+                    
+                    ToolbarItem(placement: .principal) {
+                        if allPhotoData.count > 1 {
+                            Text("\(selectedPhotoIndex + 1) von \(allPhotoData.count)")
+                                .foregroundColor(.white)
+                                .font(.headline)
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                // Initialisiere Photo States
+                for index in allPhotoData.indices {
+                    currentPhotoStates[index] = PhotoState()
+                }
+                // Lade alle Bilder
+                loadAllImages()
+            }
+        }
+        .preferredColorScheme(.dark)
+    }
+    
+    @ViewBuilder
+    private func photoView(for index: Int) -> some View {
+        ZStack {
+            if let image = loadedImages[index] {
+                ImprovedZoomableImageView(
+                    image: image,
+                    photoState: Binding(
+                        get: { currentPhotoStates[index] ?? PhotoState() },
+                        set: { currentPhotoStates[index] = $0 }
+                    ),
+                    isCurrentPhoto: selectedPhotoIndex == index,
+                    onResetZoom: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            currentPhotoStates[index] = PhotoState()
+                        }
+                    }
+                )
+            } else if isLoadingImages {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                    Text("Bild wird geladen...")
+                        .foregroundColor(.white)
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                VStack(spacing: 16) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 60))
+                        .foregroundColor(.gray)
+                    Text("Bild konnte nicht geladen werden")
+                        .foregroundColor(.white)
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+    
+    private func loadAllImages() {
+        guard !allPhotoData.isEmpty else { return }
+        
+        isLoadingImages = true
+        
+        Task {
+            let tempImages = await Task.detached(priority: .userInitiated) {
+                var images: [Int: UIImage] = [:]
+                
+                for (index, photoData) in allPhotoData.enumerated() {
+                    if let image = UIImage(data: photoData.data) {
+                        images[index] = image
+                    }
+                }
+                
+                return images
+            }.value
+            
+            await MainActor.run {
+                self.loadedImages = tempImages
+                self.isLoadingImages = false
+            }
+        }
+    }
+}
+
+// MARK: - ImprovedZoomableImageView
+
+struct ImprovedZoomableImageView: View {
+    let image: UIImage
+    @Binding var photoState: ImprovedFullScreenPhotoView.PhotoState
+    let isCurrentPhoto: Bool
+    let onResetZoom: () -> Void
+    
+    var body: some View {
+        // Verwende die neue Apple-Style Implementation
+        AppleStyleZoomableImageViewMemories(image: image)
     }
 }
 
@@ -1744,32 +2207,4 @@ struct MediaThumbnailPreview: View {
     
     return MemoriesView()
         .environment(\.managedObjectContext, context)
-}
-
-// MARK: - Toolbar & Alerts (Extension)
-
-extension MemoryDetailView {
-    @ToolbarContentBuilder
-    fileprivate var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarLeading) {
-            Menu {
-                Button("Teilen", systemImage: "square.and.arrow.up") { shareCurrentPhoto() }
-                    .disabled(allPhotoData.isEmpty)
-                Button("Bearbeiten", systemImage: "pencil") { showingEditView = true }
-                Button("Löschen", systemImage: "trash", role: .destructive) { showingDeleteAlert = true }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-        }
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button("Fertig") { dismiss() }
-        }
-    }
-
-    fileprivate var deleteAlertButtons: some View {
-        Group {
-            Button("Löschen", role: .destructive) { deleteMemory() }
-            Button("Abbrechen", role: .cancel) { }
-        }
-    }
 } 

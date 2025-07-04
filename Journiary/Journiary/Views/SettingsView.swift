@@ -13,47 +13,21 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
     @StateObject private var mapCache = MapCacheManager.shared
-    @StateObject private var appSettings = AppSettings.shared
-    @StateObject private var authManager = AuthManager.shared
     
     @State private var showingDeleteAlert = false
-    @State private var showingBackendSettings = false
     @State private var showingOfflineMapSettings = false
     @State private var showingGPXDebugTest = false
     @State private var showingTracesTrackSettings = false
     @State private var showingGPSDebugView = false
-    @State private var showingUserProfile = false
-    @State private var showingGraphQLTest = false
-    @State private var showingTripCrudTest = false
-    @State private var showingAdminPanel = false
-    @State private var showingErrorHandlingTest = false
-    @State private var showingSchemaMigrationTest = false
-    @State private var showingMultiUserQueryTest = false
-    @State private var showingCloudKitCompatibilityTest = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
     @State private var placeProvider: String = UserDefaults.standard.string(forKey: "PlaceProvider") ?? "Nominatim"
     
-    // Legacy Trip Fix States
-    @State private var isFixingLegacyTrips = false
-    @State private var showingFixResult = false
-    @State private var fixResultMessage = ""
-    
-    // Legacy Memory Fix States
-    @State private var isFixingLegacyMemories = false
-    @State private var showingMemoryFixResult = false
-    @State private var memoryFixResultMessage = ""
-    
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // User-Bereich (nur bei Backend-Mode)
-                    if appSettings.shouldUseBackend && authManager.isAuthenticated {
-                        userSection
-                    }
-                    
                     // Ortssuche Einstellungen
                     placeSearchSection
                     
@@ -65,9 +39,6 @@ struct SettingsView: View {
                     
                     // Tags Verwaltung
                     tagManagementSection
-                    
-                    // Backend & Sync Einstellungen
-                    backendSyncSection
                     
                     // CloudKit Sync
                     cloudKitSection
@@ -109,36 +80,6 @@ struct SettingsView: View {
             GPSDebugView()
                 .environmentObject(locationManager)
         }
-        .sheet(isPresented: $showingBackendSettings) {
-            BackendSettingsView()
-        }
-        .sheet(isPresented: $showingUserProfile) {
-            UserProfileView()
-                .environmentObject(authManager)
-                .environmentObject(appSettings)
-        }
-        .sheet(isPresented: $showingGraphQLTest) {
-            GraphQLTestView()
-                .environmentObject(appSettings)
-        }
-        .sheet(isPresented: $showingTripCrudTest) {
-            TripCrudTestView()
-        }
-        .sheet(isPresented: $showingAdminPanel) {
-            AdminPanelView()
-        }
-        .sheet(isPresented: $showingErrorHandlingTest) {
-            ErrorHandlingTestView()
-        }
-        .sheet(isPresented: $showingSchemaMigrationTest) {
-            SchemaMigrationTestView()
-        }
-        .sheet(isPresented: $showingMultiUserQueryTest) {
-            MultiUserQueryTestView()
-        }
-        .sheet(isPresented: $showingCloudKitCompatibilityTest) {
-            CloudKitCompatibilityTestView()
-        }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
                 deleteAllData()
@@ -147,73 +88,9 @@ struct SettingsView: View {
         } message: {
             Text("Diese Aktion kann nicht rückgängig gemacht werden. Alle deine Reisen und Erinnerungen werden permanent gelöscht.")
         }
-        .alert("Legacy Trip Fix", isPresented: $showingFixResult) {
-            Button("OK") { }
-        } message: {
-            Text(fixResultMessage)
-        }
-        .alert("Legacy Memory Fix", isPresented: $showingMemoryFixResult) {
-            Button("OK") { }
-        } message: {
-            Text(memoryFixResultMessage)
-        }
     }
     
     // MARK: - Settings Sections
-    
-    private var userSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Benutzerkonto")
-                .font(.headline)
-            
-            VStack(spacing: 8) {
-                Button(action: {
-                    showingUserProfile = true
-                }) {
-                    HStack(spacing: 12) {
-                        // User Avatar
-                        ZStack {
-                            Circle()
-                                .fill(LinearGradient(
-                                    colors: [.blue, .blue.opacity(0.7)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ))
-                                .frame(width: 50, height: 50)
-                            
-                            Text(authManager.currentUser?.initials ?? "?")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        
-                        // User Info
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(authManager.currentUser?.displayName ?? "Unbekannter Benutzer")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.primary)
-                            
-                            Text(authManager.currentUser?.email ?? "")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-        }
-    }
     
     private var placeSearchSection: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -339,40 +216,16 @@ struct SettingsView: View {
         }
     }
     
-    private var backendSyncSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Backend & Synchronisation")
-                .font(.headline)
-            
-            VStack(spacing: 8) {
-                Button {
-                    showingBackendSettings = true
-                } label: {
-                    SettingsRowNavigable(
-                        title: "Backend-Einstellungen",
-                        icon: appSettings.storageMode.iconName,
-                        status: backendStatusText
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-        }
-    }
-    
     private var cloudKitSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("CloudKit Sync")
+            Text("Cloud Sync")
                 .font(.headline)
             
             VStack(spacing: 8) {
                 SettingsRow(
                     title: "CloudKit Sync",
                     icon: "icloud.fill",
-                    status: appSettings.shouldUseCloudKit ? "Aktiv" : "Inaktiv"
+                    status: "Aktiv"
                 )
             }
             .padding()
@@ -397,149 +250,6 @@ struct SettingsView: View {
                         status: "Details"
                     )
                 }
-                
-                Button(action: {
-                    showingGraphQLTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "GraphQL Connectivity Test",
-                        icon: "network",
-                        status: "Backend testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingTripCrudTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "Trip CRUD Test",
-                        icon: "suitcase",
-                        status: "Reisen testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingAdminPanel = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "Admin Panel",
-                        icon: "person.badge.key",
-                        status: "User verwalten"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingErrorHandlingTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "Error Handling Test",
-                        icon: "exclamationmark.triangle",
-                        status: "Fehlerbehandlung testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingSchemaMigrationTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "Schema Migration Test",
-                        icon: "externaldrive.fill.badge.checkmark",
-                        status: "Core Data Migration testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingMultiUserQueryTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "Multi-User Query Test",
-                        icon: "person.2.circle.fill",
-                        status: "User-Isolation & Sharing testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    showingCloudKitCompatibilityTest = true
-                }) {
-                    SettingsRowNavigable(
-                        title: "CloudKit Compatibility Test",
-                        icon: "icloud.fill",
-                        status: "CloudKit Sync & Schema testen"
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    Task {
-                        await fixLegacyTripsWithoutOwner()
-                    }
-                }) {
-                    HStack {
-                        if isFixingLegacyTrips {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .frame(width: 24)
-                        } else {
-                            Image(systemName: "wrench.fill")
-                                .font(.title3)
-                                .foregroundColor(.blue)
-                                .frame(width: 24)
-                        }
-                        
-                        Text("🔧 Fix Legacy Trips ohne Owner")
-                            .font(.body)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        Text(isFixingLegacyTrips ? "Wird repariert..." : "Repariert Trips ohne User-Zuordnung")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isFixingLegacyTrips)
-                
-                Button(action: {
-                    Task {
-                        await fixLegacyMemoriesWithoutCreator()
-                    }
-                }) {
-                    HStack {
-                        if isFixingLegacyMemories {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                                .frame(width: 24)
-                        } else {
-                            Image(systemName: "brain.head.profile")
-                                .font(.title3)
-                                .foregroundColor(.orange)
-                                .frame(width: 24)
-                        }
-                        
-                        Text("🧠 Fix Legacy Memories ohne Creator")
-                            .font(.body)
-                            .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        Text(isFixingLegacyMemories ? "Wird repariert..." : "Repariert Memories ohne Creator-Zuordnung")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 12)
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isFixingLegacyMemories)
             }
             .padding()
             .background(Color(.systemBackground))
@@ -611,161 +321,6 @@ struct SettingsView: View {
             try context.save()
         } catch {
             print("Fehler beim Speichern: \(error)")
-        }
-    }
-    
-    // MARK: - Legacy Data Fix
-    
-    private func fixLegacyTripsWithoutOwner() async {
-        // Start loading state
-        await MainActor.run {
-            isFixingLegacyTrips = true
-        }
-        
-        print("🔧 Starte Legacy-Trip-Fix...")
-        
-        let context = viewContext
-        
-        do {
-            let result = try await context.perform {
-                // Hole aktuellen User
-                let userRequest: NSFetchRequest<User> = User.fetchRequest()
-                userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
-                let currentUsers = try context.fetch(userRequest)
-                
-                guard let currentUser = currentUsers.first else {
-                    throw LegacyFixError.noCurrentUser
-                }
-                
-                // Finde Trips ohne Owner
-                let orphanTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
-                orphanTripsRequest.predicate = NSPredicate(format: "owner == nil")
-                let orphanTrips = try context.fetch(orphanTripsRequest)
-                
-                print("🔍 Gefunden: \(orphanTrips.count) Trips ohne Owner")
-                
-                // Weise alle Trips dem aktuellen User zu
-                for trip in orphanTrips {
-                    trip.owner = currentUser
-                    print("✅ Trip '\(trip.name ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
-                }
-                
-                // Speichere Änderungen
-                try context.save()
-                print("✅ Legacy-Trip-Fix erfolgreich abgeschlossen: \(orphanTrips.count) Trips repariert")
-                
-                return (orphanTrips.count, currentUser.displayName)
-            }
-            
-            // Success - Show result
-            await MainActor.run {
-                isFixingLegacyTrips = false
-                if result.0 == 0 {
-                    fixResultMessage = "✅ Keine Trips ohne Owner gefunden.\nAlle Trips sind korrekt zugeordnet!"
-                } else {
-                    fixResultMessage = "✅ Erfolgreich repariert!\n\n\(result.0) Trip(s) wurden dem User '\(result.1)' zugewiesen."
-                }
-                showingFixResult = true
-            }
-            
-        } catch {
-            print("❌ Fehler beim Legacy-Trip-Fix: \(error)")
-            
-            // Error - Show error message
-            await MainActor.run {
-                isFixingLegacyTrips = false
-                if let legacyError = error as? LegacyFixError {
-                    switch legacyError {
-                    case .noCurrentUser:
-                        fixResultMessage = "❌ Fehler: Kein aktueller User gefunden.\n\nBitte stellen Sie sicher, dass ein User angemeldet ist."
-                    }
-                } else {
-                    fixResultMessage = "❌ Fehler beim Reparieren:\n\n\(error.localizedDescription)"
-                }
-                showingFixResult = true
-            }
-        }
-    }
-    
-    private func fixLegacyMemoriesWithoutCreator() async {
-        // Start loading state
-        await MainActor.run {
-            isFixingLegacyMemories = true
-        }
-        
-        print("🧠 Starte Legacy-Memory-Fix...")
-        
-        // Hole aktuellen User im Main Actor Kontext
-        guard let currentUser = await MainActor.run(body: { UserContextManager.shared.currentUser }) else {
-            await MainActor.run {
-                isFixingLegacyMemories = false
-                memoryFixResultMessage = "❌ Fehler: Kein aktueller User gefunden.\n\nBitte stellen Sie sicher, dass ein User angemeldet ist."
-                showingMemoryFixResult = true
-            }
-            return
-        }
-        
-        let context = viewContext
-        
-        do {
-            let result = try await context.perform {
-                // Finde Memories ohne Creator
-                let orphanMemoriesRequest: NSFetchRequest<Memory> = Memory.fetchRequest()
-                orphanMemoriesRequest.predicate = NSPredicate(format: "creator == nil")
-                let orphanMemories = try context.fetch(orphanMemoriesRequest)
-                
-                print("🔍 Gefunden: \(orphanMemories.count) Memories ohne Creator")
-                
-                // Weise alle Memories dem aktuellen User zu
-                for memory in orphanMemories {
-                    memory.creator = currentUser
-                    print("✅ Memory '\(memory.title ?? "Unbekannt")' wurde User '\(currentUser.displayName)' zugewiesen")
-                }
-                
-                // Speichere Änderungen
-                try context.save()
-                print("✅ Legacy-Memory-Fix erfolgreich abgeschlossen: \(orphanMemories.count) Memories repariert")
-                
-                return (orphanMemories.count, currentUser.displayName)
-            }
-            
-            // Success - Show result
-            await MainActor.run {
-                isFixingLegacyMemories = false
-                if result.0 == 0 {
-                    memoryFixResultMessage = "✅ Keine Memories ohne Creator gefunden.\nAlle Memories sind korrekt zugeordnet!"
-                } else {
-                    memoryFixResultMessage = "✅ Erfolgreich repariert!\n\n\(result.0) Memory(ies) wurden dem User '\(result.1)' zugewiesen."
-                }
-                showingMemoryFixResult = true
-            }
-            
-        } catch {
-            print("❌ Fehler beim Legacy-Memory-Fix: \(error)")
-            
-            // Error - Show error message
-            await MainActor.run {
-                isFixingLegacyMemories = false
-                memoryFixResultMessage = "❌ Fehler beim Reparieren:\n\n\(error.localizedDescription)"
-                showingMemoryFixResult = true
-            }
-        }
-    }
-    
-    enum LegacyFixError: Error {
-        case noCurrentUser
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var backendStatusText: String {
-        switch appSettings.storageMode {
-        case .cloudKit:
-            return "CloudKit"
-        case .backend:
-            return appSettings.isBackendConfigured ? "Backend konfiguriert" : "Nicht konfiguriert"
-        case .hybrid:
-            return appSettings.isBackendConfigured ? "Hybrid-Modus" : "Backend fehlt"
         }
     }
 }

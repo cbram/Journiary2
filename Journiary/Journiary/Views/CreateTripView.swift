@@ -43,9 +43,6 @@ struct CreateTripView: View {
     @State private var validationMessage = ""
     @State private var showingGPSWarning = false
     
-    @State private var createdTripId: String?
-    @State private var showInviteView = false
-    
     var isEditing: Bool {
         existingTrip != nil
     }
@@ -74,70 +71,58 @@ struct CreateTripView: View {
     var body: some View {
         NavigationView {
             Form {
-                if showInviteView, let tripId = createdTripId {
-                    Section(header: Text("Trip teilen")) {
-                        InviteUserView(tripId: tripId)
-                    }
-                } else {
-                    // Grundinformationen
-                    Section("Reiseinformationen") {
-                        TextField("Reisename", text: $tripName)
-                            .textInputAutocapitalization(.words)
-                        
-                        TextField("Beschreibung (optional)", text: $tripDescription, axis: .vertical)
-                            .lineLimit(3...6)
-                            .textInputAutocapitalization(.sentences)
-                        
+                // Grundinformationen
+                Section("Reiseinformationen") {
+                    TextField("Reisename", text: $tripName)
+                        .textInputAutocapitalization(.words)
+                    
+                    TextField("Beschreibung (optional)", text: $tripDescription, axis: .vertical)
+                        .lineLimit(3...6)
+                        .textInputAutocapitalization(.sentences)
+                    
 
-                    }
+                }
+                
+                // Reisedaten
+                Section("Reisedaten") {
+                    DatePicker("Startdatum", selection: $startDate, displayedComponents: [.date])
                     
-                    // Reisedaten
-                    Section("Reisedaten") {
-                        DatePicker("Startdatum", selection: $startDate, displayedComponents: [.date])
-                        
-                        Toggle("Enddatum festlegen", isOn: $hasEndDate)
-                        
-                        if hasEndDate {
-                            DatePicker("Enddatum", selection: Binding(
-                                get: { endDate ?? startDate.addingTimeInterval(86400) },
-                                set: { endDate = $0 }
-                            ), displayedComponents: [.date])
-                            .disabled(!hasEndDate)
-                        }
-                    }
+                    Toggle("Enddatum festlegen", isOn: $hasEndDate)
                     
-                    // Titelfoto
-                    Section("Titelfoto") {
-                        coverPhotoSection
+                    if hasEndDate {
+                        DatePicker("Enddatum", selection: Binding(
+                            get: { endDate ?? startDate.addingTimeInterval(86400) },
+                            set: { endDate = $0 }
+                        ), displayedComponents: [.date])
+                        .disabled(!hasEndDate)
                     }
+                }
+                
+                // Titelfoto
+                Section("Titelfoto") {
+                    coverPhotoSection
+                }
+                
+                // Reisebegleiter
+                Section("Reisebegleiter") {
+                    TextField("Namen der Reisebegleiter (optional)", text: $travelCompanions)
+                        .textInputAutocapitalization(.words)
                     
-                    // Reisebegleiter
-                    Section("Reisebegleiter") {
-                        TextField("Namen der Reisebegleiter (optional)", text: $travelCompanions)
-                            .textInputAutocapitalization(.words)
-                        
-                        if !travelCompanions.isEmpty {
-                            Text("Tipp: Mehrere Namen durch Komma trennen")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                    if !travelCompanions.isEmpty {
+                        Text("Tipp: Mehrere Namen durch Komma trennen")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                    
-                    // GPS-Tracking
-                    Section("GPS-Tracking") {
-                        gpsTrackingSection
-                    }
-                    
-                    // Besuchte Länder
-                    Section("Besuchte Länder") {
-                        visitedCountriesSection
-                    }
-                    
-                    Section {
-                        Button(isEditing ? "Änderungen speichern" : "Reise erstellen") {
-                            saveTrip()
-                        }
-                    }
+                }
+                
+                // GPS-Tracking
+                Section("GPS-Tracking") {
+                    gpsTrackingSection
+                }
+                
+                // Besuchte Länder
+                Section("Besuchte Länder") {
+                    visitedCountriesSection
                 }
             }
             .navigationTitle(isEditing ? "Reise bearbeiten" : "Neue Reise")
@@ -147,6 +132,14 @@ struct CreateTripView: View {
                     Button("Abbrechen") {
                         dismiss()
                     }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(isEditing ? "Speichern" : "Erstellen") {
+                        saveTrip()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(tripName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .alert("Ungültige Eingabe", isPresented: $showingValidationAlert) {
@@ -379,23 +372,6 @@ struct CreateTripView: View {
         } else {
             // Neue Reise erstellen
             trip = Trip(context: viewContext)
-            
-            // WICHTIG: Owner zuweisen bei neuen Trips!
-            // User im GLEICHEN Context finden wie der Trip
-            let userRequest: NSFetchRequest<User> = User.fetchRequest()
-            userRequest.predicate = NSPredicate(format: "isCurrentUser == true")
-            userRequest.fetchLimit = 1
-            
-            do {
-                if let currentUser = try viewContext.fetch(userRequest).first {
-                    trip.owner = currentUser
-                    print("✅ Neue Reise mit Owner erstellt: \(currentUser.displayName)")
-                } else {
-                    print("⚠️ Warnung: Neue Reise ohne Owner erstellt - kein aktueller User im Context gefunden")
-                }
-            } catch {
-                print("❌ Fehler beim Laden des aktuellen Users: \(error)")
-            }
         }
         
         // Werte setzen
@@ -423,23 +399,10 @@ struct CreateTripView: View {
             trip.isActive = !hasEndDate
         }
         
-        // BUSINESS RULE: Pro Benutzer darf es nur eine aktive Reise geben.
-        if trip.isActive, let owner = trip.owner {
-            let activeTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
-            activeTripsRequest.predicate = NSPredicate(format: "owner == %@ AND isActive == YES AND self != %@", owner, trip)
-            if let otherActiveTrips = try? viewContext.fetch(activeTripsRequest) {
-                for activeTrip in otherActiveTrips {
-                    activeTrip.isActive = false
-                    if activeTrip.endDate == nil {
-                        activeTrip.endDate = Date() // Beendet zum aktuellen Zeitpunkt
-                    }
-                }
-            }
-        }
-        
         // Speichern
         do {
             try viewContext.save()
+            print("Reise '\(trip.name ?? "")' erfolgreich \(isEditing ? "bearbeitet" : "erstellt")")
             dismiss()
         } catch {
             print("Fehler beim Speichern der Reise: \(error)")

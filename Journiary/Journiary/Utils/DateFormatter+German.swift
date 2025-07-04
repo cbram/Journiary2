@@ -47,15 +47,6 @@ extension DateFormatter {
         formatter.dateFormat = "EEEE, dd. MMMM yyyy"
         return formatter
     }()
-    
-    static let germanMedium: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "de_DE")
-        formatter.timeZone = TimeZone.current
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
 }
 
 extension Date {

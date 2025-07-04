@@ -1,6 +1,0 @@
-mutation ClaimTrip($tripId: ID!) {
-  claimTrip(tripId: $tripId) {
-    id
-    name
-  }
-} 
