@@ -46,8 +46,9 @@ class GraphQLSyncService: ObservableObject {
             return performDemoSync()
         }
 
-        // Produktionsmodus: Erst Upload, dann Download
+        // Produktionsmodus: Upload → Memories abgleichen → Download
         return uploadChanges()
+            .flatMap { _ in self.syncMemories() }
             .flatMap { _ in self.downloadChanges() }
             .eraseToAnyPublisher()
     }
@@ -60,11 +61,14 @@ class GraphQLSyncService: ObservableObject {
         }
 
         // 1) Aktuelle Trips vom Server holen
-        return ApolloClientManager.shared.fetch(query: GetTripsQuery.self, cachePolicy: .networkOnly)
+        let tripIdsPublisher: AnyPublisher<Set<String>, GraphQLError> = ApolloClientManager.shared
+            .fetch(query: GetTripsQuery.self, cachePolicy: .networkOnly)
             .map { response -> Set<String> in
-                let ids = response.trips.map { $0.id }
-                return Set(ids)
+                Set(response.trips.map { $0.id })
             }
+            .eraseToAnyPublisher()
+
+        return tripIdsPublisher
             .flatMap { [weak self] serverTripIds -> AnyPublisher<Bool, GraphQLError> in
                 guard let self = self else {
                     return Fail(error: GraphQLError.unknown("Service deinitiert"))
@@ -78,17 +82,10 @@ class GraphQLSyncService: ObservableObject {
                     let request: NSFetchRequest<Trip> = Trip.fetchRequest()
                     if let localTrips = try? self.context.fetch(request) {
                         for trip in localTrips {
-                            var tripUUID: String
-                            if let uuid = trip.id?.uuidString {
-                                tripUUID = uuid
-                            } else {
-                                // Generiere neue UUID für Trip ohne Backend-ID
-                                let newId = UUID()
-                                trip.id = newId
-                                tripUUID = newId.uuidString
-                            }
+                            // === Trip-Matching anhand serverId ===
+                            let identifier = trip.serverId ?? trip.localId.uuidString
 
-                            if serverTripIds.contains(tripUUID) {
+                            if serverTripIds.contains(identifier) {
                                 claimTrips.append(trip)
                             } else {
                                 createTrips.append(trip)
@@ -110,12 +107,10 @@ class GraphQLSyncService: ObservableObject {
                         endDate: dto.endDate
                     )
                     .tryMap { createdDTO -> Bool in
-                        // Backend-ID in Core Data Trip übernehmen
+                        // Backend-ID im Core Data Trip ablegen
                         self.context.performAndWait {
-                            if let newUUID = UUID(uuidString: createdDTO.id) {
-                                trip.id = newUUID
-                                try? self.context.save()
-                            }
+                            trip.setBackendIdSafe(createdDTO.id)
+                            try? self.context.save()
                         }
                         print("✅ Trip '\(dto.name)' hochgeladen (Server-ID: \(createdDTO.id))")
                         return true
@@ -129,8 +124,9 @@ class GraphQLSyncService: ObservableObject {
 
                 // 3b) Claim bestehende Trips
                 let claimPublishers = claimTrips.compactMap { trip -> AnyPublisher<Bool, GraphQLError>? in
-                    guard let idStr = trip.id?.uuidString else { return nil }
-                    return self.tripService.claimTrip(id: idStr)
+                    let bid = trip.serverId
+                    guard let serverId = bid, !serverId.isEmpty else { return nil }
+                    return self.tripService.claimTrip(id: serverId)
                         .map { _ in true }
                         .eraseToAnyPublisher()
                 }
@@ -148,41 +144,7 @@ class GraphQLSyncService: ObservableObject {
                     .publisher
                     .flatMap { $0 }
                     .collect()
-                    .flatMap { _ -> AnyPublisher<Bool, GraphQLError> in
-                        // ===== MEMORY UPLOAD =====
-                        let memoryService = GraphQLMemoryService()
-
-                        // 1. Server-Memories holen IDs
-                        return ApolloClientManager.shared.fetch(query: GetMemoriesQuery.self, cachePolicy: .networkOnly)
-                            .map { $0.memories.map { $0.id } }
-                            .flatMap { serverMemoryIds -> AnyPublisher<Bool, GraphQLError> in
-                                var newMemories: [Memory] = []
-                                self.context.performAndWait {
-                                    let req: NSFetchRequest<Memory> = Memory.fetchRequest()
-                                    if let locals = try? self.context.fetch(req) {
-                                        newMemories.append(contentsOf: locals)
-                                    }
-                                }
-
-                                guard !newMemories.isEmpty else {
-                                    return Just(true).setFailureType(to: GraphQLError.self).eraseToAnyPublisher()
-                                }
-
-                                let memPublishers = newMemories.compactMap { mem -> AnyPublisher<Bool, GraphQLError>? in
-                                    guard let dto = MemoryDTO.from(coreData: mem) else { return nil }
-                                    return memoryService.createMemory(input: dto)
-                                        .map { _ in true }
-                                        .eraseToAnyPublisher()
-                                }
-
-                                return memPublishers.publisher
-                                    .flatMap { $0 }
-                                    .collect()
-                                    .map { _ in true }
-                                    .eraseToAnyPublisher()
-                            }
-                            .eraseToAnyPublisher()
-                    }
+                    .map { _ in true }
                     .eraseToAnyPublisher()
             }
             .eraseToAnyPublisher()
@@ -277,9 +239,9 @@ class GraphQLSyncService: ObservableObject {
                     let allTripsRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
                     if let localTrips = try? self.context.fetch(allTripsRequest) {
                         for localTrip in localTrips {
-                            guard let localId = localTrip.id?.uuidString else { continue }
-                            if !remoteTripIds.contains(localId) {
-                                print("🗑️ Lösche lokalen Trip, da er auf dem Server fehlt: \(localTrip.name ?? "?") (id: \(localId))")
+                            let localIdentifier = localTrip.serverId ?? localTrip.localId.uuidString
+                            if !remoteTripIds.contains(localIdentifier) {
+                                print("🗑️ Lösche lokalen Trip, da er auf dem Server fehlt: \(localTrip.name ?? "?") (backendId/id: \(localIdentifier))")
                                 self.context.delete(localTrip)
                             }
                         }
@@ -330,6 +292,9 @@ class GraphQLSyncService: ObservableObject {
                 self.syncProgress = 0.7
 
                 self.context.performAndWait {
+                    // === Memory Import ===
+                    let remoteMemoryIds = Set(memoriesData.memories.map { $0.id })
+
                     for memory in memoriesData.memories {
                         var memDict: [String: Any] = [
                             "id": memory.id,
@@ -353,6 +318,17 @@ class GraphQLSyncService: ObservableObject {
                             _ = dto.toCoreData(context: self.context)
                         }
                     }
+
+                    // === Entferne lokale Memories, die auf Server gelöscht wurden ===
+                    let memFetch: NSFetchRequest<Memory> = Memory.fetchRequest()
+                    if let localMems = try? self.context.fetch(memFetch) {
+                        for mem in localMems {
+                            if let bid = mem.serverId, !remoteMemoryIds.contains(bid) {
+                                self.context.delete(mem)
+                            }
+                        }
+                    }
+
                     if self.context.hasChanges {
                         try? self.context.save()
                     }
@@ -550,6 +526,63 @@ class GraphQLSyncService: ObservableObject {
         }
         .eraseToAnyPublisher()
     }
+
+    // MARK: - Memory Synchronisation
+
+    private func syncMemories() -> AnyPublisher<Bool, GraphQLError> {
+        let memoryService = GraphQLMemoryService()
+
+        return ApolloClientManager.shared
+            .fetch(query: GetMemoriesQuery.self, cachePolicy: .networkOnly)
+            .map { Set($0.memories.map { $0.id }) }
+            .flatMap { serverIds -> AnyPublisher<Bool, GraphQLError> in
+                var newMems: [Memory] = []
+                var localIds = Set<String>()
+
+                self.context.performAndWait {
+                    let req: NSFetchRequest<Memory> = Memory.fetchRequest()
+                    if let locals = try? self.context.fetch(req) {
+                        for mem in locals {
+                            let bid = mem.serverId
+                            if let bid = bid {
+                                localIds.insert(bid)
+                                if !serverIds.contains(bid) { newMems.append(mem) }
+                            } else {
+                                newMems.append(mem)
+                            }
+                        }
+                    }
+                }
+
+                let deletions = serverIds.subtracting(localIds)
+                    .map { memoryService.deleteMemory(id: $0) }
+
+                let uploads = newMems.compactMap { mem -> AnyPublisher<Bool, GraphQLError>? in
+                    guard let dto = MemoryDTO.from(coreData: mem) else { return nil }
+                    return memoryService.createMemory(input: dto)
+                        .map { createdDTO in
+                            self.context.performAndWait {
+                                mem.serverId = createdDTO.id
+                                try? self.context.save()
+                            }
+                            return true
+                        }
+                        .eraseToAnyPublisher()
+                }
+
+                let all = uploads + deletions
+                guard !all.isEmpty else {
+                    return Just(true).setFailureType(to: GraphQLError.self).eraseToAnyPublisher()
+                }
+
+                return all.publisher
+                    .flatMap { $0 }
+                    .collect()
+                    .map { _ in true }
+                    .eraseToAnyPublisher()
+            }
+            .eraseToAnyPublisher()
+    }
 }
 
 // MARK: - Conflict Resolution Strategy
@@ -616,4 +649,7 @@ fileprivate struct MemoryListQuery: GraphQLQuery {
     struct Data: Codable {
         let memories: [MemoryRaw]
     }
-} 
+}
+
+// MARK: - KVC-Helper
+// Helper ist jetzt obsolet – wir verwenden serverId/localId aus CoreData+SyncIDs 

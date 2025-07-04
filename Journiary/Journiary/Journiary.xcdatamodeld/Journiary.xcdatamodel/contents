@@ -12,6 +12,7 @@
         <attribute name="isActive" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="totalDistance" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="gpsTrackingEnabled" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        <attribute name="backendId" optional="YES" attributeType="String"/>
 
         <relationship name="memories" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Memory" inverseName="trip" inverseEntity="Memory"/>
         <relationship name="routePoints" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RoutePoint" inverseName="trip" inverseEntity="RoutePoint"/>
@@ -25,6 +26,7 @@
         <attribute name="longitude" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="locationName" optional="YES" attributeType="String"/>
         <attribute name="weatherJSON" optional="YES" attributeType="String"/>
+        <attribute name="backendId" optional="YES" attributeType="String"/>
         <relationship name="trip" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Trip" inverseName="memories" inverseEntity="Trip"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="memory" inverseEntity="Photo"/>
         <relationship name="mediaItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="MediaItem" inverseName="memory" inverseEntity="MediaItem"/>

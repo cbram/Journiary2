@@ -32,8 +32,24 @@ struct MemoryDTO {
             return nil
         }
         
-        // Backend ID generieren falls nicht vorhanden
-        let backendId = UUID().uuidString // Memory hat keine Backend ID im Core Data
+        // Versuche vorhandene Backend-ID zu lesen
+        var serverId: String?
+        if memory.entity.attributesByName.keys.contains("id"),
+           let sid = memory.value(forKey: "id") as? String {
+            serverId = sid
+        }
+        
+        // Falls keine vorhanden – generieren, aber gleichzeitig im Objekt speichern, sofern Attribut existiert
+        if serverId == nil {
+            serverId = UUID().uuidString
+            if memory.entity.attributesByName.keys.contains("id") {
+                memory.setValue(serverId, forKey: "id")
+            }
+        }
+        
+        guard let finalId = serverId else {
+            return nil
+        }
         
         // Location aus Core Data extrahieren
         var location: LocationDTO?
@@ -45,14 +61,22 @@ struct MemoryDTO {
             )
         }
         
-        // Trip ID extrahieren
-        let tripId = memory.trip?.id?.uuidString
+        // Trip ID ermitteln – primär backendId, sonst lokale UUID
+        var tripId: String?
+        if let trip = memory.trip {
+            if trip.entity.attributesByName.keys.contains("id") {
+                tripId = trip.value(forKey: "id") as? String
+            }
+            if tripId == nil {
+                tripId = trip.id?.uuidString
+            }
+        }
         
         // User ID aus aktuell angemeldetem User oder Default
         let userId = AuthManager.shared.currentUser?.backendUserId ?? "unknown"
         
         return MemoryDTO(
-            id: backendId,
+            id: finalId,
             title: title,
             content: memory.text,
             location: location,
@@ -145,50 +169,72 @@ struct MemoryDTO {
     /// - Returns: Core Data Memory Entität
     @discardableResult
     func toCoreData(context: NSManagedObjectContext) -> Memory {
-        // Memory immer neu erstellen da keine Backend ID im Core Data
-        let memory = Memory(context: context)
-        
-        // Memory Daten setzen
-        memory.title = title
-        memory.text = content
-        memory.timestamp = createdAt ?? Date()
-        
+        // === Backend-ID Attribut prüfen ===
+        let entity = NSEntityDescription.entity(forEntityName: "Memory", in: context)
+        let hasServerId = entity?.attributesByName.keys.contains("id") == true
+
+        // Versuche vorhandenes Memory anhand der serverId zu finden
+        var memory: Memory?
+        if hasServerId {
+            let fetch: NSFetchRequest<Memory> = Memory.fetchRequest()
+            fetch.predicate = NSPredicate(format: "id == %@", self.id)
+            fetch.fetchLimit = 1
+            memory = try? context.fetch(fetch).first
+        }
+
+        // Fallback-Heuristik (Titel + Zeitstempel) wenn keine backendId im Schema oder nichts gefunden
+        if memory == nil {
+            let fetch: NSFetchRequest<Memory> = Memory.fetchRequest()
+            var predicates: [NSPredicate] = [NSPredicate(format: "title == %@", self.title)]
+            if let createdAt = self.createdAt {
+                predicates.append(NSPredicate(format: "timestamp == %@", createdAt as CVarArg))
+            }
+            fetch.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+            fetch.fetchLimit = 1
+            memory = try? context.fetch(fetch).first
+        }
+
+        // Falls weiterhin nichts gefunden -> neu anlegen
+        let mem = memory ?? Memory(context: context)
+
+        // === Grunddaten setzen / aktualisieren ===
+        mem.title = title
+        mem.text = content
+        mem.timestamp = createdAt ?? Date()
+
+        // Backend-ID setzen sofern Attribut existiert
+        if hasServerId {
+            mem.setValue(self.id, forKey: "id")
+        }
+
         // Location setzen
         if let location = location {
-            memory.latitude = location.latitude
-            memory.longitude = location.longitude
-            memory.locationName = location.name
+            mem.latitude = location.latitude
+            mem.longitude = location.longitude
+            mem.locationName = location.name
         }
-        
-        // Trip verknüpfen falls vorhanden
+
+        // Trip-Verknüpfung
         if let tripId = tripId, let tripUUID = UUID(uuidString: tripId) {
-            let tripRequest: NSFetchRequest<Trip> = Trip.fetchRequest()
-            tripRequest.predicate = NSPredicate(format: "id == %@", tripUUID as CVarArg)
-            
-            if let trip = try? context.fetch(tripRequest).first {
-                memory.trip = trip
+            let tripFetch: NSFetchRequest<Trip> = Trip.fetchRequest()
+            tripFetch.predicate = NSPredicate(format: "id == %@", tripUUID as CVarArg)
+            tripFetch.fetchLimit = 1
+            if let trip = try? context.fetch(tripFetch).first {
+                mem.trip = trip
             }
         }
-        
-        // WICHTIG: Bei neuen Memories aus Backend Creator zuweisen!
-        // Versuche User via UUID zu finden, falls vorhanden
-        if let creatorId = creatorId,
-           let creatorUUID = UUID(uuidString: creatorId) {
-            let userRequest: NSFetchRequest<User> = User.fetchRequest()
-            userRequest.predicate = NSPredicate(format: "id == %@", creatorUUID as CVarArg)
-            userRequest.fetchLimit = 1
-            
-            if let creator = try? context.fetch(userRequest).first {
-                memory.creator = creator
-                print("✅ Memory aus Backend mit bekanntem Creator zugewiesen: \(creator.displayName)")
-            } else {
-                print("⚠️ Warnung: Creator UUID \(creatorId) nicht in lokaler DB gefunden")
+
+        // Creator beibehalten/setzen
+        if let creatorId = creatorId, let creatorUUID = UUID(uuidString: creatorId) {
+            let userFetch: NSFetchRequest<User> = User.fetchRequest()
+            userFetch.predicate = NSPredicate(format: "id == %@", creatorUUID as CVarArg)
+            userFetch.fetchLimit = 1
+            if let creator = try? context.fetch(userFetch).first {
+                mem.creator = creator
             }
-        } else {
-            print("⚠️ Warnung: Memory aus Backend ohne Creator-Information")
         }
-        
-        return memory
+
+        return mem
     }
     
     // MARK: - GraphQL Input

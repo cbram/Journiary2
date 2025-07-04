@@ -96,13 +96,32 @@ extension TripDTO {
     /// - Parameter coreDataTrip: Core Data Trip Entity
     /// - Returns: TripDTO oder nil
     static func from(coreData coreDataTrip: Trip) -> TripDTO? {
-        guard let id = coreDataTrip.id?.uuidString,
-              let name = coreDataTrip.name else {
+        // Sicherstellen, dass der Trip eine gültige UUID hat
+        var tripId: String
+        if let existingId = coreDataTrip.id {
+            tripId = existingId.uuidString
+        } else {
+            let newId = UUID()
+            coreDataTrip.id = newId
+            tripId = newId.uuidString
+
+            // Versuche sofort zu persistieren, damit nachfolgende Aufrufe den Wert sehen
+            if let context = coreDataTrip.managedObjectContext, context.hasChanges {
+                do {
+                    try context.save()
+                    print("✅ TripDTO.from: Fehlende UUID ergänzt und gespeichert: \(tripId)")
+                } catch {
+                    print("❌ TripDTO.from: Fehler beim Speichern der neuen UUID – \(error)")
+                }
+            }
+        }
+
+        guard let name = coreDataTrip.name else {
             return nil
         }
         
         return TripDTO(
-            id: id,
+            id: tripId,
             name: name,
             tripDescription: coreDataTrip.tripDescription,
             coverImageObjectName: nil, // Core Data hat coverImageData, nicht coverImageObjectName
@@ -126,24 +145,45 @@ extension TripDTO {
     func toCoreData(context: NSManagedObjectContext) -> Trip {
         // Prüfe ob Trip bereits existiert
         let request: NSFetchRequest<Trip> = Trip.fetchRequest()
+        var predicates: [NSPredicate] = []
+
+        // 1) Primär nach UUID suchen
         if let uuidID = UUID(uuidString: id) {
-            request.predicate = NSPredicate(format: "id == %@", uuidID as CVarArg)
-        } else {
-            request.predicate = NSPredicate(format: "name == %@", name)
+            predicates.append(NSPredicate(format: "id == %@", uuidID as CVarArg))
         }
+
+        // 2) Fallback: id (String) Attribut falls vorhanden
+        let entity = NSEntityDescription.entity(forEntityName: "Trip", in: context)
+        let hasServerId = entity?.attributesByName.keys.contains("id") == true
+        if hasServerId {
+            predicates.append(NSPredicate(format: "id == %@", id))
+        }
+
+        // 3) Fallback: Name (nur wenn keine anderen Predicate)
+        if predicates.isEmpty {
+            predicates.append(NSPredicate(format: "name == %@", name))
+        }
+
+        request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
+        request.fetchLimit = 1
         
         let trip: Trip
         if let existingTrip = try? context.fetch(request).first {
             trip = existingTrip
         } else {
             trip = Trip(context: context)
-            trip.id = UUID(uuidString: id) ?? UUID()
-            
-            // HINWEIS: Owner muss vom aufrufenden Service gesetzt werden!
-            // Da UserContextManager @MainActor isoliert ist, können wir hier nicht darauf zugreifen
-            print("⚠️ Neuer Trip erstellt - Owner muss vom Service gesetzt werden")
+            if let uuid = UUID(uuidString: id) {
+                trip.id = uuid
+            } else {
+                trip.id = UUID()
+            }
         }
-        
+
+        // serverId setzen (falls vorhanden)
+        if hasServerId {
+            trip.setValue(id, forKey: "id")
+        }
+
         // Daten aktualisieren
         trip.name = name
         trip.tripDescription = tripDescription
