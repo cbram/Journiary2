@@ -12,6 +12,7 @@ import { TrackSegment } from "../entities/TrackSegment";
 import { TrackMetadata } from "../entities/TrackMetadata";
 import { User } from "../entities/User";
 import { TripMembership } from "../entities/TripMembership";
+import { DeletionLog } from "../entities/DeletionLog";
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -43,7 +44,8 @@ export const AppDataSource = new DataSource(
             TrackSegment, 
             TrackMetadata,
             User,
-            TripMembership
+            TripMembership,
+            DeletionLog
         ],
         subscribers: [],
         migrations: [],
@@ -65,7 +67,8 @@ export const AppDataSource = new DataSource(
             TrackSegment, 
             TrackMetadata,
             User,
-            TripMembership
+            TripMembership,
+            DeletionLog
         ],
         subscribers: [],
         migrations: [],

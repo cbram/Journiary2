@@ -42,6 +42,10 @@ export class TagCategory {
     @CreateDateColumn()
     createdAt!: Date;
 
+    @Field()
+    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    updatedAt!: Date;
+
     @ManyToOne(() => User, user => user.createdTagCategories)
     creator!: User;
 

@@ -21,6 +21,7 @@ import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { checkTripAccess } from '../utils/auth';
 import { TripRole } from '../entities/TripMembership';
 import { Int } from "type-graphql";
+import { DeletionLog } from "../entities/DeletionLog";
 
 @Resolver(MediaItem)
 export class MediaItemResolver {
@@ -143,8 +144,7 @@ export class MediaItemResolver {
   ): Promise<boolean> {
     if (!userId) throw new AuthenticationError("You must be logged in.");
 
-    const mediaItemRepository = AppDataSource.getRepository(MediaItem);
-    const mediaItem = await mediaItemRepository.findOne({
+    const mediaItem = await AppDataSource.getRepository(MediaItem).findOne({
       where: { id },
       relations: ["memory", "memory.trip"]
     });
@@ -153,15 +153,25 @@ export class MediaItemResolver {
       throw new UserInputError(`Media item with ID ${id} not found.`);
     }
 
-    // Check if the user has at least EDITOR rights for the trip this media item belongs to
     const hasAccess = await checkTripAccess(userId, mediaItem.memory.trip.id, TripRole.EDITOR);
     if (!hasAccess) {
       throw new AuthenticationError("You don't have permission to delete this media item.");
     }
+    
+    try {
+        await AppDataSource.transaction(async (em) => {
+            // Log the deletion
+            const deletionLog = em.create(DeletionLog, { entityId: id, entityType: 'MediaItem', tripId: mediaItem.memory.trip.id });
+            await em.save(deletionLog);
 
-    // Delete the media item
-    await mediaItemRepository.remove(mediaItem);
-    return true;
+            // Delete the media item. The actual file deletion from MinIO is not handled here.
+            await em.remove(mediaItem);
+        });
+        return true;
+    } catch (error) {
+        console.error("Error deleting media item:", error);
+        throw new Error("Could not delete media item.");
+    }
   }
 
   // ---------------------------------------------------------------------------

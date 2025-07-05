@@ -6,6 +6,7 @@ import { Memory } from "../entities/Memory";
 import { MyContext } from "../index";
 import { User } from "../entities/User";
 import { AuthenticationError, UserInputError } from "apollo-server-express";
+import { DeletionLog } from "../entities/DeletionLog";
 
 @Resolver(BucketListItem)
 export class BucketListItemResolver {
@@ -35,11 +36,15 @@ export class BucketListItemResolver {
         @Ctx() { userId }: MyContext
     ): Promise<BucketListItem | null> {
         if (!userId) throw new AuthenticationError("You must be logged in.");
-        const item = await AppDataSource.getRepository(BucketListItem).findOne({ where: { id, creator: { id: userId } } });
+        const itemRepo = AppDataSource.getRepository(BucketListItem);
+        const item = await itemRepo.findOne({ where: { id, creator: { id: userId } } });
         if (!item) throw new UserInputError("Item not found or you don't have access.");
 
-        await AppDataSource.getRepository(BucketListItem).update(id, input);
-        return item; // Return the original item after update to avoid a second DB call
+        // Apply partial update
+        Object.assign(item, input);
+        
+        await itemRepo.save(item);
+        return item; // Return the updated item
     }
 
     @Mutation(() => BucketListItem, { nullable: true })
@@ -72,7 +77,26 @@ export class BucketListItemResolver {
         @Ctx() { userId }: MyContext
     ): Promise<boolean> {
         if (!userId) throw new AuthenticationError("You must be logged in.");
-        const result = await AppDataSource.getRepository(BucketListItem).delete({ id, creator: { id: userId } });
-        return result.affected === 1;
+
+        try {
+            await AppDataSource.transaction(async (em) => {
+                const item = await em.findOneBy(BucketListItem, { id, creator: { id: userId } });
+                if (!item) {
+                    throw new UserInputError("Item not found or you don't have access.");
+                }
+
+                // Log the deletion
+                const deletionLog = em.create(DeletionLog, { entityId: id, entityType: 'BucketListItem', ownerId: userId });
+                await em.save(deletionLog);
+
+                // Perform the deletion
+                await em.remove(item);
+            });
+            return true;
+        } catch (error) {
+            console.error("Error deleting bucket list item:", error);
+            if (error instanceof UserInputError) throw error;
+            return false;
+        }
     }
 } 

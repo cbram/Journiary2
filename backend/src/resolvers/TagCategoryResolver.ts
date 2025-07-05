@@ -5,6 +5,8 @@ import { UpdateTagCategoryInput } from "../entities/UpdateTagCategoryInput";
 import { AppDataSource } from "../utils/database";
 import { MyContext } from "..";
 import { AuthenticationError } from "apollo-server-express";
+import { DeletionLog } from "../entities/DeletionLog";
+import { Tag } from "../entities/Tag";
 
 @Resolver(TagCategory)
 export class TagCategoryResolver {
@@ -55,8 +57,32 @@ export class TagCategoryResolver {
     ): Promise<boolean> {
         if (!userId) throw new AuthenticationError("You must be logged in to delete a tag category.");
         
-        const deleteResult = await AppDataSource.getRepository(TagCategory).delete(id);
-        
-        return deleteResult.affected === 1;
+        try {
+            await AppDataSource.transaction(async (em) => {
+                const category = await em.findOneBy(TagCategory, { id });
+                if (!category) {
+                    throw new Error("TagCategory not found.");
+                }
+
+                // Log the deletion
+                const deletionLog = em.create(DeletionLog, { entityId: id, entityType: 'TagCategory' });
+                await em.save(deletionLog);
+                
+                // Manually set category to null for all tags in this category
+                // This is to ensure the update timestamp on the tags is touched for sync
+                await em.createQueryBuilder()
+                    .update(Tag)
+                    .set({ category: undefined })
+                    .where({ category: { id } })
+                    .execute();
+
+                // Perform the deletion
+                await em.remove(category);
+            });
+            return true;
+        } catch (error) {
+            console.error("Error deleting tag category:", error);
+            return false;
+        }
     }
 } 

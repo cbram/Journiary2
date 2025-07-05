@@ -11,6 +11,7 @@ services:
       - DATABASE_URL=postgres://travelcompanion:travelcompanion@db:5432/journiary
       - MINIO_URL=minio
       - MINIO_PORT=9000
+      - JWT_SECRET=a_super_secret_and_long_key_for_dev_that_should_be_replaced_in_prod_12345
     depends_on:
       db:
         condition: service_healthy

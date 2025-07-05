@@ -34,6 +34,7 @@ import { MyContext } from "..";
 import { AuthenticationError, UserInputError } from "apollo-server-express";
 import { checkTripAccess } from '../utils/auth';
 import { TripRole } from '../entities/TripMembership';
+import { DeletionLog } from '../entities/DeletionLog';
 
 interface GpxPoint {
   lat: number;
@@ -183,6 +184,58 @@ export class GPXResolver {
     return await AppDataSource.manager.save(newGpxTrack);
   }
 
+  @Mutation(() => Boolean, { description: "Deletes a GPX track and its associated data." })
+    async deleteGpxTrack(
+        @Arg("id", () => ID) id: string,
+        @Ctx() { userId }: MyContext
+    ): Promise<boolean> {
+        if (!userId) {
+            throw new AuthenticationError("You must be logged in.");
+        }
+
+        const gpxTrack = await AppDataSource.getRepository(GPXTrack).findOne({
+            where: { id },
+            relations: ["trip", "segments", "segments.points"],
+        });
+
+        if (!gpxTrack) {
+            throw new UserInputError(`GPXTrack with ID ${id} not found.`);
+        }
+
+        const hasAccess = await checkTripAccess(userId, gpxTrack.trip.id, TripRole.EDITOR);
+        if (!hasAccess) {
+            throw new AuthenticationError("You don't have permission to delete this track.");
+        }
+        
+        try {
+            await AppDataSource.transaction(async (em) => {
+                const deletionLogs: DeletionLog[] = [];
+
+                // Log deletion of the track itself
+                deletionLogs.push(em.create(DeletionLog, { entityId: gpxTrack.id, entityType: 'GPXTrack', tripId: gpxTrack.trip.id }));
+
+                // Log deletion of associated segments and points
+                for (const segment of gpxTrack.segments) {
+                    deletionLogs.push(em.create(DeletionLog, { entityId: segment.id, entityType: 'TrackSegment', tripId: gpxTrack.trip.id }));
+                    for (const point of segment.points) {
+                        deletionLogs.push(em.create(DeletionLog, { entityId: point.id, entityType: 'RoutePoint', tripId: gpxTrack.trip.id }));
+                    }
+                }
+                
+                // Save all deletion logs
+                await em.save(DeletionLog, deletionLogs);
+
+                // Now, perform the actual deletion (TypeORM's cascade should handle the rest)
+                await em.remove(gpxTrack);
+            });
+
+            return true;
+        } catch (error) {
+            console.error("Error deleting GPX track:", error);
+            throw new Error("Could not delete GPX track.");
+        }
+    }
+
   @Mutation(() => GPXTrack, { description: "Processes an uploaded GPX file and creates the track data." })
   async processGpxFile(
     @Arg("objectName") objectName: string,
@@ -261,23 +314,5 @@ export class GPXResolver {
     
     // Save the track again to update its segments relation
     return await gpxTrackRepository.save(newGpxTrack);
-  }
-
-  @Mutation(() => Boolean, { description: "Deletes a GPX track and its associated data." })
-  async deleteGpxTrack(
-    @Arg("id", () => ID) id: string,
-    @Ctx() { userId }: MyContext
-  ): Promise<boolean> {
-    if (!userId) throw new AuthenticationError("You must be logged in.");
-
-    const repo = AppDataSource.getRepository(GPXTrack);
-    const track = await repo.findOne({ where: { id }, relations: ["trip"] });
-    if (!track) return false;
-
-    const hasAccess = await checkTripAccess(userId, track.trip.id, TripRole.EDITOR);
-    if (!hasAccess) throw new UserInputError("You don't have permission to delete this track.");
-
-    const result = await repo.delete(id);
-    return result.affected === 1;
   }
 } 

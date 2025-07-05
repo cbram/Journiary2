@@ -43,9 +43,9 @@ export class Tag {
     @CreateDateColumn()
     createdAt!: Date;
 
-    @Field({ nullable: true })
-    @UpdateDateColumn({ nullable: true })
-    lastUsedAt?: Date;
+    @Field()
+    @UpdateDateColumn()
+    updatedAt!: Date;
 
     @Field()
     @Column({ default: false })

@@ -14,6 +14,7 @@ import { checkTripAccess } from '../utils/auth';
 import { TripRole } from '../entities/TripMembership';
 import { TripMembership } from '../entities/TripMembership';
 import { Location as GQLLocation } from './types/Location';
+import { DeletionLog } from '../entities/DeletionLog';
 
 @Resolver(() => Memory)
 export class MemoryResolver {
@@ -209,8 +210,7 @@ export class MemoryResolver {
             throw new AuthenticationError("You must be logged in to delete a memory.");
         }
 
-        const memoryRepository = AppDataSource.getRepository(Memory);
-        const memory = await memoryRepository.findOne({
+        const memory = await AppDataSource.getRepository(Memory).findOne({
             where: { id },
             relations: ["trip", "mediaItems"]
         });
@@ -219,20 +219,37 @@ export class MemoryResolver {
             throw new UserInputError(`Memory with ID ${id} not found.`);
         }
 
-        // Check if the user has at least EDITOR rights for the trip this memory belongs to
         const hasAccess = await checkTripAccess(userId, memory.trip.id, TripRole.EDITOR);
         if (!hasAccess) {
             throw new AuthenticationError("You don't have permission to delete this memory.");
         }
 
-        // Delete associated media items first
-        if (memory.mediaItems && memory.mediaItems.length > 0) {
-            await AppDataSource.getRepository(MediaItem).remove(memory.mediaItems);
-        }
+        try {
+            await AppDataSource.transaction(async (em) => {
+                const deletionLogs: DeletionLog[] = [];
 
-        // Delete the memory
-        await memoryRepository.remove(memory);
-        return true;
+                // Log deletion of the memory itself
+                deletionLogs.push(em.create(DeletionLog, { entityId: memory.id, entityType: 'Memory', tripId: memory.trip.id }));
+
+                // Log deletion of associated media items
+                if (memory.mediaItems) {
+                    for (const mediaItem of memory.mediaItems) {
+                        deletionLogs.push(em.create(DeletionLog, { entityId: mediaItem.id, entityType: 'MediaItem', tripId: memory.trip.id }));
+                    }
+                }
+                
+                // Save all deletion logs
+                await em.save(DeletionLog, deletionLogs);
+
+                // Now, perform the actual deletion (TypeORM's cascade should handle the rest)
+                await em.remove(memory);
+            });
+
+            return true;
+        } catch (error) {
+            console.error("Error deleting memory:", error);
+            throw new Error("Could not delete memory.");
+        }
     }
 
     @Query(() => [Memory], { description: "Search memories by query and optional trip filter" })

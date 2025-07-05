@@ -6,6 +6,7 @@ import { AppDataSource } from "../utils/database";
 import { TagCategory } from "../entities/TagCategory";
 import { MyContext } from "..";
 import { AuthenticationError } from "apollo-server-express";
+import { DeletionLog } from "../entities/DeletionLog";
 
 @Resolver(Tag)
 export class TagResolver {
@@ -79,9 +80,25 @@ export class TagResolver {
     ): Promise<boolean> {
         if (!userId) throw new AuthenticationError("You must be logged in to delete a tag.");
         
-        const deleteResult = await AppDataSource.getRepository(Tag).delete(id);
-        
-        return deleteResult.affected === 1;
+        try {
+            await AppDataSource.transaction(async (em) => {
+                const tag = await em.findOneBy(Tag, { id });
+                if (!tag) {
+                    throw new Error("Tag not found.");
+                }
+                
+                // Log the deletion
+                const deletionLog = em.create(DeletionLog, { entityId: id, entityType: 'Tag' });
+                await em.save(deletionLog);
+
+                // Perform the deletion
+                await em.remove(tag);
+            });
+            return true;
+        } catch (error) {
+            console.error("Error deleting tag:", error);
+            return false;
+        }
     }
 
     // ---------------------------------------------------------------------------

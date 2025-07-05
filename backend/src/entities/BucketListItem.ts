@@ -50,6 +50,10 @@ export class BucketListItem {
     @CreateDateColumn()
     createdAt!: Date;
 
+    @Field()
+    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    updatedAt!: Date;
+
     @ManyToOne(() => User, user => user.createdBucketListItems)
     creator!: User;
 

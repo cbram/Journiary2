@@ -20,6 +20,7 @@ import jwt from 'jsonwebtoken';
 import { UserResolver } from "./resolvers/UserResolver";
 import { AdminResolver } from "./resolvers/AdminResolver";
 import { User } from "./entities/User";
+import { SyncResolver } from "./resolvers/SyncResolver";
 
 export interface MyContext {
     req: any;
@@ -58,7 +59,8 @@ async function startServer() {
                 BucketListItemResolver,
                 GPXResolver,
                 UserResolver,
-                AdminResolver
+                AdminResolver,
+                SyncResolver
             ],
             validate: false,
         }),

@@ -18,6 +18,7 @@ import { TrackSegment } from '../entities/TrackSegment';
 import { GPXTrack } from '../entities/GPXTrack';
 import { Permission } from '../entities/Permission';
 import { Not } from 'typeorm';
+import { DeletionLog } from '../entities/DeletionLog';
 
 @ObjectType()
 class TripMembershipResponse {
@@ -239,43 +240,48 @@ export class TripResolver {
             throw new AuthenticationError("You must be an owner to delete this trip.");
         }
         
-        // Use transaction to ensure proper cleanup order
+        const trip = await AppDataSource.getRepository(Trip).findOne({ where: { id }, relations: ["memories", "gpxTracks", "routePoints"] });
+        if (!trip) {
+            throw new UserInputError("Trip not found.");
+        }
+
         try {
-            await AppDataSource.transaction(async (transactionalEntityManager) => {
-                // 1. First delete all MediaItems (they reference Memory)
-                const memories = await transactionalEntityManager.find(Memory, { 
-                    where: { trip: { id } },
-                    relations: ["mediaItems"]
-                });
-                
-                for (const memory of memories) {
-                    if (memory.mediaItems && memory.mediaItems.length > 0) {
-                        await transactionalEntityManager.remove(MediaItem, memory.mediaItems);
+            await AppDataSource.transaction(async (em) => {
+                const deletionLogs: DeletionLog[] = [];
+
+                // Log deletion of the trip itself
+                deletionLogs.push(em.create(DeletionLog, { entityId: trip.id, entityType: 'Trip', tripId: trip.id }));
+
+                // Log deletion of associated memories and their media items
+                for (const memory of trip.memories) {
+                    deletionLogs.push(em.create(DeletionLog, { entityId: memory.id, entityType: 'Memory', tripId: trip.id }));
+                    const mediaItems = await em.find(MediaItem, { where: { memory: { id: memory.id } } });
+                    for (const mediaItem of mediaItems) {
+                        deletionLogs.push(em.create(DeletionLog, { entityId: mediaItem.id, entityType: 'MediaItem', tripId: trip.id }));
                     }
                 }
+
+                // Log deletion of associated GPX tracks
+                for (const track of trip.gpxTracks) {
+                    deletionLogs.push(em.create(DeletionLog, { entityId: track.id, entityType: 'GPXTrack', tripId: trip.id }));
+                }
+
+                // Log deletion of associated route points
+                 for (const point of trip.routePoints) {
+                    deletionLogs.push(em.create(DeletionLog, { entityId: point.id, entityType: 'RoutePoint', tripId: trip.id }));
+                }
                 
-                // 2. Delete all Memories (they reference Trip)
-                await transactionalEntityManager.delete(Memory, { trip: { id } });
-                
-                // 3. Delete all RoutePoints (they reference Trip and TrackSegment)
-                await transactionalEntityManager.delete(RoutePoint, { trip: { id } });
-                
-                // 4. Delete all TrackSegments (they reference Trip and GPXTrack)
-                await transactionalEntityManager.delete(TrackSegment, { trip: { id } });
-                
-                // 5. Delete all GPXTracks (they reference Trip)
-                await transactionalEntityManager.delete(GPXTrack, { trip: { id } });
-                
-                // 6. Delete all trip memberships
-                await transactionalEntityManager.delete(TripMembership, { trip: { id } });
-                
-                // 7. Finally delete the trip itself
-                await transactionalEntityManager.delete(Trip, { id });
+                // Save all deletion logs
+                await em.save(DeletionLog, deletionLogs);
+
+                // Now, perform the actual deletion (TypeORM's cascade should handle most of this)
+                await em.remove(trip);
             });
-            
+
             return true;
         } catch (error) {
             console.error("Error deleting trip:", error);
+            // Re-throw a generic error to the client
             throw new Error("Could not delete trip.");
         }
     }
