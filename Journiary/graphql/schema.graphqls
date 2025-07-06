@@ -34,7 +34,32 @@ type Query {
   getCurrentUser: User
   "Get all users for debugging (production: remove this)"
   listUsers: AdminResponse!
+  "Performs an incremental sync."
+  sync(lastSyncedAt: DateTime): SyncResponse!
 }
+
+"Response object for the sync query"
+type SyncResponse {
+  "A list of trips that have been created or updated since the last sync."
+  trips: [Trip!]!
+  # Add other entity types here as they become syncable
+  # e.g., memories: [Memory!]!
+
+  "A list of objects that have been deleted since the last sync."
+  deletedIds: [Deletion!]!
+
+  "The timestamp of this sync operation, to be used as `lastSyncedAt` in the next sync."
+  timestamp: DateTime!
+}
+
+"Represents the deletion of an entity"
+type Deletion {
+  "The ID of the deleted entity."
+  id: ID!
+  "The type of the deleted entity (e.g., 'Trip', 'Memory')."
+  entityName: String!
+}
+
 "Represents a single journey or trip"
 type Trip {
   id: ID!

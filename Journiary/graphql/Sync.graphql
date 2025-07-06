@@ -1,0 +1,27 @@
+query Sync($lastSyncedAt: DateTime) {
+  sync(lastSyncedAt: $lastSyncedAt) {
+    trips {
+      id
+      name
+      tripDescription
+      travelCompanions
+      visitedCountries
+      startDate
+      endDate
+      isActive
+      totalDistance
+      gpsTrackingEnabled
+      createdAt
+      updatedAt
+    }
+    # Hier können später weitere Entitäten wie Memories, MediaItems etc. hinzugefügt werden
+    # z.B. memories { id, ... }
+
+    deletedIds {
+      id
+      entityName
+    }
+    
+    timestamp
+  }
+} 

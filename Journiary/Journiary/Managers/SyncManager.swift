@@ -38,17 +38,17 @@ final class SyncManager {
     func sync() async {
         print("Sync started...")
 
-        // The timestamp for the current sync operation.
-        // This will be used to update `lastSyncedAt` upon successful completion.
-        let currentSyncTimestamp = Date()
-
         do {
             try await uploadPhase()
-            try await downloadPhase(since: lastSyncedAt)
+            let syncData = try await downloadPhase(since: lastSyncedAt)
 
-            // If both phases succeed, update the last synced timestamp.
-            self.lastSyncedAt = currentSyncTimestamp
-            print("Sync completed successfully.")
+            // If both phases succeed, update the last synced timestamp from the server response.
+            if let serverTimestamp = self.dateTimeToDate(syncData.timestamp) {
+                self.lastSyncedAt = serverTimestamp
+                print("Sync completed successfully. New lastSyncedAt: \(serverTimestamp)")
+            } else {
+                print("Sync completed, but server timestamp was invalid.")
+            }
 
         } catch {
             print("Sync failed: \(error.localizedDescription)")
@@ -97,14 +97,107 @@ final class SyncManager {
     ///
     /// Fetches remote changes since the last successful sync and applies them to the local Core Data store.
     /// - parameter since: The timestamp of the last successful synchronization. If `nil`, a full sync might be performed.
-    private func downloadPhase(since lastSync: Date?) async throws {
-        // TODO: Implement download logic
-        // 1. Call the `sync` query with the `lastSyncedAt` timestamp.
-        // 2. Process the response:
-        //    - Create new local objects.
-        //    - Update existing local objects based on "Last-Write-Wins".
-        //    - Delete local objects that were deleted on the server.
+    /// - returns: The `SyncQuery.Data.Sync` object from the server.
+    private func downloadPhase(since lastSync: Date?) async throws -> SyncQuery.Data.Sync {
         print("Executing download phase...")
+        
+        // 1. Call the `sync` query with the `lastSyncedAt` timestamp.
+        let syncData = try await networkProvider.sync(lastSyncedAt: lastSync)
+        
+        let context = persistenceController.container.newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        // 2. Process deletions first
+        let deletedIds = syncData.deletedIds.reduce(into: [String: [String]]()) { result, deletion in
+            result[deletion.entityName, default: []].append(deletion.id)
+        }
+        
+        for (entityName, ids) in deletedIds {
+            try await deleteLocalObjects(entityName: entityName, serverIds: ids, context: context)
+        }
+        
+        // 3. Process creations and updates
+        // The trips array is non-optional in the schema, so we can iterate directly.
+        try await upsertTrips(syncData.trips, context: context)
+        
+        // TODO: Add processing for other entities like Memory, MediaItem, etc.
+        // if let memories = syncData.memories { ... }
+        
+        // 4. Save changes to the persistent store
+        if context.hasChanges {
+            try await context.perform {
+                try context.save()
+            }
+        }
+        
+        // The new timestamp from the server is stored by the calling `sync()` method upon full success.
+        print("Download phase completed.")
+        return syncData
+    }
+
+    private func upsertTrips(_ trips: [SyncQuery.Data.Sync.Trip], context: NSManagedObjectContext) async throws {
+        for remoteTrip in trips {
+            await context.perform {
+                let fetchRequest = Trip.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteTrip.id)
+                fetchRequest.fetchLimit = 1
+
+                let localTrip = try? context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localTrip = localTrip, let localUpdatedAt = localTrip.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteTrip.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for Trip \(remoteTrip.id), local version is newer or same.")
+                    return
+                }
+
+                let tripToUpdate = localTrip ?? Trip(context: context)
+                
+                tripToUpdate.serverId = remoteTrip.id
+                tripToUpdate.name = remoteTrip.name
+                tripToUpdate.tripDescription = remoteTrip.tripDescription
+                tripToUpdate.travelCompanions = remoteTrip.travelCompanions
+                tripToUpdate.visitedCountries = remoteTrip.visitedCountries
+                // Handle non-optional dates with a fallback, although they are guaranteed by the schema
+                tripToUpdate.startDate = self.dateTimeToDate(remoteTrip.startDate) ?? Date()
+                tripToUpdate.endDate = self.dateTimeToDate(remoteTrip.endDate)
+                tripToUpdate.isActive = remoteTrip.isActive
+                tripToUpdate.totalDistance = remoteTrip.totalDistance
+                tripToUpdate.gpsTrackingEnabled = remoteTrip.gpsTrackingEnabled
+                tripToUpdate.createdAt = self.dateTimeToDate(remoteTrip.createdAt) ?? Date()
+                tripToUpdate.updatedAt = self.dateTimeToDate(remoteTrip.updatedAt) ?? Date()
+                tripToUpdate.syncStatus = .inSync
+            }
+        }
+    }
+
+    private func deleteLocalObjects(entityName: String, serverIds: [String], context: NSManagedObjectContext) async throws {
+        let fetchRequest: NSFetchRequest<NSManagedObject>
+        
+        // Create the correct fetch request based on the entity name
+        switch entityName {
+        case "Trip":
+            fetchRequest = Trip.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        // TODO: Add cases for other syncable entities
+        // case "Memory":
+        //     fetchRequest = Memory.fetchRequest()
+        default:
+            print("Unknown entity type for deletion: \(entityName)")
+            return
+        }
+        
+        fetchRequest.predicate = NSPredicate(format: "serverId IN %@", serverIds)
+        
+        await context.perform {
+            do {
+                let objectsToDelete = try context.fetch(fetchRequest)
+                for object in objectsToDelete {
+                    print("Deleting \(entityName) with server ID \((object as? Synchronizable)?.serverId ?? "") locally.")
+                    context.delete(object)
+                }
+            } catch {
+                print("Failed to fetch local objects for deletion: \(error)")
+            }
+        }
     }
 
     private func uploadEntities<T>(
@@ -197,7 +290,8 @@ final class SyncManager {
     }
     
     /// Converts a DateTime (String) to Date for Core Data operations
-    private func dateTimeToDate(_ dateTime: DateTime) -> Date? {
+    private func dateTimeToDate(_ dateTime: DateTime?) -> Date? {
+        guard let dateTime = dateTime else { return nil }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: dateTime)

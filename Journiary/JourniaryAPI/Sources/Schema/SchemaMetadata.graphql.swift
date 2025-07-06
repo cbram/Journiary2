@@ -21,7 +21,10 @@ public enum SchemaMetadata: ApolloAPI.SchemaMetadata {
   public static func objectType(forTypename typename: String) -> ApolloAPI.Object? {
     switch typename {
     case "AuthResponse": return JourniaryAPI.Objects.AuthResponse
+    case "Deletion": return JourniaryAPI.Objects.Deletion
     case "Mutation": return JourniaryAPI.Objects.Mutation
+    case "Query": return JourniaryAPI.Objects.Query
+    case "SyncResponse": return JourniaryAPI.Objects.SyncResponse
     case "Trip": return JourniaryAPI.Objects.Trip
     case "User": return JourniaryAPI.Objects.User
     default: return nil

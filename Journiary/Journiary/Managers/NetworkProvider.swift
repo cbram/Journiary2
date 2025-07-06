@@ -161,6 +161,39 @@ class NetworkProvider {
             }
         }
     }
+
+    func sync(lastSyncedAt: Date?) async throws -> SyncQuery.Data.Sync {
+        // Correctly handle the optional Date by mapping to GraphQLNullable<DateTime>
+        let lastSyncDateTime: GraphQLNullable<DateTime> = lastSyncedAt.map { .some(dateToDateTime($0)) } ?? .none
+        let query = SyncQuery(lastSyncedAt: lastSyncDateTime)
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SyncQuery.Data.Sync, Error>) in
+            apollo.fetch(query: query, cachePolicy: .fetchIgnoringCacheData) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 4, userInfo: [NSLocalizedDescriptionKey: "GraphQL query failed for sync"]))
+                        return
+                    }
+                    
+                    guard let syncData = graphQLResult.data?.sync else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to sync, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: syncData)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func dateToDateTime(_ date: Date) -> DateTime {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.string(from: date)
+    }
 }
 
 extension JourniaryAPI.TripInput {
