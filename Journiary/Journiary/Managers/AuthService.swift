@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import Apollo
 import ApolloAPI
+import JourniaryAPI
 import KeychainSwift
 
 @MainActor
@@ -89,7 +90,7 @@ class AuthService: ObservableObject {
     }
     
     private func perform<M: GraphQLMutation>(mutation: M) async throws -> GraphQLResult<M.Data> {
-        return try await withCheckedThrowingContinuation { continuation in
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<GraphQLResult<M.Data>, Error>) in
             NetworkProvider.shared.apollo.perform(mutation: mutation) { result in
                 switch result {
                 case .success(let data):

@@ -1,4 +1,5 @@
 import SwiftUI
+import JourniaryAPI
 
 struct RegistrationView: View {
     @Environment(\.dismiss) private var dismiss

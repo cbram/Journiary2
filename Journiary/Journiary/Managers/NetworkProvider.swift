@@ -8,8 +8,8 @@
 import Foundation
 import Apollo
 import ApolloAPI
+import JourniaryAPI
 
-@MainActor
 class NetworkProvider {
     
     private(set) var apollo: ApolloClient
@@ -80,5 +80,101 @@ class NetworkProvider {
         )
         
         return ApolloClient(networkTransport: transport, store: store)
+    }
+
+    // MARK: - Trip Mutations
+
+    func createTrip(input: TripInput) async throws -> CreateTripMutation.Data.CreateTrip {
+        let mutation = CreateTripMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CreateTripMutation.Data.CreateTrip, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 1, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed"]))
+                        return
+                    }
+                    
+                    guard let trip = graphQLResult.data?.createTrip else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create trip, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: trip)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func updateTrip(id: String, input: TripInput) async throws -> UpdateTripMutation.Data.UpdateTrip {
+        let updateInput = input.toUpdateTripInput()
+        let mutation = UpdateTripMutation(id: id, input: updateInput)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UpdateTripMutation.Data.UpdateTrip, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 2, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed"]))
+                        return
+                    }
+                    
+                    guard let trip = graphQLResult.data?.updateTrip else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to update trip, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: trip)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteTrip(id: String) async throws -> String {
+        let mutation = DeleteTripMutation(id: id)
+
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 3, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteTrip"]))
+                        return
+                    }
+                    
+                    // The 'deleteTrip' mutation returns a boolean for success.
+                    // If successful, we return the original ID.
+                    guard let success = graphQLResult.data?.deleteTrip, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to delete trip, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+}
+
+extension JourniaryAPI.TripInput {
+    func toUpdateTripInput() -> JourniaryAPI.UpdateTripInput {
+        return JourniaryAPI.UpdateTripInput(
+            name: .some(self.name),
+            tripDescription: self.tripDescription,
+            travelCompanions: self.travelCompanions,
+            visitedCountries: self.visitedCountries,
+            startDate: .some(self.startDate),
+            endDate: self.endDate,
+            isActive: self.isActive,
+            totalDistance: self.totalDistance,
+            gpsTrackingEnabled: self.gpsTrackingEnabled
+        )
     }
 } 

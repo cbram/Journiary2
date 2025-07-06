@@ -243,7 +243,7 @@ extension MediaItem {
                         let thumbnailTime = CMTime(seconds: 0.5, preferredTimescale: 600)
                         
                         // Asynchrone Thumbnail-Generierung mit Continuation
-                        return try await withCheckedThrowingContinuation { continuation in
+                        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<UIImage, Error>) in
                             imageGenerator.generateCGImageAsynchronously(for: thumbnailTime) { cgImage, actualTime, error in
                                 if let cgImage = cgImage {
                                     let thumbnail = UIImage(cgImage: cgImage)

@@ -1,4 +1,5 @@
 import SwiftUI
+import JourniaryAPI
 
 struct LoginView: View {
     @EnvironmentObject private var authService: AuthService

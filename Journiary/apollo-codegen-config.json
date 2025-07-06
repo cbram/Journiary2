@@ -15,13 +15,14 @@
     "schemaTypes": {
       "path": "./JourniaryAPI",
       "moduleType": {
-        "embeddedInTarget": {
-          "name": "Journiary"
-        }
+        "swiftPackage": {}
       }
     },
     "operations": {
       "inSchemaModule": {}
     }
+  },
+  "experimentalFeatures": {
+    "legacySafelisting": true
   }
 }

@@ -38,6 +38,7 @@
 		761D652F2E1838B40096E863 /* apollo-codegen-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "apollo-codegen-config.json"; sourceTree = "<group>"; };
 		761D65302E1838B40096E863 /* schema.graphqls */ = {isa = PBXFileReference; lastKnownFileType = text; path = schema.graphqls; sourceTree = "<group>"; };
 		761D65312E1838B40096E863 /* UserLogin.graphql */ = {isa = PBXFileReference; lastKnownFileType = text; path = UserLogin.graphql; sourceTree = "<group>"; };
+		762934A72E1AF2830007B6E0 /* JourniaryAPI */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = JourniaryAPI; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -67,11 +68,6 @@
 		761954F62DF57EB7003E92C7 /* JourniaryUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = JourniaryUITests;
-			sourceTree = "<group>";
-		};
-		762930F92E19CCA10007B6E0 /* JourniaryAPI */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = JourniaryAPI;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -107,12 +103,12 @@
 		761954CC2DF57EB6003E92C7 = {
 			isa = PBXGroup;
 			children = (
-				762930F92E19CCA10007B6E0 /* JourniaryAPI */,
 				761954D72DF57EB6003E92C7 /* Journiary */,
 				761954EC2DF57EB7003E92C7 /* JourniaryTests */,
 				761954F62DF57EB7003E92C7 /* JourniaryUITests */,
 				761954D62DF57EB6003E92C7 /* Products */,
 				761D65322E1838B40096E863 /* graphql */,
+				762934A62E1AF2830007B6E0 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -136,6 +132,14 @@
 			path = graphql;
 			sourceTree = "<group>";
 		};
+		762934A62E1AF2830007B6E0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				762934A72E1AF2830007B6E0 /* JourniaryAPI */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -154,13 +158,13 @@
 			);
 			fileSystemSynchronizedGroups = (
 				761954D72DF57EB6003E92C7 /* Journiary */,
-				762930F92E19CCA10007B6E0 /* JourniaryAPI */,
 			);
 			name = Journiary;
 			packageProductDependencies = (
 				765555A12E19B6B800434A41 /* KeychainSwift */,
 				760927BD2E199B6800434A41 /* Apollo */,
 				760927BF2E199B6800434A41 /* ApolloAPI */,
+				762934A92E1AF2840007B6E0 /* JourniaryAPI */,
 			);
 			productName = Journiary;
 			productReference = 761954D52DF57EB6003E92C7 /* Journiary.app */;
@@ -247,6 +251,7 @@
 			packageReferences = (
 				765555A02E19B6B800434A41 /* XCRemoteSwiftPackageReference "keychain-swift" */,
 				760927BC2E199B6800434A41 /* XCRemoteSwiftPackageReference "apollo-ios" */,
+				762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 761954D62DF57EB6003E92C7 /* Products */;
@@ -301,7 +306,7 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(SRCROOT)/JourniaryAPI/JourniaryAPI.graphql.swift",
+
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -668,6 +673,13 @@
 		};
 /* End XCRemoteSwiftPackageReference section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = JourniaryAPI;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		760927BD2E199B6800434A41 /* Apollo */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -683,6 +695,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 765555A02E19B6B800434A41 /* XCRemoteSwiftPackageReference "keychain-swift" */;
 			productName = KeychainSwift;
+		};
+		762934A92E1AF2840007B6E0 /* JourniaryAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */;
+			productName = JourniaryAPI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

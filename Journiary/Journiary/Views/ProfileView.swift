@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CoreData
+import JourniaryAPI
 
 struct ProfileView: View {
     @Environment(\.managedObjectContext) private var viewContext
