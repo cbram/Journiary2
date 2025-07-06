@@ -2,3 +2,7 @@
 # Node dependencies
 **/node_modules/
 backend/package-lock.json 
+
+# Local data stores
+/minio-data/
+/postgres-data/ 
