@@ -112,38 +112,38 @@ struct PersistenceController {
 
     init(inMemory: Bool = false) {
         container = NSPersistentCloudKitContainer(name: "Journiary")
+
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
-        
-        // CloudKit Konfiguration
-        container.persistentStoreDescriptions.forEach { storeDescription in
-            // Aktiviere History Tracking für CloudKit Sync
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-            storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-            
-            // Verbesserte Performance für große Datenmengen
-            storeDescription.setOption(1000 as NSNumber, forKey: NSMigrationManagerKey)
+
+        guard let description = container.persistentStoreDescriptions.first else {
+            fatalError("Failed to retrieve a persistent store description.")
         }
+
+        // Enable lightweight migrations
+        description.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
+        description.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
         
+        // Enable history tracking for CloudKit
+        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+        description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                print("❌ CRITICAL: Core Data Store konnte nicht geladen werden: \(error)")
+                print("❌ CRITICAL: Core Data Store could not be loaded: \(error)")
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             } else {
-                print("✅ Core Data Store geladen")
+                print("✅ Core Data Store loaded for: \(storeDescription.url?.absoluteString ?? "N/A")")
             }
         })
-        
-        // Verbesserte Threading und Sync-Konfiguration
+
+        // Configure context properties
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        
-        // Performance Optimierungen
         container.viewContext.undoManager = nil
         container.viewContext.shouldDeleteInaccessibleFaults = true
         
-        // CloudKit Remote Change Handling
         setupRemoteChangeHandling()
     }
     
