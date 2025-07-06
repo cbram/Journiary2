@@ -1,0 +1,27 @@
+{
+  "schemaNamespace": "JourniaryAPI",
+  "input": {
+    "operationSearchPaths": [
+      "**/*.graphql"
+    ],
+    "schemaSearchPaths": [
+      "**/*.graphqls"
+    ]
+  },
+  "output": {
+    "testMocks": {
+      "none": {}
+    },
+    "schemaTypes": {
+      "path": "./JourniaryAPI",
+      "moduleType": {
+        "embeddedInTarget": {
+          "name": "Journiary"
+        }
+      }
+    },
+    "operations": {
+      "inSchemaModule": {}
+    }
+  }
+}

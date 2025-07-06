@@ -82,13 +82,32 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct JourniaryApp: App {
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    // Der PersistenceController für Core Data.
     let persistenceController = PersistenceController.shared
+    @StateObject private var locationManager: LocationManager
+    @StateObject private var authService = AuthService.shared
+
+    init() {
+        let context = persistenceController.container.viewContext
+        // Initialize LocationManager
+        _locationManager = StateObject(wrappedValue: LocationManager(context: context))
+    }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            // Entscheidet basierend auf dem Authentifizierungsstatus, welche Ansicht gezeigt wird.
+            if authService.isAuthenticated {
+                ContentView()
+                    // Stellt den Core Data Context für die Haupt-App bereit.
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                    // Stellt den AuthService für untergeordnete Views (z.B. für einen Logout-Button) bereit.
+                    .environmentObject(authService)
+            } else {
+                // Zeigt die LoginView an, wenn der Benutzer nicht authentifiziert ist.
+                LoginView()
+                    // Stellt den AuthService für die LoginView bereit, damit diese den Status ändern kann.
+                    .environmentObject(authService)
+            }
         }
     }
 }

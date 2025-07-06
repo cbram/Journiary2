@@ -1,5 +1,5 @@
 import { ObjectType, Field, ID } from "type-graphql";
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, BaseEntity } from "typeorm";
 import { Trip } from "./Trip";
 import { Memory } from "./Memory";
 import { MediaItem } from "./MediaItem";
@@ -12,7 +12,7 @@ import { TripMembership } from "./TripMembership";
 
 @ObjectType({ description: "Represents a user of the application" })
 @Entity()
-export class User {
+export class User extends BaseEntity {
     @Field(() => ID)
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -59,6 +59,10 @@ export class User {
     @Field()
     @UpdateDateColumn()
     updatedAt!: Date;
+
+    @Field(() => [String])
+    @Column("simple-array", { default: "" })
+    roles!: string[];
 
     // User-owned Trips
     @OneToMany(() => Trip, trip => trip.owner)

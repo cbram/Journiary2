@@ -12,6 +12,7 @@ struct ProfileView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var authService: AuthService
     @StateObject private var mapCache = MapCacheManager.shared
     
     @FetchRequest(
@@ -55,13 +56,22 @@ struct ProfileView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.blue)
             
-            Text("Reisender")
+            Text(authService.user?.displayName ?? "Reisender")
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("Journiary Explorer")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            Button(action: {
+                authService.logout()
+                dismiss()
+            }) {
+                Text("Abmelden")
+                    .foregroundColor(.red)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity)
         .padding()
@@ -165,11 +175,27 @@ struct StatisticCard: View {
     }
 }
 
-#Preview {
-    let context = PersistenceController.preview.container.viewContext
-    let locationManager = LocationManager(context: context)
-    
-    ProfileView()
-        .environmentObject(locationManager)
-        .environment(\.managedObjectContext, context)
+struct ProfileView_Previews: PreviewProvider {
+    static var previews: some View {
+        let context = PersistenceController.preview.container.viewContext
+        let locationManager = LocationManager(context: context)
+        let authService = AuthService() // Erstelle eine Dummy-Instanz für die Preview
+        
+        // Simuliere einen eingeloggten Benutzer für die Preview
+        let userData: [String: AnyHashable] = [
+            "__typename": "User",
+            "id": "1",
+            "email": "preview@journiary.com",
+            "username": "PreviewUser",
+            "displayName": "Max Mustermann"
+        ]
+        let user = JourniaryAPI.UserLoginMutation.Data.Login.User(_dataDict: .init(data: userData, fulfilledFragments: .init()))
+        authService.user = user
+        authService.isAuthenticated = true
+        
+        return ProfileView()
+            .environmentObject(locationManager)
+            .environmentObject(authService) // Füge den authService zur Environment hinzu
+            .environment(\.managedObjectContext, context)
+    }
 } 

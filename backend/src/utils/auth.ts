@@ -1,5 +1,8 @@
 import { AppDataSource } from "./database";
 import { TripMembership, TripRole } from "../entities/TripMembership";
+import { MyContext } from "../index";
+import { User } from "../entities/User";
+import { AuthChecker } from "type-graphql";
 
 /**
  * Checks if a user has access to a specific trip with at least a minimum required role.
@@ -36,3 +39,31 @@ export async function checkTripAccess(
 
     return userLevel >= requiredLevel;
 } 
+
+export const authChecker: AuthChecker<MyContext> = async (
+    { root, args, context, info },
+    roles,
+) => {
+    // here we can read the user from context
+    // and check his permission in the database
+    if (!context.userId) {
+        return false;
+    }
+
+    // if `@Authorized()`, check only if user is logged in
+    if (roles.length === 0) {
+        return context.userId !== undefined;
+    }
+    
+    // if `@Authorized("ADMIN")`, check if user is admin
+    const user = await User.findOne({ where: { id: context.userId } });
+    if (!user) {
+        return false;
+    }
+    
+    if (user.roles.some((role: string) => roles.includes(role))) {
+        return true;
+    }
+
+    return false;
+}; 

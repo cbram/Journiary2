@@ -40,8 +40,8 @@ struct SettingsView: View {
                     // Tags Verwaltung
                     tagManagementSection
                     
-                    // CloudKit Sync
-                    cloudKitSection
+                    // Backend-Einstellungen
+                    backendSettingsSection
                     
                     // Debug-Sektion
                     debugSection
@@ -216,25 +216,10 @@ struct SettingsView: View {
         }
     }
     
-    private var cloudKitSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Cloud Sync")
-                .font(.headline)
-            
-            VStack(spacing: 8) {
-                SettingsRow(
-                    title: "CloudKit Sync",
-                    icon: "icloud.fill",
-                    status: "Aktiv"
-                )
-            }
-            .padding()
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
-        }
+    private var backendSettingsSection: some View {
+        BackendSettingsSection()
     }
-    
+
     private var debugSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Debug & Entwicklung")
@@ -382,6 +367,53 @@ struct SettingsRowNavigable: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
+    }
+}
+
+struct BackendSettingsSection: View {
+    @State private var backendURL: String = UserDefaults.standard.string(forKey: "backendURL") ?? ""
+    @State private var urlSavedMessage: String?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Backend")
+                .font(.headline)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Backend URL")
+                    .font(.subheadline)
+                
+                TextField("http://localhost:4001/graphql", text: $backendURL)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textContentType(.URL)
+                    .keyboardType(.URL)
+                    .autocapitalization(.none)
+                
+                Button("URL speichern") {
+                    UserDefaults.standard.set(backendURL, forKey: "backendURL")
+                    NetworkProvider.shared.resetClient()
+                    urlSavedMessage = "URL gespeichert & Client neu initialisiert!"
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        urlSavedMessage = nil
+                    }
+                }
+                .disabled(backendURL.isEmpty)
+                
+                if let msg = urlSavedMessage {
+                    Text(msg)
+                        .font(.caption)
+                        .foregroundColor(.green)
+                }
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+        .onAppear {
+            // Stelle sicher, dass die URL beim Erscheinen der Ansicht geladen wird
+            backendURL = UserDefaults.standard.string(forKey: "backendURL") ?? "http://localhost:4001/graphql"
+        }
     }
 }
 

@@ -21,6 +21,7 @@ import { UserResolver } from "./resolvers/UserResolver";
 import { AdminResolver } from "./resolvers/AdminResolver";
 import { User } from "./entities/User";
 import { SyncResolver } from "./resolvers/SyncResolver";
+import { authChecker } from "./utils/auth";
 
 export interface MyContext {
     req: any;
@@ -63,6 +64,7 @@ async function startServer() {
                 SyncResolver
             ],
             validate: false,
+            authChecker,
         }),
         context: ({ req, res }): MyContext => {
             const context: MyContext = { req, res };
