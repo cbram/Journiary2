@@ -14,6 +14,7 @@ struct ProfileView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     @StateObject private var mapCache = MapCacheManager.shared
     
     @FetchRequest(
@@ -43,6 +44,13 @@ struct ProfileView: View {
             .refreshable {
                 await syncData()
             }
+            // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
+            .autoRefreshOnSync(
+                refreshAction: {
+                    print("📊 ProfileView: Statistiken automatisch aktualisiert")
+                },
+                showIndicator: true
+            )
             .navigationTitle("Profil")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -142,7 +150,8 @@ struct ProfileView: View {
     
     private func syncData() async {
         print("ProfileView: Initiating sync...")
-        await SyncManager.shared.sync()
+        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
+        await syncTriggerManager.triggerManualSync()
         print("ProfileView: Sync completed.")
     }
     

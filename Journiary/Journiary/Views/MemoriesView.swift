@@ -14,6 +14,7 @@ import AVKit
 struct MemoriesView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     
     // Optionaler Trip für die Filterung
     var trip: Trip?
@@ -126,6 +127,8 @@ struct MemoriesView: View {
         .onAppear {
             // MemoriesView ist aktiv
         }
+        // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
+        .autoRefreshList()
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
                 ActivityViewController(activityItems: [image])
@@ -223,7 +226,8 @@ struct MemoriesView: View {
     
     private func syncData() async {
         print("MemoriesView: Initiating sync...")
-        await SyncManager.shared.sync()
+        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
+        await syncTriggerManager.triggerManualSync()
         print("MemoriesView: Sync completed.")
     }
     

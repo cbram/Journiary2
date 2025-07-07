@@ -36,8 +36,11 @@ final class SyncManager {
     ///
     /// If any step in the cycle fails, the entire process is aborted,
     /// and the `lastSyncedAt` timestamp is not updated to ensure data consistency.
-    func sync() async {
+    func sync(reason: String = "Unknown") async {
         print("Sync started...")
+        
+        // Phase 5.4: Notify sync start
+        SyncNotificationCenter.shared.notifySyncStart(reason: reason)
 
         do {
             try await uploadPhase()
@@ -48,17 +51,45 @@ final class SyncManager {
                 self.lastSyncedAt = serverTimestamp
                 print("Sync completed successfully. New lastSyncedAt: \(serverTimestamp)")
                 
+                // Phase 5.4: Berechne synchronisierte Entitäten
+                let syncedEntities = SyncedEntities(
+                    tripsUpdated: syncData.trips.count,
+                    memoriesUpdated: syncData.memories.count,
+                    mediaItemsUpdated: syncData.mediaItems.count,
+                    gpxTracksUpdated: syncData.gpxTracks.count,
+                    tagsUpdated: syncData.tags.count,
+                    tagCategoriesUpdated: syncData.tagCategories.count,
+                    bucketListItemsUpdated: syncData.bucketListItems.count
+                )
+                
+                // Phase 5.4: Notify sync success
+                SyncNotificationCenter.shared.notifySyncSuccess(
+                    reason: reason,
+                    syncedEntities: syncedEntities
+                )
+                
                 // Start file synchronization asynchronously (doesn't block the main sync)
                 Task {
                     await self.fileSyncPhase()
                 }
             } else {
                 print("Sync completed, but server timestamp was invalid.")
+                let invalidTimestampError = SyncError.invalidServerTimestamp
+                SyncNotificationCenter.shared.notifySyncError(
+                    reason: reason,
+                    error: invalidTimestampError
+                )
             }
 
         } catch {
             print("Sync failed: \(error.localizedDescription)")
             // The `lastSyncedAt` timestamp is not updated, so the next sync will retry the failed operations.
+            
+            // Phase 5.4: Notify sync error
+            SyncNotificationCenter.shared.notifySyncError(
+                reason: reason,
+                error: error
+            )
         }
     }
 
@@ -1325,6 +1356,29 @@ extension SyncManager {
             } catch {
                 print("Failed to upload GPXTrack with local ID \(object.objectID): \(error)")
             }
+        }
+    }
+}
+
+// MARK: - Sync Error Types
+
+/// Errors that can occur during synchronization
+enum SyncError: Error, LocalizedError {
+    case invalidServerTimestamp
+    case networkError(Error)
+    case dataError(String)
+    case authenticationError
+    
+    var errorDescription: String? {
+        switch self {
+        case .invalidServerTimestamp:
+            return "Server-Zeitstempel ist ungültig"
+        case .networkError(let error):
+            return "Netzwerkfehler: \(error.localizedDescription)"
+        case .dataError(let message):
+            return "Datenfehler: \(message)"
+        case .authenticationError:
+            return "Authentifizierungsfehler"
         }
     }
 }

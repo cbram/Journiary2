@@ -168,6 +168,8 @@ struct TrackExportManagerView: View {
             .sheet(item: $tripForDetailedExport) { trip in
                 GPXExportView(trip: trip)
             }
+            // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
+            .autoRefreshList()
         }
     }
     
