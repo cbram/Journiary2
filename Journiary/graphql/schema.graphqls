@@ -409,6 +409,9 @@ type Mutation {
   createUploadUrl(mimeType: String, filename: String!): PresignedUrlResponse!
   createMediaItem(input: MediaItemInput!): MediaItem!
 
+  """Update a media item"""
+  updateMediaItem(id: String!, input: UpdateMediaItemInput!): MediaItem!
+
   """Delete a media item"""
   deleteMediaItem(id: String!): Boolean!
   createRoutePoints(points: [RoutePointInput!]!, tripId: ID!): [RoutePoint!]!
@@ -428,6 +431,9 @@ type Mutation {
 
   """Creates a new GPX track record and processes the uploaded file."""
   createGpxTrack(input: GPXTrackInput!): GPXTrack!
+
+  """Update a GPX track"""
+  updateGpxTrack(id: ID!, input: UpdateGPXTrackInput!): GPXTrack!
 
   """Deletes a GPX track and its associated data."""
   deleteGpxTrack(id: ID!): Boolean!
@@ -556,6 +562,30 @@ input MediaItemInput {
   duration: Int
 }
 
+"""Input data for updating a MediaItem"""
+input UpdateMediaItemInput {
+  """The name of the object in the storage (e.g., from createUploadUrl)"""
+  objectName: String
+
+  """The name of the thumbnail object in the storage"""
+  thumbnailObjectName: String
+
+  """The type of media, e.g., 'image', 'video'."""
+  mediaType: String
+  
+  """The timestamp of when the media was created"""
+  timestamp: DateTime
+
+  """The order of this item within the memory's media list"""
+  order: Int
+
+  """File size in bytes"""
+  filesize: Int
+
+  """For videos, the duration in seconds."""
+  duration: Int
+}
+
 """Input data to create a new RoutePoint"""
 input RoutePointInput {
   latitude: Float!
@@ -624,6 +654,24 @@ input GPXTrackInput {
   """Optional ID of the memory this GPX track is associated with"""
   memoryId: ID
   creator: String
+  trackType: String
+}
+
+"""Input data for updating a GPXTrack"""
+input UpdateGPXTrackInput {
+  """The name of the GPX track"""
+  name: String
+
+  """The name of the uploaded GPX file in the object storage"""
+  gpxFileObjectName: String
+  
+  originalFilename: String
+
+  """Optional ID of the memory this GPX track is associated with"""
+  memoryId: ID
+  
+  creator: String
+
   trackType: String
 }
 

@@ -1,0 +1,3 @@
+mutation DeleteBucketListItem($id: ID!) {
+  deleteBucketListItem(id: $id)
+} 

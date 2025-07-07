@@ -27,6 +27,7 @@ import { RoutePoint } from "../entities/RoutePoint";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const GpxParser = require("gpxparser");
 import { GPXTrackInput } from "../entities/GPXTrackInput";
+import { UpdateGPXTrackInput } from "../entities/UpdateGPXTrackInput";
 import { PresignedUrlResponse } from "./types/PresignedUrlResponse";
 import { generatePresignedPutUrl, getObjectContent, generatePresignedGetUrl } from "../utils/minio";
 import { Memory } from "../entities/Memory";
@@ -182,6 +183,50 @@ export class GPXResolver {
 
     // Use the entity manager to save the track and all its cascaded segments and points
     return await AppDataSource.manager.save(newGpxTrack);
+  }
+
+  @Mutation(() => GPXTrack, { description: "Update a GPX track" })
+  async updateGpxTrack(
+    @Arg("id", () => ID) id: string,
+    @Arg("input") input: UpdateGPXTrackInput,
+    @Ctx() { userId }: MyContext
+  ): Promise<GPXTrack> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+
+    const gpxTrack = await AppDataSource.getRepository(GPXTrack).findOne({
+      where: { id },
+      relations: ["trip", "memory"]
+    });
+
+    if (!gpxTrack) {
+      throw new UserInputError(`GPX track with ID ${id} not found.`);
+    }
+
+    const hasAccess = await checkTripAccess(userId, gpxTrack.trip.id, TripRole.EDITOR);
+    if (!hasAccess) {
+      throw new AuthenticationError("You don't have permission to update this GPX track.");
+    }
+
+    // Handle memory association if provided
+    if (input.memoryId !== undefined) {
+      if (input.memoryId) {
+        const memory = await AppDataSource.getRepository(Memory).findOne({ 
+          where: { id: input.memoryId, trip: { id: gpxTrack.trip.id } } 
+        });
+        if (!memory) {
+          throw new UserInputError(`Memory with ID ${input.memoryId} not found in this trip.`);
+        }
+        gpxTrack.memory = memory;
+      } else {
+        gpxTrack.memory = undefined;
+      }
+    }
+
+    // Update the GPX track with the provided fields (excluding memoryId which we handled above)
+    const { memoryId, ...updateFields } = input;
+    Object.assign(gpxTrack, updateFields);
+
+    return await AppDataSource.getRepository(GPXTrack).save(gpxTrack);
   }
 
   @Mutation(() => Boolean, { description: "Deletes a GPX track and its associated data." })

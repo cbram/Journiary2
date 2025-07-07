@@ -1,0 +1,17 @@
+mutation CreateBucketListItem($input: BucketListItemInput!) {
+  createBucketListItem(input: $input) {
+    id
+    name
+    country
+    region
+    type
+    latitude1
+    longitude1
+    latitude2
+    longitude2
+    isDone
+    createdAt
+    updatedAt
+    completedAt
+  }
+} 

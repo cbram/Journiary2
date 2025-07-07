@@ -1,0 +1,14 @@
+mutation CreateTagCategory($input: TagCategoryInput!) {
+  createTagCategory(input: $input) {
+    id
+    name
+    displayName
+    emoji
+    color
+    isSystemCategory
+    sortOrder
+    isExpanded
+    createdAt
+    updatedAt
+  }
+} 

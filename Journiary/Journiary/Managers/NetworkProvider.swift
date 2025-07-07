@@ -165,21 +165,80 @@ class NetworkProvider {
     // MARK: - Memory Mutations
 
     func createMemory(input: MemoryInput) async throws -> (id: String, updatedAt: DateTime) {
-        fatalError("Codegen not yet successful")
-        // let mutation = CreateMemoryMutation(input: input)
-        // ...
+        let mutation = CreateMemoryMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 5, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createMemory"]))
+                        return
+                    }
+                    
+                    guard let memory = graphQLResult.data?.createMemory else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to create memory, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: memory.id, updatedAt: memory.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     func updateMemory(id: String, input: UpdateMemoryInput) async throws -> (id: String, updatedAt: DateTime) {
-        fatalError("Codegen not yet successful")
-        // let mutation = UpdateMemoryMutation(id: id, input: input)
-        // ...
+        let mutation = UpdateMemoryMutation(id: id, input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 6, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for updateMemory"]))
+                        return
+                    }
+                    
+                    guard let memory = graphQLResult.data?.updateMemory else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 6, userInfo: [NSLocalizedDescriptionKey: "Failed to update memory, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: memory.id, updatedAt: memory.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     func deleteMemory(id: String) async throws -> String {
-        fatalError("Codegen not yet successful")
-        // let mutation = DeleteMemoryMutation(id: id)
-        // ...
+        let mutation = DeleteMemoryMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 7, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteMemory"]))
+                        return
+                    }
+                    
+                    // The 'deleteMemory' mutation returns a boolean for success.
+                    // If successful, we return the original ID.
+                    guard let success = graphQLResult.data?.deleteMemory, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 7, userInfo: [NSLocalizedDescriptionKey: "Failed to delete memory, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 
     func sync(lastSyncedAt: Date?) async throws -> SyncQuery.Data.Sync {
@@ -201,6 +260,110 @@ class NetworkProvider {
                         return
                     }
                     continuation.resume(returning: syncData)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: - MediaItem Mutations
+
+    func createMediaItem(input: MediaItemInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = CreateMediaItemMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 8, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createMediaItem"]))
+                        return
+                    }
+                    
+                    guard let mediaItem = graphQLResult.data?.createMediaItem else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 8, userInfo: [NSLocalizedDescriptionKey: "Failed to create media item, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: mediaItem.id, updatedAt: mediaItem.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteMediaItem(id: String) async throws -> String {
+        let mutation = DeleteMediaItemMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 9, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteMediaItem"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.deleteMediaItem, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 9, userInfo: [NSLocalizedDescriptionKey: "Failed to delete media item, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: - GPXTrack Mutations
+
+    func createGPXTrack(input: GPXTrackInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = CreateGPXTrackMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 10, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createGPXTrack"]))
+                        return
+                    }
+                    
+                    guard let gpxTrack = graphQLResult.data?.createGpxTrack else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 10, userInfo: [NSLocalizedDescriptionKey: "Failed to create GPX track, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: gpxTrack.id, updatedAt: gpxTrack.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteGPXTrack(id: String) async throws -> String {
+        let mutation = DeleteGPXTrackMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 11, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteGPXTrack"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.deleteGpxTrack, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 11, userInfo: [NSLocalizedDescriptionKey: "Failed to delete GPX track, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
                     
                 case .failure(let error):
                     continuation.resume(throwing: error)

@@ -93,6 +93,26 @@ final class SyncManager {
             }
         )
         
+        // Upload MediaItems (string-based sync status)
+        try await uploadStringBasedEntities(
+            fetchRequest: MediaItem.fetchRequest(),
+            context: context,
+            create: { input in
+                let result = try await self.networkProvider.createMediaItem(input: input as! MediaItemInput)
+                return (result.id, result.updatedAt)
+            }
+        )
+        
+        // Upload GPXTracks (string-based sync status) 
+        try await uploadStringBasedEntities(
+            fetchRequest: GPXTrack.fetchRequest(),
+            context: context,
+            create: { input in
+                let result = try await self.networkProvider.createGPXTrack(input: input as! GPXTrackInput)
+                return (result.id, result.updatedAt)
+            }
+        )
+        
         // Step 2: Process deletions
         try await processDeletions(context: context)
         
@@ -131,6 +151,16 @@ final class SyncManager {
             try await self.deleteLocalObjects(entityName: "Memory", serverIds: deletedIds.memories.map { $0 }, context: context)
         }
         
+        // Process media item deletions
+        if !deletedIds.mediaItems.isEmpty {
+            try await self.deleteLocalObjects(entityName: "MediaItem", serverIds: deletedIds.mediaItems.map { $0 }, context: context)
+        }
+        
+        // Process GPX track deletions
+        if !deletedIds.gpxTracks.isEmpty {
+            try await self.deleteLocalObjects(entityName: "GPXTrack", serverIds: deletedIds.gpxTracks.map { $0 }, context: context)
+        }
+        
         // 3. Process creations and updates
         // The trips array is non-optional in the schema, so we can iterate directly.
         try await upsertTrips(syncData.trips, context: context)
@@ -141,8 +171,17 @@ final class SyncManager {
             try await upsertMemories(memories, context: context)
         }
         
-        // TODO: Add processing for other entities like Memory, MediaItem, etc.
-        // if let memories = syncData.memories { ... }
+        // Process media items if they exist
+        let mediaItems = syncData.mediaItems
+        if !mediaItems.isEmpty {
+            try await upsertMediaItems(mediaItems, context: context)
+        }
+        
+        // Process GPX tracks if they exist
+        let gpxTracks = syncData.gpxTracks
+        if !gpxTracks.isEmpty {
+            try await upsertGPXTracks(gpxTracks, context: context)
+        }
         
         // 4. Save changes to the persistent store
         if context.hasChanges {
@@ -195,6 +234,85 @@ final class SyncManager {
             }
         }
     }
+    
+    private func upsertMediaItems(_ mediaItems: [SyncQuery.Data.Sync.MediaItem], context: NSManagedObjectContext) async throws {
+        for remoteMediaItem in mediaItems {
+            try await context.perform {
+                let fetchRequest = MediaItem.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverID == %@", remoteMediaItem.id)
+                fetchRequest.fetchLimit = 1
+
+                let localMediaItem = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localMediaItem = localMediaItem, let localUpdatedAt = localMediaItem.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteMediaItem.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for MediaItem \(remoteMediaItem.id), local version is newer or same.")
+                    return
+                }
+
+                let mediaItemToUpdate = localMediaItem ?? MediaItem(context: context)
+                
+                mediaItemToUpdate.serverID = remoteMediaItem.id
+                mediaItemToUpdate.filename = remoteMediaItem.filename
+                mediaItemToUpdate.mediaType = remoteMediaItem.mimeType
+                mediaItemToUpdate.timestamp = self.dateTimeToDate(remoteMediaItem.timestamp) ?? Date()
+                mediaItemToUpdate.order = Int16(remoteMediaItem.order)
+                mediaItemToUpdate.filesize = Int64(remoteMediaItem.fileSize)
+                mediaItemToUpdate.duration = Double(remoteMediaItem.duration ?? 0)
+                mediaItemToUpdate.createdAt = self.dateTimeToDate(remoteMediaItem.createdAt) ?? Date()
+                mediaItemToUpdate.updatedAt = self.dateTimeToDate(remoteMediaItem.updatedAt) ?? Date()
+                mediaItemToUpdate.syncStatusEnum = .inSync
+                
+                // Handle Memory relationship
+                let memory = remoteMediaItem.memory
+                let memoryFetchRequest = Memory.fetchRequest()
+                memoryFetchRequest.predicate = NSPredicate(format: "serverId == %@", memory.id)
+                memoryFetchRequest.fetchLimit = 1
+                if let localMemory = try context.fetch(memoryFetchRequest).first {
+                    mediaItemToUpdate.memory = localMemory
+                }
+            }
+        }
+    }
+    
+    private func upsertGPXTracks(_ gpxTracks: [SyncQuery.Data.Sync.GpxTrack], context: NSManagedObjectContext) async throws {
+        for remoteGPXTrack in gpxTracks {
+            try await context.perform {
+                let fetchRequest = GPXTrack.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverID == %@", remoteGPXTrack.id)
+                fetchRequest.fetchLimit = 1
+
+                let localGPXTrack = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localGPXTrack = localGPXTrack, let localUpdatedAt = localGPXTrack.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteGPXTrack.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for GPXTrack \(remoteGPXTrack.id), local version is newer or same.")
+                    return
+                }
+
+                let gpxTrackToUpdate = localGPXTrack ?? GPXTrack(context: context)
+                
+                gpxTrackToUpdate.serverID = remoteGPXTrack.id
+                gpxTrackToUpdate.name = remoteGPXTrack.name
+                gpxTrackToUpdate.originalFilename = remoteGPXTrack.originalFilename
+                gpxTrackToUpdate.creator = remoteGPXTrack.creator
+                gpxTrackToUpdate.trackType = remoteGPXTrack.trackType
+                gpxTrackToUpdate.createdAt = self.dateTimeToDate(remoteGPXTrack.createdAt) ?? Date()
+                gpxTrackToUpdate.updatedAt = self.dateTimeToDate(remoteGPXTrack.updatedAt) ?? Date()
+                gpxTrackToUpdate.syncStatusEnum = .inSync
+                
+                // Handle Trip relationship (GPXTrack is connected to Trip via Memory)
+                let tripId = remoteGPXTrack.tripId
+                let tripFetchRequest = Trip.fetchRequest()
+                tripFetchRequest.predicate = NSPredicate(format: "serverId == %@", tripId)
+                tripFetchRequest.fetchLimit = 1
+                if let trip = try context.fetch(tripFetchRequest).first {
+                    // Note: GPXTrack doesn't have direct trip relation in Core Data
+                    // The relationship is established via Memory
+                }
+            }
+        }
+    }
 
     private func upsertTrips(_ trips: [SyncQuery.Data.Sync.Trip], context: NSManagedObjectContext) async throws {
         for remoteTrip in trips {
@@ -240,6 +358,10 @@ final class SyncManager {
             fetchRequest = Trip.fetchRequest() as! NSFetchRequest<NSManagedObject>
         case "Memory":
             fetchRequest = Memory.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        case "MediaItem":
+            fetchRequest = MediaItem.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        case "GPXTrack":
+            fetchRequest = GPXTrack.fetchRequest() as! NSFetchRequest<NSManagedObject>
         default:
             print("Unknown entity type for deletion: \(entityName)")
             return
@@ -294,6 +416,39 @@ final class SyncManager {
         }
     }
     
+    private func uploadStringBasedEntities<T: StringBasedSynchronizable>(
+        fetchRequest: NSFetchRequest<T>,
+        context: NSManagedObjectContext,
+        create: @escaping (Any) async throws -> (id: String, updatedAt: DateTime)
+    ) async throws where T: NSManagedObject {
+        
+        let objectsToUpload = try await context.perform { () -> [T] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                let result = try await create(input)
+                print("Created \(T.entity().name ?? "entity"): \(result.id)")
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    object.updatedAt = self.dateTimeToDate(result.updatedAt)
+                    object.syncStatusEnum = .inSync
+                }
+            } catch {
+                print("Failed to upload \(T.entity().name ?? "entity") with local ID \(object.objectID): \(error)")
+                // Set status to failed upload
+                try await context.perform {
+                    object.syncStatusEnum = .needsUpload // Keep trying for now
+                }
+            }
+        }
+    }
+    
     private func processDeletions(context: NSManagedObjectContext) async throws {
         let deletions = try await context.perform { () -> [DeletionLog] in
             let request = DeletionLog.fetchRequest()
@@ -311,6 +466,12 @@ final class SyncManager {
                 case "Memory":
                     _ = try await self.networkProvider.deleteMemory(id: entityId)
                     print("Deleted memory with id: \(entityId) on server.")
+                case "MediaItem":
+                    _ = try await self.networkProvider.deleteMediaItem(id: entityId)
+                    print("Deleted media item with id: \(entityId) on server.")
+                case "GPXTrack":
+                    _ = try await self.networkProvider.deleteGPXTrack(id: entityId)
+                    print("Deleted GPX track with id: \(entityId) on server.")
                 default:
                     print("Unknown entity type for deletion: \(entityName)")
                 }
@@ -348,6 +509,15 @@ protocol Synchronizable: AnyObject {
     var serverId: String? { get set }
     var updatedAt: Date? { get set }
     var syncStatus: SyncStatus { get set }
+    
+    func toGraphQLInput() -> Any
+}
+
+/// A protocol for entities that use String-based sync status (like MediaItem, GPXTrack)
+protocol StringBasedSynchronizable: AnyObject {
+    var serverId: String? { get set }
+    var updatedAt: Date? { get set }
+    var syncStatusEnum: SyncStatus { get set }
     
     func toGraphQLInput() -> Any
 }
@@ -439,5 +609,80 @@ extension Memory: Synchronizable {
                 tripId: self.trip?.serverId ?? ""
             )
         }
+    }
+}
+
+// MARK: - MediaItem Synchronizable Extension
+
+extension MediaItem: StringBasedSynchronizable {
+    var serverId: String? {
+        get { return self.serverID }
+        set { self.serverID = newValue }
+    }
+    
+    var syncStatusEnum: SyncStatus {
+        get { 
+            if let statusString = self.syncStatus, let statusValue = Int16(statusString) {
+                return SyncStatus(rawValue: statusValue) ?? .inSync
+            }
+            return .inSync
+        }
+        set { 
+            self.syncStatus = String(newValue.rawValue)
+        }
+    }
+    
+    func toGraphQLInput() -> Any {
+        func dateToDateTime(_ date: Date) -> DateTime {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.string(from: date)
+        }
+        
+        // For MediaItem, we only support create for now
+        return MediaItemInput(
+            objectName: self.filename ?? "",
+            thumbnailObjectName: .none,
+            memoryId: self.memory?.serverId ?? "",
+            mediaType: self.mediaType ?? "unknown",
+            timestamp: dateToDateTime(self.timestamp ?? Date()),
+            order: Int(self.order),
+            filesize: Int(self.filesize),
+            duration: self.duration > 0 ? GraphQLNullable.some(Int(self.duration)) : .none
+        )
+    }
+}
+
+// MARK: - GPXTrack Synchronizable Extension
+
+extension GPXTrack: StringBasedSynchronizable {
+    var serverId: String? {
+        get { return self.serverID }
+        set { self.serverID = newValue }
+    }
+    
+    var syncStatusEnum: SyncStatus {
+        get {
+            if let statusString = self.syncStatus, let statusValue = Int16(statusString) {
+                return SyncStatus(rawValue: statusValue) ?? .inSync
+            }
+            return .inSync
+        }
+        set {
+            self.syncStatus = String(newValue.rawValue)
+        }
+    }
+    
+    func toGraphQLInput() -> Any {
+        // For GPXTrack, we only support create for now
+        return GPXTrackInput(
+            name: self.name ?? "Unnamed Track",
+            gpxFileObjectName: GraphQLNullable<String>.none, // File sync is handled separately
+            originalFilename: self.originalFilename != nil ? GraphQLNullable<String>.some(self.originalFilename!) : GraphQLNullable<String>.none,
+            tripId: self.memory?.trip?.serverId ?? "",
+            memoryId: self.memory?.serverId != nil ? GraphQLNullable<String>.some(self.memory!.serverId!) : GraphQLNullable<String>.none,
+            creator: self.creator != nil ? GraphQLNullable<String>.some(self.creator!) : GraphQLNullable<String>.none,
+            trackType: self.trackType != nil ? GraphQLNullable<String>.some(self.trackType!) : GraphQLNullable<String>.none
+        )
     }
 }

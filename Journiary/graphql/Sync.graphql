@@ -26,6 +26,70 @@ query Sync($lastSyncedAt: DateTime!) {
       updatedAt
       tripId
     }
+    tags {
+      id
+      name
+      emoji
+      color
+      isSystemTag
+      usageCount
+      createdAt
+      updatedAt
+      categoryId
+      tagDescription
+    }
+    tagCategories {
+      id
+      name
+      displayName
+      emoji
+      color
+      isSystemCategory
+      sortOrder
+      isExpanded
+      createdAt
+      updatedAt
+    }
+    bucketListItems {
+      id
+      name
+      country
+      region
+      type
+      latitude1
+      longitude1
+      latitude2
+      longitude2
+      isDone
+      createdAt
+      updatedAt
+      completedAt
+    }
+    mediaItems {
+      id
+      filename
+      originalFilename
+      mimeType
+      timestamp
+      order
+      fileSize
+      duration
+      createdAt
+      updatedAt
+      memory {
+        id
+      }
+    }
+    gpxTracks {
+      id
+      name
+      originalFilename
+      creator
+      trackType
+      createdAt
+      updatedAt
+      tripId
+    }
 
     deleted {
       trips

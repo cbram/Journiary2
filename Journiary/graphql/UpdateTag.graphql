@@ -1,0 +1,10 @@
+mutation UpdateTag($id: String!, $input: UpdateTagInput!) {
+  updateTag(id: $id, input: $input) {
+    id
+    name
+    emoji
+    color
+    tagDescription
+    categoryId
+  }
+} 

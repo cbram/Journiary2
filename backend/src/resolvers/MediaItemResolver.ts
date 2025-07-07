@@ -11,6 +11,7 @@ import {
 } from "type-graphql";
 import { MediaItem } from "../entities/MediaItem";
 import { MediaItemInput } from "../entities/MediaItemInput";
+import { UpdateMediaItemInput } from "../entities/UpdateMediaItemInput";
 import { AppDataSource } from "../utils/database";
 import { generatePresignedPutUrl, generatePresignedGetUrl } from "../utils/minio";
 import { Memory } from "../entities/Memory";
@@ -135,6 +136,34 @@ export class MediaItemResolver {
     });
 
     return await mediaItemRepository.save(mediaItem);
+  }
+
+  @Mutation(() => MediaItem, { description: "Update a media item" })
+  async updateMediaItem(
+    @Arg("id", () => String) id: string,
+    @Arg("input") input: UpdateMediaItemInput,
+    @Ctx() { userId }: MyContext
+  ): Promise<MediaItem> {
+    if (!userId) throw new AuthenticationError("You must be logged in.");
+
+    const mediaItem = await AppDataSource.getRepository(MediaItem).findOne({
+      where: { id },
+      relations: ["memory", "memory.trip"]
+    });
+
+    if (!mediaItem) {
+      throw new UserInputError(`Media item with ID ${id} not found.`);
+    }
+
+    const hasAccess = await checkTripAccess(userId, mediaItem.memory.trip.id, TripRole.EDITOR);
+    if (!hasAccess) {
+      throw new AuthenticationError("You don't have permission to update this media item.");
+    }
+
+    // Update the media item with the provided fields
+    Object.assign(mediaItem, input);
+
+    return await AppDataSource.getRepository(MediaItem).save(mediaItem);
   }
 
   @Mutation(() => Boolean, { description: "Delete a media item" })

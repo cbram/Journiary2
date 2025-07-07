@@ -1,0 +1,6 @@
+mutation CreateMediaItem($input: MediaItemInput!) {
+  createMediaItem(input: $input) {
+    id
+    updatedAt
+  }
+} 

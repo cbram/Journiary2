@@ -1,0 +1,3 @@
+mutation DeleteGPXTrack($id: ID!) {
+  deleteGpxTrack(id: $id)
+} 
