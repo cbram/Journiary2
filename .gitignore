@@ -1,12 +1,37 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
 
-# Node dependencies
-**/node_modules/
-backend/package-lock.json 
+# Xcode
+build/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.xcworkspace/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
 
-# Local data stores
-/minio-data/
-/postgres-data/ 
-
-# Swift
+# Swift Package Manager
 .build/
-**/.build/ 
+.swiftpm/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Development files
+journiary-dev.sqlite
+debug-auth.js
+.env
+/apollo-ios-cli
+/apollo-ios-cli.zip
+
+# MinIO & Postgres data
+minio-data/
+postgres-data/ 
