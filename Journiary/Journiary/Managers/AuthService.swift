@@ -68,6 +68,11 @@ class AuthService: ObservableObject {
         self.user = result.data?.login.user
         saveToken(token)
         print("Login nach Registrierung erfolgreich. Token gespeichert.")
+        
+        // Synchronisation nach erfolgreichem Login auslösen
+        Task {
+            await SyncManager.shared.sync(reason: "Nach Registrierung")
+        }
     }
     
     func login(user: JourniaryAPI.UserInput) async throws {
@@ -81,6 +86,11 @@ class AuthService: ObservableObject {
         self.user = result.data?.login.user
         saveToken(token)
         print("Login erfolgreich. Token gespeichert.")
+        
+        // Synchronisation nach erfolgreichem Login auslösen
+        Task {
+            await SyncManager.shared.sync(reason: "Nach Login")
+        }
     }
 
     func logout() {
@@ -112,12 +122,29 @@ class AuthService: ObservableObject {
     // MARK: - Private Helpers
     
     private func checkAuthentication() {
-        if getToken() != nil {
+        if let token = getToken() {
+            // TODO: Künftig sollte hier auch die Token-Gültigkeit geprüft werden
+            // Beispiel: Einfache Test-Anfrage an das Backend senden
             self.isAuthenticated = true
             print("AuthService initialized. User is authenticated.")
         } else {
             self.isAuthenticated = false
             print("AuthService initialized. User is not authenticated.")
         }
+    }
+    
+    /// Prüft, ob der aktuelle Token noch gültig ist
+    /// Diese Funktion kann künftig erweitert werden für automatische Token-Validierung
+    func validateToken() async -> Bool {
+        guard getToken() != nil else {
+            self.isAuthenticated = false
+            return false
+        }
+        
+        // TODO: Hier könnte eine einfache GraphQL-Anfrage gemacht werden
+        // um zu prüfen, ob der Token noch gültig ist
+        // Bei 401/403 Fehlern: Token löschen und isAuthenticated = false setzen
+        
+        return true
     }
 } 

@@ -78,8 +78,14 @@ async function startServer() {
                 
                 if (token) {
                     try {
-                        console.log('🔐 Attempting to verify token with secret: "your-super-secret-key"');
-                        const decoded = jwt.verify(token, "your-super-secret-key") as { userId: string };
+                        const jwtSecret = process.env.JWT_SECRET;
+                        if (!jwtSecret) {
+                            console.log('❌ JWT_SECRET nicht in Umgebungsvariablen definiert');
+                            throw new Error('JWT_SECRET nicht konfiguriert');
+                        }
+                        
+                        console.log('🔐 Attempting to verify token with environment JWT_SECRET');
+                        const decoded = jwt.verify(token, jwtSecret) as { userId: string };
                         console.log('✅ JWT verified successfully, userId:', decoded.userId);
                         context.userId = decoded.userId;
                     } catch (err: any) {

@@ -39,8 +39,27 @@ final class SyncManager {
     func sync(reason: String = "Unknown") async {
         print("Sync started...")
         
+        // Prüfe Authentifizierung vor dem Sync (MainActor-sicher)
+        let isAuthenticated = await MainActor.run {
+            return AuthService.shared.isAuthenticated
+        }
+        
+        guard isAuthenticated else {
+            print("⚠️ Sync übersprungen: Benutzer ist nicht authentifiziert")
+            let authError = SyncError.authenticationError
+            await MainActor.run {
+                SyncNotificationCenter.shared.notifySyncError(
+                    reason: reason,
+                    error: authError
+                )
+            }
+            return
+        }
+        
         // Phase 5.4: Notify sync start
-        SyncNotificationCenter.shared.notifySyncStart(reason: reason)
+        await MainActor.run {
+            SyncNotificationCenter.shared.notifySyncStart(reason: reason)
+        }
 
         do {
             try await uploadPhase()
@@ -63,10 +82,12 @@ final class SyncManager {
                 )
                 
                 // Phase 5.4: Notify sync success
-                SyncNotificationCenter.shared.notifySyncSuccess(
-                    reason: reason,
-                    syncedEntities: syncedEntities
-                )
+                await MainActor.run {
+                    SyncNotificationCenter.shared.notifySyncSuccess(
+                        reason: reason,
+                        syncedEntities: syncedEntities
+                    )
+                }
                 
                 // Start file synchronization asynchronously (doesn't block the main sync)
                 Task {
@@ -75,10 +96,12 @@ final class SyncManager {
             } else {
                 print("Sync completed, but server timestamp was invalid.")
                 let invalidTimestampError = SyncError.invalidServerTimestamp
-                SyncNotificationCenter.shared.notifySyncError(
-                    reason: reason,
-                    error: invalidTimestampError
-                )
+                await MainActor.run {
+                    SyncNotificationCenter.shared.notifySyncError(
+                        reason: reason,
+                        error: invalidTimestampError
+                    )
+                }
             }
 
         } catch {
@@ -86,10 +109,12 @@ final class SyncManager {
             // The `lastSyncedAt` timestamp is not updated, so the next sync will retry the failed operations.
             
             // Phase 5.4: Notify sync error
-            SyncNotificationCenter.shared.notifySyncError(
-                reason: reason,
-                error: error
-            )
+            await MainActor.run {
+                SyncNotificationCenter.shared.notifySyncError(
+                    reason: reason,
+                    error: error
+                )
+            }
         }
     }
 

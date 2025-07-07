@@ -12,6 +12,7 @@ struct SettingsView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
+    @EnvironmentObject var syncTriggerManager: SyncTriggerManager
     @StateObject private var mapCache = MapCacheManager.shared
     
     @State private var showingDeleteAlert = false
@@ -19,6 +20,7 @@ struct SettingsView: View {
     @State private var showingGPXDebugTest = false
     @State private var showingTracesTrackSettings = false
     @State private var showingGPSDebugView = false
+    @State private var showingSyncStatusView = false
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     @State private var googlePlacesApiKey: String = UserDefaults.standard.string(forKey: "GooglePlacesAPIKey") ?? ""
     @State private var apiKeySavedMessage: String? = nil
@@ -28,6 +30,9 @@ struct SettingsView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Synchronisation (Phase 5.2)
+                    syncSection
+                    
                     // Ortssuche Einstellungen
                     placeSearchSection
                     
@@ -80,6 +85,10 @@ struct SettingsView: View {
             GPSDebugView()
                 .environmentObject(locationManager)
         }
+        .sheet(isPresented: $showingSyncStatusView) {
+            SyncStatusView()
+                .environmentObject(syncTriggerManager)
+        }
         .alert("Alle Daten löschen?", isPresented: $showingDeleteAlert) {
             Button("Löschen", role: .destructive) {
                 deleteAllData()
@@ -91,6 +100,83 @@ struct SettingsView: View {
     }
     
     // MARK: - Settings Sections
+    
+    private var syncSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Synchronisation")
+                .font(.headline)
+            
+            VStack(spacing: 8) {
+                HStack {
+                    Image(systemName: syncTriggerManager.isSyncing ? "arrow.triangle.2.circlepath" : "checkmark.circle")
+                        .foregroundColor(syncTriggerManager.isSyncing ? .blue : .green)
+                        .font(.title2)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(syncTriggerManager.isSyncing ? "Synchronisation läuft..." : "Synchronisation aktiv")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        
+                        Text("Letzter Sync: \(syncTriggerManager.lastSyncFormatted)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        showingSyncStatusView = true
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(Color(.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .onTapGesture {
+                    showingSyncStatusView = true
+                }
+                
+                // Schnellaktionen
+                HStack(spacing: 12) {
+                    Button(action: {
+                        Task {
+                            await syncTriggerManager.triggerManualSync()
+                        }
+                    }) {
+                        Label("Sync", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .disabled(syncTriggerManager.isSyncing)
+                    
+                    if syncTriggerManager.lastSyncError != nil {
+                        Label("Fehler", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.red.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal)
+            }
+            .padding()
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+        }
+    }
     
     private var placeSearchSection: some View {
         VStack(alignment: .leading, spacing: 16) {

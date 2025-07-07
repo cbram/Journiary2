@@ -22,7 +22,7 @@ struct SyncStatusView: View {
                             Text(syncTriggerManager.isSyncing ? "Synchronisation läuft..." : "Synchronisation bereit")
                                 .font(.headline)
                             
-                            if let lastSync = syncTriggerManager.lastSyncAttempt {
+                            if let _ = syncTriggerManager.lastSyncAttempt {
                                 Text("Letzter Versuch: \(syncTriggerManager.lastSyncFormatted)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)

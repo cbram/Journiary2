@@ -1,4 +1,4 @@
-import { InputType, Field, Float } from "type-graphql";
+import { InputType, Field, Float, ID } from "type-graphql";
 
 @InputType({ description: "Input data to create a new RoutePoint" })
 export class RoutePointInput {
@@ -16,4 +16,7 @@ export class RoutePointInput {
 
     @Field()
     timestamp!: Date;
+
+    @Field(() => ID, { description: "The ID of the trip this route point belongs to" })
+    tripId!: string;
 } 

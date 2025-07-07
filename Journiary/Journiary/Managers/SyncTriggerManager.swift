@@ -148,11 +148,24 @@ final class SyncTriggerManager: ObservableObject {
         await performSync(reason: reason, ignoreThrottle: false)
     }
     
+    /// Prüft, ob der User authentifiziert ist
+    private func isUserAuthenticated() async -> Bool {
+        return await MainActor.run {
+            return AuthService.shared.isAuthenticated
+        }
+    }
+    
     /// Führt Synchronisation durch
     private func performSync(reason: String, ignoreThrottle: Bool) async {
         // Prüfe, ob bereits ein Sync läuft
         guard !isSyncing else {
             logger.debug("Sync bereits in Bearbeitung, überspringe \(reason)-Sync")
+            return
+        }
+        
+        // Prüfe Authentifizierung
+        guard await isUserAuthenticated() else {
+            logger.debug("Sync übersprungen: Benutzer ist nicht authentifiziert (\(reason))")
             return
         }
         

@@ -12,6 +12,7 @@ struct BucketListMemoriesView: View {
     let bucketListItem: BucketListItem
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     
     @State private var selectedMemoryID: NSManagedObjectID?
     @State private var showingMemoryDetail = false
@@ -272,7 +273,8 @@ struct BucketListMemoriesView: View {
     
     private func syncData() async {
         print("BucketListMemoriesView: Initiating sync...")
-        await SyncManager.shared.sync()
+        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
+        await syncTriggerManager.triggerManualSync()
         print("BucketListMemoriesView: Sync completed.")
     }
     

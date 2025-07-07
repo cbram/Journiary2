@@ -363,4 +363,43 @@ extension BucketListItem: StringSynchronizable {
             isDone: GraphQLNullable<Bool>.some(self.isDone)
         )
     }
+}
+
+// MARK: - RoutePoint Synchronizable Extension
+
+extension RoutePoint: StringSynchronizable {
+    var serverId: String? {
+        get { return self.serverID }
+        set { self.serverID = newValue }
+    }
+    
+    var synchronizationStatus: SyncStatus {
+        get {
+            if let statusString = self.syncStatus, let statusValue = Int16(statusString) {
+                return SyncStatus(rawValue: statusValue) ?? .inSync
+            }
+            return .inSync
+        }
+        set {
+            self.syncStatus = String(newValue.rawValue)
+        }
+    }
+    
+    func toGraphQLInput() -> Any {
+        func dateToDateTime(_ date: Date) -> DateTime {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.string(from: date)
+        }
+        
+        // For RoutePoint, we only support create for now (temporary dictionary implementation)
+        return [
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "altitude": self.altitude,
+            "timestamp": dateToDateTime(self.timestamp ?? Date()),
+            "speed": self.speed,
+            "tripId": self.trip?.serverId ?? ""
+        ]
+    }
 } 

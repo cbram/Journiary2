@@ -1767,6 +1767,11 @@ struct AddMemoryView: View {
         // Mit aktiver Reise verknüpfen
         memory.trip = activeTrip
         
+        // WICHTIG: Sync-Status für Upload setzen
+        memory.syncStatus = .needsUpload
+        memory.createdAt = Date()
+        memory.updatedAt = Date()
+        
         // Tags hinzufügen
         for tag in selectedTags {
             memory.addToTags(tag)

@@ -1748,6 +1748,11 @@ class LocationManager: NSObject, ObservableObject {
         routePoint.speed = max(0, location.speed)
         routePoint.trip = trip
         
+        // WICHTIG: Sync-Status für Upload setzen
+        routePoint.syncStatus = "1" // needsUpload (String-basiert wie MediaItem)
+        routePoint.createdAt = Date()
+        routePoint.updatedAt = Date()
+        
         // Hybrid Storage: Punkt zum Live-Segment hinzufügen
         if enableHybridStorage, let liveSegment = currentLiveSegment {
             Task { @MainActor in
