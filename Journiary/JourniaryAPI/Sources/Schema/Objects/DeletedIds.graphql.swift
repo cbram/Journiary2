@@ -4,8 +4,8 @@
 import ApolloAPI
 
 public extension Objects {
-  static let SyncResponse = ApolloAPI.Object(
-    typename: "SyncResponse",
+  static let DeletedIds = ApolloAPI.Object(
+    typename: "DeletedIds",
     implementedInterfaces: [],
     keyFields: nil
   )

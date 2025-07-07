@@ -1,4 +1,4 @@
-query Sync($lastSyncedAt: DateTime) {
+query Sync($lastSyncedAt: DateTime!) {
   sync(lastSyncedAt: $lastSyncedAt) {
     trips {
       id
@@ -14,14 +14,29 @@ query Sync($lastSyncedAt: DateTime) {
       createdAt
       updatedAt
     }
-    # Hier können später weitere Entitäten wie Memories, MediaItems etc. hinzugefügt werden
-    # z.B. memories { id, ... }
-
-    deletedIds {
+    memories {
       id
-      entityName
+      title
+      text
+      timestamp
+      latitude
+      longitude
+      locationName
+      createdAt
+      updatedAt
+      tripId
+    }
+
+    deleted {
+      trips
+      memories
+      tags
+      tagCategories
+      mediaItems
+      gpxTracks
+      bucketListItems
     }
     
-    timestamp
+    serverTimestamp
   }
 } 

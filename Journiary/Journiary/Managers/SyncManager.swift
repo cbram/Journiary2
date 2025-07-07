@@ -43,7 +43,7 @@ final class SyncManager {
             let syncData = try await downloadPhase(since: lastSyncedAt)
 
             // If both phases succeed, update the last synced timestamp from the server response.
-            if let serverTimestamp = self.dateTimeToDate(syncData.timestamp) {
+            if let serverTimestamp = self.dateTimeToDate(syncData.serverTimestamp) {
                 self.lastSyncedAt = serverTimestamp
                 print("Sync completed successfully. New lastSyncedAt: \(serverTimestamp)")
             } else {
@@ -80,7 +80,18 @@ final class SyncManager {
         )
 
         // TODO: Add similar calls for other entities like Memory, MediaItem, etc.
-        // try await uploadEntities(fetchRequest: Memory.fetchRequest(), ...)
+        try await uploadEntities(
+            fetchRequest: Memory.fetchRequest(),
+            context: context,
+            create: { input in
+                let result = try await self.networkProvider.createMemory(input: input as! MemoryInput)
+                return (result.id, result.updatedAt)
+            },
+            update: { id, input in
+                let result = try await self.networkProvider.updateMemory(id: id, input: input as! UpdateMemoryInput)
+                return (result.id, result.updatedAt)
+            }
+        )
         
         // Step 2: Process deletions
         try await processDeletions(context: context)
@@ -108,17 +119,27 @@ final class SyncManager {
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
 
         // 2. Process deletions first
-        let deletedIds = syncData.deletedIds.reduce(into: [String: [String]]()) { result, deletion in
-            result[deletion.entityName, default: []].append(deletion.id)
+        let deletedIds = syncData.deleted
+        
+        // Process trip deletions
+        if !deletedIds.trips.isEmpty {
+            try await self.deleteLocalObjects(entityName: "Trip", serverIds: deletedIds.trips.map { $0 }, context: context)
         }
         
-        for (entityName, ids) in deletedIds {
-            try await deleteLocalObjects(entityName: entityName, serverIds: ids, context: context)
+        // Process memory deletions  
+        if !deletedIds.memories.isEmpty {
+            try await self.deleteLocalObjects(entityName: "Memory", serverIds: deletedIds.memories.map { $0 }, context: context)
         }
         
         // 3. Process creations and updates
         // The trips array is non-optional in the schema, so we can iterate directly.
         try await upsertTrips(syncData.trips, context: context)
+        
+        // Process memories if they exist
+        let memories = syncData.memories
+        if !memories.isEmpty {
+            try await upsertMemories(memories, context: context)
+        }
         
         // TODO: Add processing for other entities like Memory, MediaItem, etc.
         // if let memories = syncData.memories { ... }
@@ -135,14 +156,54 @@ final class SyncManager {
         return syncData
     }
 
+    private func upsertMemories(_ memories: [SyncQuery.Data.Sync.Memory], context: NSManagedObjectContext) async throws {
+        for remoteMemory in memories {
+            try await context.perform {
+                let fetchRequest = Memory.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteMemory.id)
+                fetchRequest.fetchLimit = 1
+
+                let localMemory = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localMemory = localMemory, let localUpdatedAt = localMemory.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteMemory.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for Memory \(remoteMemory.id), local version is newer or same.")
+                    return
+                }
+
+                let memoryToUpdate = localMemory ?? Memory(context: context)
+                
+                memoryToUpdate.serverId = remoteMemory.id
+                memoryToUpdate.title = remoteMemory.title
+                memoryToUpdate.text = remoteMemory.text // Use correct field name
+                memoryToUpdate.timestamp = self.dateTimeToDate(remoteMemory.timestamp) ?? Date()
+                memoryToUpdate.latitude = remoteMemory.latitude
+                memoryToUpdate.longitude = remoteMemory.longitude
+                memoryToUpdate.locationName = remoteMemory.locationName
+                memoryToUpdate.createdAt = self.dateTimeToDate(remoteMemory.createdAt) ?? Date()
+                memoryToUpdate.updatedAt = self.dateTimeToDate(remoteMemory.updatedAt) ?? Date()
+                memoryToUpdate.syncStatus = .inSync
+                
+                // Handle Trip relationship
+                let tripId = remoteMemory.tripId
+                let tripFetchRequest = Trip.fetchRequest()
+                tripFetchRequest.predicate = NSPredicate(format: "serverId == %@", tripId)
+                tripFetchRequest.fetchLimit = 1
+                if let trip = try context.fetch(tripFetchRequest).first {
+                    memoryToUpdate.trip = trip
+                }
+            }
+        }
+    }
+
     private func upsertTrips(_ trips: [SyncQuery.Data.Sync.Trip], context: NSManagedObjectContext) async throws {
         for remoteTrip in trips {
-            await context.perform {
+            try await context.perform {
                 let fetchRequest = Trip.fetchRequest()
                 fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteTrip.id)
                 fetchRequest.fetchLimit = 1
 
-                let localTrip = try? context.fetch(fetchRequest).first
+                let localTrip = try context.fetch(fetchRequest).first
 
                 // Last-Write-Wins: only update if server data is newer
                 if let localTrip = localTrip, let localUpdatedAt = localTrip.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteTrip.updatedAt), remoteUpdatedAt <= localUpdatedAt {
@@ -177,9 +238,8 @@ final class SyncManager {
         switch entityName {
         case "Trip":
             fetchRequest = Trip.fetchRequest() as! NSFetchRequest<NSManagedObject>
-        // TODO: Add cases for other syncable entities
-        // case "Memory":
-        //     fetchRequest = Memory.fetchRequest()
+        case "Memory":
+            fetchRequest = Memory.fetchRequest() as! NSFetchRequest<NSManagedObject>
         default:
             print("Unknown entity type for deletion: \(entityName)")
             return
@@ -187,15 +247,11 @@ final class SyncManager {
         
         fetchRequest.predicate = NSPredicate(format: "serverId IN %@", serverIds)
         
-        await context.perform {
-            do {
-                let objectsToDelete = try context.fetch(fetchRequest)
-                for object in objectsToDelete {
-                    print("Deleting \(entityName) with server ID \((object as? Synchronizable)?.serverId ?? "") locally.")
-                    context.delete(object)
-                }
-            } catch {
-                print("Failed to fetch local objects for deletion: \(error)")
+        try await context.perform {
+            let objectsToDelete = try context.fetch(fetchRequest)
+            for object in objectsToDelete {
+                print("Deleting \(entityName) with server ID \((object as? Synchronizable)?.serverId ?? "") locally.")
+                context.delete(object)
             }
         }
     }
@@ -207,15 +263,10 @@ final class SyncManager {
         update: @escaping (String, Any) async throws -> (id: String, updatedAt: DateTime)
     ) async throws where T: NSManagedObject, T: Synchronizable {
         
-        let objectsToUpload = await context.perform { () -> [T] in
-            do {
-                // We use the underlying Int16 value for the predicate
-                fetchRequest.predicate = NSPredicate(format: "syncStatusValue == %d", SyncStatus.needsUpload.rawValue)
-                return try context.fetch(fetchRequest)
-            } catch {
-                print("Failed to fetch \(T.entity().name ?? "entities") for upload: \(error)")
-                return []
-            }
+        let objectsToUpload = try await context.perform { () -> [T] in
+            // We use the underlying Int16 value for the predicate
+            fetchRequest.predicate = NSPredicate(format: "syncStatusValue == %d", SyncStatus.needsUpload.rawValue)
+            return try context.fetch(fetchRequest)
         }
 
         for object in objectsToUpload {
@@ -232,7 +283,7 @@ final class SyncManager {
                 }
 
                 // Update local object with server data after successful upload
-                await context.perform {
+                try await context.perform {
                     object.serverId = result.id
                     object.updatedAt = self.dateTimeToDate(result.updatedAt)
                     object.syncStatus = .inSync
@@ -244,14 +295,9 @@ final class SyncManager {
     }
     
     private func processDeletions(context: NSManagedObjectContext) async throws {
-        let deletions = await context.perform { () -> [DeletionLog] in
-            do {
-                let request = DeletionLog.fetchRequest()
-                return try context.fetch(request)
-            } catch {
-                print("Failed to fetch deletion logs: \(error)")
-                return []
-            }
+        let deletions = try await context.perform { () -> [DeletionLog] in
+            let request = DeletionLog.fetchRequest()
+            return try context.fetch(request)
         }
         
         for deletion in deletions {
@@ -262,16 +308,15 @@ final class SyncManager {
                 case "Trip":
                     _ = try await self.networkProvider.deleteTrip(id: entityId)
                     print("Deleted trip with id: \(entityId) on server.")
-                // Add cases for other entities here
-                // case "Memory":
-                //     _ = try await self.networkProvider.deleteMemory(id: entityId)
-                //     print("Deleted memory with id: \(entityId) on server.")
+                case "Memory":
+                    _ = try await self.networkProvider.deleteMemory(id: entityId)
+                    print("Deleted memory with id: \(entityId) on server.")
                 default:
                     print("Unknown entity type for deletion: \(entityName)")
                 }
                 
                 // If server deletion was successful, delete the log entry
-                await context.perform {
+                try await context.perform {
                     context.delete(deletion)
                 }
             } catch {
@@ -350,5 +395,49 @@ extension Trip: Synchronizable {
             totalDistance: .some(self.totalDistance),
             gpsTrackingEnabled: .some(self.gpsTrackingEnabled)
         )
+    }
+}
+
+extension Memory: Synchronizable {
+
+    var syncStatus: SyncStatus {
+        get {
+            return SyncStatus(rawValue: self.syncStatusValue) ?? .inSync
+        }
+        set {
+            self.syncStatusValue = newValue.rawValue
+        }
+    }
+
+    func toGraphQLInput() -> Any {
+        
+        func dateToDateTime(_ date: Date) -> DateTime {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.string(from: date)
+        }
+        
+        // For updates, we use a different input type.
+        // We decide based on whether serverId exists.
+        if let _ = self.serverId {
+            return UpdateMemoryInput(
+                title: self.title.map { .some($0) } ?? .none,
+                content: self.text.map { .some($0) } ?? .none,
+                date: self.timestamp.map { .some(dateToDateTime($0)) } ?? .none,
+                latitude: GraphQLNullable.some(self.latitude),
+                longitude: GraphQLNullable.some(self.longitude),
+                address: self.locationName.map { .some($0) } ?? .none
+            )
+        } else {
+            return MemoryInput(
+                title: self.title ?? "Unnamed Memory",
+                content: self.text.map { .some($0) } ?? .none,
+                date: self.timestamp.map { .some(dateToDateTime($0)) } ?? .none,
+                latitude: GraphQLNullable.some(self.latitude),
+                longitude: GraphQLNullable.some(self.longitude),
+                address: self.locationName.map { .some($0) } ?? .none,
+                tripId: self.trip?.serverId ?? ""
+            )
+        }
     }
 }

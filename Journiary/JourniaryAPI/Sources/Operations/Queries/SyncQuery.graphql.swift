@@ -7,12 +7,12 @@ public class SyncQuery: GraphQLQuery {
   public static let operationName: String = "Sync"
   public static let operationDocument: ApolloAPI.OperationDocument = .init(
     definition: .init(
-      #"query Sync($lastSyncedAt: DateTime) { sync(lastSyncedAt: $lastSyncedAt) { __typename trips { __typename id name tripDescription travelCompanions visitedCountries startDate endDate isActive totalDistance gpsTrackingEnabled createdAt updatedAt } deletedIds { __typename id entityName } timestamp } }"#
+      #"query Sync($lastSyncedAt: DateTime!) { sync(lastSyncedAt: $lastSyncedAt) { __typename trips { __typename id name tripDescription travelCompanions visitedCountries startDate endDate isActive totalDistance gpsTrackingEnabled createdAt updatedAt } memories { __typename id title text timestamp latitude longitude locationName createdAt updatedAt tripId } deleted { __typename trips memories tags tagCategories mediaItems gpxTracks bucketListItems } serverTimestamp } }"#
     ))
 
-  public var lastSyncedAt: GraphQLNullable<DateTime>
+  public var lastSyncedAt: DateTime
 
-  public init(lastSyncedAt: GraphQLNullable<DateTime>) {
+  public init(lastSyncedAt: DateTime) {
     self.lastSyncedAt = lastSyncedAt
   }
 
@@ -27,7 +27,6 @@ public class SyncQuery: GraphQLQuery {
       .field("sync", Sync.self, arguments: ["lastSyncedAt": .variable("lastSyncedAt")]),
     ] }
 
-    /// Performs an incremental sync.
     public var sync: Sync { __data["sync"] }
 
     /// Sync
@@ -41,16 +40,15 @@ public class SyncQuery: GraphQLQuery {
       public static var __selections: [ApolloAPI.Selection] { [
         .field("__typename", String.self),
         .field("trips", [Trip].self),
-        .field("deletedIds", [DeletedId].self),
-        .field("timestamp", JourniaryAPI.DateTime.self),
+        .field("memories", [Memory].self),
+        .field("deleted", Deleted.self),
+        .field("serverTimestamp", JourniaryAPI.DateTime.self),
       ] }
 
-      /// A list of trips that have been created or updated since the last sync.
       public var trips: [Trip] { __data["trips"] }
-      /// A list of objects that have been deleted since the last sync.
-      public var deletedIds: [DeletedId] { __data["deletedIds"] }
-      /// The timestamp of this sync operation, to be used as `lastSyncedAt` in the next sync.
-      public var timestamp: JourniaryAPI.DateTime { __data["timestamp"] }
+      public var memories: [Memory] { __data["memories"] }
+      public var deleted: Deleted { __data["deleted"] }
+      public var serverTimestamp: JourniaryAPI.DateTime { __data["serverTimestamp"] }
 
       /// Sync.Trip
       ///
@@ -90,24 +88,66 @@ public class SyncQuery: GraphQLQuery {
         public var updatedAt: JourniaryAPI.DateTime { __data["updatedAt"] }
       }
 
-      /// Sync.DeletedId
+      /// Sync.Memory
       ///
-      /// Parent Type: `Deletion`
-      public struct DeletedId: JourniaryAPI.SelectionSet {
+      /// Parent Type: `Memory`
+      public struct Memory: JourniaryAPI.SelectionSet {
         public let __data: DataDict
         public init(_dataDict: DataDict) { __data = _dataDict }
 
-        public static var __parentType: any ApolloAPI.ParentType { JourniaryAPI.Objects.Deletion }
+        public static var __parentType: any ApolloAPI.ParentType { JourniaryAPI.Objects.Memory }
         public static var __selections: [ApolloAPI.Selection] { [
           .field("__typename", String.self),
           .field("id", JourniaryAPI.ID.self),
-          .field("entityName", String.self),
+          .field("title", String.self),
+          .field("text", String?.self),
+          .field("timestamp", JourniaryAPI.DateTime.self),
+          .field("latitude", Double.self),
+          .field("longitude", Double.self),
+          .field("locationName", String?.self),
+          .field("createdAt", JourniaryAPI.DateTime.self),
+          .field("updatedAt", JourniaryAPI.DateTime.self),
+          .field("tripId", JourniaryAPI.ID.self),
         ] }
 
-        /// The ID of the deleted entity.
         public var id: JourniaryAPI.ID { __data["id"] }
-        /// The type of the deleted entity (e.g., 'Trip', 'Memory').
-        public var entityName: String { __data["entityName"] }
+        public var title: String { __data["title"] }
+        public var text: String? { __data["text"] }
+        public var timestamp: JourniaryAPI.DateTime { __data["timestamp"] }
+        public var latitude: Double { __data["latitude"] }
+        public var longitude: Double { __data["longitude"] }
+        public var locationName: String? { __data["locationName"] }
+        public var createdAt: JourniaryAPI.DateTime { __data["createdAt"] }
+        public var updatedAt: JourniaryAPI.DateTime { __data["updatedAt"] }
+        public var tripId: JourniaryAPI.ID { __data["tripId"] }
+      }
+
+      /// Sync.Deleted
+      ///
+      /// Parent Type: `DeletedIds`
+      public struct Deleted: JourniaryAPI.SelectionSet {
+        public let __data: DataDict
+        public init(_dataDict: DataDict) { __data = _dataDict }
+
+        public static var __parentType: any ApolloAPI.ParentType { JourniaryAPI.Objects.DeletedIds }
+        public static var __selections: [ApolloAPI.Selection] { [
+          .field("__typename", String.self),
+          .field("trips", [JourniaryAPI.ID].self),
+          .field("memories", [JourniaryAPI.ID].self),
+          .field("tags", [JourniaryAPI.ID].self),
+          .field("tagCategories", [JourniaryAPI.ID].self),
+          .field("mediaItems", [JourniaryAPI.ID].self),
+          .field("gpxTracks", [JourniaryAPI.ID].self),
+          .field("bucketListItems", [JourniaryAPI.ID].self),
+        ] }
+
+        public var trips: [JourniaryAPI.ID] { __data["trips"] }
+        public var memories: [JourniaryAPI.ID] { __data["memories"] }
+        public var tags: [JourniaryAPI.ID] { __data["tags"] }
+        public var tagCategories: [JourniaryAPI.ID] { __data["tagCategories"] }
+        public var mediaItems: [JourniaryAPI.ID] { __data["mediaItems"] }
+        public var gpxTracks: [JourniaryAPI.ID] { __data["gpxTracks"] }
+        public var bucketListItems: [JourniaryAPI.ID] { __data["bucketListItems"] }
       }
     }
   }

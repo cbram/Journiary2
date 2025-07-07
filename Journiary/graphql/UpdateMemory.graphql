@@ -1,0 +1,6 @@
+mutation UpdateMemory($id: String!, $input: UpdateMemoryInput!) {
+  updateMemory(id: $id, input: $input) {
+    id
+    updatedAt
+  }
+} 

@@ -162,9 +162,29 @@ class NetworkProvider {
         }
     }
 
+    // MARK: - Memory Mutations
+
+    func createMemory(input: MemoryInput) async throws -> (id: String, updatedAt: DateTime) {
+        fatalError("Codegen not yet successful")
+        // let mutation = CreateMemoryMutation(input: input)
+        // ...
+    }
+
+    func updateMemory(id: String, input: UpdateMemoryInput) async throws -> (id: String, updatedAt: DateTime) {
+        fatalError("Codegen not yet successful")
+        // let mutation = UpdateMemoryMutation(id: id, input: input)
+        // ...
+    }
+
+    func deleteMemory(id: String) async throws -> String {
+        fatalError("Codegen not yet successful")
+        // let mutation = DeleteMemoryMutation(id: id)
+        // ...
+    }
+
     func sync(lastSyncedAt: Date?) async throws -> SyncQuery.Data.Sync {
-        // Correctly handle the optional Date by mapping to GraphQLNullable<DateTime>
-        let lastSyncDateTime: GraphQLNullable<DateTime> = lastSyncedAt.map { .some(dateToDateTime($0)) } ?? .none
+        // SyncQuery expects DateTime! (required), so we provide a default timestamp for first sync
+        let lastSyncDateTime: DateTime = lastSyncedAt.map { dateToDateTime($0) } ?? dateToDateTime(Date.distantPast)
         let query = SyncQuery(lastSyncedAt: lastSyncDateTime)
 
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<SyncQuery.Data.Sync, Error>) in

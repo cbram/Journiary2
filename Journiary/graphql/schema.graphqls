@@ -1,73 +1,89 @@
-schema {
-  query: Query
-  mutation: Mutation
-}
-"The javascript `Date` as string. Type represents date and time as the ISO Date string."
-scalar DateTime
+"""
+A directive used by the Apollo iOS client to annotate operations or fragments that should be used exclusively for generating local cache mutations instead of as standard operations.
+"""
+directive @apollo_client_ios_localCacheMutation on QUERY | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION
+
+"""
+A directive used by the Apollo iOS code generation engine to generate custom import statements in operation or fragment definition files. An import statement to import a module with the name provided in the `module` argument will be added to the generated definition file.
+"""
+directive @import(
+  """The name of the module to import."""
+  module: String!
+) repeatable on QUERY | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION
+
+"""Attach extra information to a given type."""
+directive @typePolicy(
+  """
+  A selection set containing fields used to compute the cache key of an object. Referenced fields must have non-nullable scalar types. Order is important.
+  """
+  keyFields: String!
+) on OBJECT | INTERFACE
+
+"""
+Directs the executor to defer this fragment when the `if` argument is true or undefined.
+"""
+directive @defer(
+  """Deferred when true or undefined."""
+  if: Boolean
+
+  """Unique name"""
+  label: String
+) on FRAGMENT_SPREAD | INLINE_FRAGMENT
+
 type Query {
-  "Get all trips the logged-in user is a member of"
+  """Get all trips the logged-in user is a member of"""
   trips: [Trip!]!
-  "Get a single trip by ID."
+
+  """Get a single trip by ID."""
   trip(id: ID!): Trip
-  "Get all members of a trip"
+
+  """Get all members of a trip"""
   getTripMembers(tripId: ID!): [TripMembershipResponse!]!
-  "Get all memories for trips the user is a member of"
+
+  """Get all memories for trips the user is a member of"""
   memories(tripId: ID): [Memory!]!
-  "Get a single memory by ID"
+
+  """Get a single memory by ID"""
   memory(id: String!): Memory
-  "Search memories by query and optional trip filter"
+
+  """Search memories by query and optional trip filter"""
   searchMemories(tripId: ID, query: String!): [Memory!]!
-  "Generate a pre-signed URL to upload a file"
+
+  """Generate a pre-signed URL to upload a file"""
   getPresignedUploadUrl(mimeType: String!, filename: String!): PresignedUrlResponse!
-  "Generate a pre-signed URL to download a file"
+
+  """Generate a pre-signed URL to download a file"""
   getPresignedDownloadUrl(objectKey: String!): PresignedUrlResponse!
   routePoints(tripId: ID!): [RoutePoint!]!
   hello: String!
   tags: [Tag!]!
   tagCategories: [TagCategory!]!
   bucketListItems: [BucketListItem!]!
-  "Get all GPX tracks for a specific trip."
+
+  """Get all GPX tracks for a specific trip."""
   gpxTracksByTrip(tripId: ID!): [GPXTrack!]!
-  "Get a single GPX track by its ID, including all its data."
+
+  """Get a single GPX track by its ID, including all its data."""
   gpxTrack(id: ID!): GPXTrack
-  "Get current user profile"
+
+  """Get current user profile"""
   getCurrentUser: User
-  "Get all users for debugging (production: remove this)"
+
+  """Get all users for debugging (production: remove this)"""
   listUsers: AdminResponse!
-  "Performs an incremental sync."
-  sync(lastSyncedAt: DateTime): SyncResponse!
+  sync(lastSyncedAt: DateTime!): SyncResponse!
 }
 
-"Response object for the sync query"
-type SyncResponse {
-  "A list of trips that have been created or updated since the last sync."
-  trips: [Trip!]!
-  # Add other entity types here as they become syncable
-  # e.g., memories: [Memory!]!
-
-  "A list of objects that have been deleted since the last sync."
-  deletedIds: [Deletion!]!
-
-  "The timestamp of this sync operation, to be used as `lastSyncedAt` in the next sync."
-  timestamp: DateTime!
-}
-
-"Represents the deletion of an entity"
-type Deletion {
-  "The ID of the deleted entity."
-  id: ID!
-  "The type of the deleted entity (e.g., 'Trip', 'Memory')."
-  entityName: String!
-}
-
-"Represents a single journey or trip"
+"""Represents a single journey or trip"""
 type Trip {
   id: ID!
   name: String!
   tripDescription: String
-  "The name of the cover image object in the storage (e.g., MinIO)"
+
+  """The name of the cover image object in the storage (e.g., MinIO)"""
   coverImageObjectName: String
-  "A temporary URL to view the trip's cover image."
+
+  """A temporary URL to view the trip's cover image."""
   coverImageUrl: String
   travelCompanions: String
   visitedCountries: String
@@ -83,7 +99,13 @@ type Trip {
   gpxTracks: [GPXTrack!]!
   trackSegments: [TrackSegment!]!
 }
-"Represents a single memory or event within a trip"
+
+"""
+The javascript `Date` as string. Type represents date and time as the ISO Date string.
+"""
+scalar DateTime
+
+"""Represents a single memory or event within a trip"""
 type Memory {
   id: ID!
   title: String!
@@ -95,9 +117,11 @@ type Memory {
   longitude: Float!
   locationName: String
   address: String
-  "JSON string containing weather data"
+
+  """JSON string containing weather data"""
   weatherJSON: String
-  "A list of media items associated with this memory"
+
+  """A list of media items associated with this memory"""
   mediaItems: [MediaItem!]!
   tags: [Tag!]!
   tripId: ID!
@@ -107,30 +131,37 @@ type Memory {
   userId: ID!
   location: Location
 }
-"Represents a media file (photo, video, etc.) associated with a memory"
+
+"""Represents a media file (photo, video, etc.) associated with a memory"""
 type MediaItem {
   id: ID!
   mimeType: String!
   timestamp: DateTime!
-  "The order of this item within the memory's media list"
+
+  """The order of this item within the memory's media list"""
   order: Int!
   s3Key: String!
   fileSize: Int!
-  "For videos, the duration in seconds."
+
+  """For videos, the duration in seconds."""
   duration: Float
-  "The name of the thumbnail object in the storage (e.g., MinIO)"
+
+  """The name of the thumbnail object in the storage (e.g., MinIO)"""
   thumbnailS3Key: String
   memory: Memory!
   createdAt: DateTime!
   updatedAt: DateTime!
-  "A temporary URL to download the full media file."
+
+  """A temporary URL to download the full media file."""
   downloadUrl: String
-  "A temporary URL to download the thumbnail of the media file."
+
+  """A temporary URL to download the thumbnail of the media file."""
   thumbnailUrl: String
   filename: String!
   originalFilename: String
 }
-"A tag to categorize memories"
+
+"""A tag to categorize memories"""
 type Tag {
   id: ID!
   name: String!
@@ -141,7 +172,7 @@ type Tag {
   isSystemTag: Boolean!
   usageCount: Int!
   createdAt: DateTime!
-  lastUsedAt: DateTime
+  updatedAt: DateTime!
   isArchived: Boolean!
   sortOrder: Int!
   tagDescription: String
@@ -149,7 +180,8 @@ type Tag {
   relatedTags: [Tag!]
   categoryId: String
 }
-"Represents a category for grouping tags"
+
+"""Represents a category for grouping tags"""
 type TagCategory {
   id: ID!
   name: String!
@@ -160,15 +192,18 @@ type TagCategory {
   sortOrder: Int!
   isExpanded: Boolean!
   createdAt: DateTime!
+  updatedAt: DateTime!
   tags: [Tag!]!
 }
-"Represents a GPX track, which is a collection of track segments"
+
+"""Represents a GPX track, which is a collection of track segments"""
 type GPXTrack {
   id: ID!
   name: String!
   description: String
   originalFilename: String
-  "The name of the GPX file object in the storage (e.g., MinIO)"
+
+  """The name of the GPX file object in the storage (e.g., MinIO)"""
   gpxFileObjectName: String
   totalDistance: Float
   totalDuration: Float
@@ -184,12 +219,15 @@ type GPXTrack {
   creator: String
   trackType: String
   createdAt: DateTime!
+  updatedAt: DateTime!
   tripId: ID!
-  "A temporary URL to download the GPX file."
+
+  """A temporary URL to download the GPX file."""
   downloadUrl: String
   segments: [TrackSegment!]!
 }
-"A continuous segment of a GPX track, containing a series of points."
+
+"""A continuous segment of a GPX track, containing a series of points."""
 type TrackSegment {
   id: ID!
   points: [RoutePoint!]!
@@ -205,7 +243,8 @@ type TrackSegment {
   qualityLevel: String
   metadata: TrackMetadata
 }
-"Represents a single GPS point on a route"
+
+"""Represents a single GPS point on a route"""
 type RoutePoint {
   id: ID!
   latitude: Float!
@@ -215,7 +254,8 @@ type RoutePoint {
   timestamp: DateTime!
   created_at: DateTime!
 }
-"Represents metadata for a track segment"
+
+"""Represents metadata for a track segment"""
 type TrackMetadata {
   id: ID!
   transportationMode: String
@@ -229,11 +269,13 @@ type TrackMetadata {
   pauseDuration: Float
   createdAt: DateTime!
 }
+
 type Location {
   latitude: Float!
   longitude: Float!
   name: String
 }
+
 type TripMembershipResponse {
   id: ID!
   tripId: String!
@@ -244,7 +286,15 @@ type TripMembershipResponse {
   trip: Trip
   createdAt: DateTime!
 }
-"Represents a user of the application"
+
+"""The role of a user in a trip"""
+enum TripRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+"""Represents a user of the application"""
 type User {
   id: ID!
   email: String!
@@ -257,16 +307,19 @@ type User {
   lastLoginAt: DateTime
   createdAt: DateTime!
   updatedAt: DateTime!
+  roles: [String!]!
   displayName: String!
   initials: String!
   isOnline: Boolean!
 }
+
 type PresignedUrlResponse {
   uploadUrl: String!
   downloadUrl: String
   expiresIn: Float
   objectKey: String!
 }
+
 type BucketListItem {
   id: ID!
   name: String!
@@ -279,45 +332,84 @@ type BucketListItem {
   longitude2: Float
   isDone: Boolean!
   createdAt: DateTime!
+  updatedAt: DateTime!
   completedAt: DateTime
   memories: [Memory!]
 }
+
 type AdminResponse {
   success: Boolean!
   message: String!
   users: [AdminUserInfo!]!
 }
+
 type AdminUserInfo {
   id: String!
   email: String!
   passwordHash: String!
   createdAt: DateTime!
 }
+
+type SyncResponse {
+  trips: [Trip!]!
+  memories: [Memory!]!
+  tags: [Tag!]!
+  tagCategories: [TagCategory!]!
+  mediaItems: [MediaItem!]!
+  gpxTracks: [GPXTrack!]!
+  bucketListItems: [BucketListItem!]!
+  deleted: DeletedIds!
+  serverTimestamp: DateTime!
+}
+
+type DeletedIds {
+  trips: [ID!]!
+  memories: [ID!]!
+  tags: [ID!]!
+  tagCategories: [ID!]!
+  mediaItems: [ID!]!
+  gpxTracks: [ID!]!
+  bucketListItems: [ID!]!
+}
+
 type Mutation {
-  "Create a new trip"
+  """Create a new trip"""
   createTrip(input: TripInput!): Trip!
-  "Update an existing trip"
+
+  """Update an existing trip"""
   updateTrip(input: UpdateTripInput!, id: ID!): Trip!
-  "Generate a pre-signed URL to upload a trip cover image"
+
+  """Generate a pre-signed URL to upload a trip cover image"""
   generateTripCoverImageUploadUrl(contentType: String!, tripId: ID!): PresignedUrlResponse!
-  "Assign a new cover image to a trip after upload"
+
+  """Assign a new cover image to a trip after upload"""
   assignCoverImageToTrip(objectName: String!, tripId: ID!): Trip!
-  "Delete a trip"
+
+  """Delete a trip"""
   deleteTrip(id: ID!): Boolean!
-  "Share a trip with another user"
+
+  """Share a trip with another user"""
   shareTrip(permission: Permission!, email: String!, tripId: ID!): TripMembership!
-  "Claim an existing trip for the current user (adds OWNER membership if missing)"
+
+  """
+  Claim an existing trip for the current user (adds OWNER membership if missing)
+  """
   claimTrip(tripId: ID!): Trip!
-  "Create a new memory and associate it with a trip"
+
+  """Create a new memory and associate it with a trip"""
   createMemory(input: MemoryInput!): Memory!
-  "Update an existing memory"
+
+  """Update an existing memory"""
   updateMemory(input: UpdateMemoryInput!, id: String!): Memory!
-  "Delete a memory"
+
+  """Delete a memory"""
   deleteMemory(id: String!): Boolean!
-  "Generates a pre-signed URL to upload a file to MinIO."
+
+  """Generates a pre-signed URL to upload a file to MinIO."""
   createUploadUrl(mimeType: String, filename: String!): PresignedUrlResponse!
   createMediaItem(input: MediaItemInput!): MediaItem!
-  "Delete a media item"
+
+  """Delete a media item"""
   deleteMediaItem(id: String!): Boolean!
   createRoutePoints(points: [RoutePointInput!]!, tripId: ID!): [RoutePoint!]!
   createTag(input: TagInput!): Tag!
@@ -330,46 +422,36 @@ type Mutation {
   updateBucketListItem(input: BucketListItemInput!, id: ID!): BucketListItem
   completeBucketListItem(memoryId: ID!, id: ID!): BucketListItem
   deleteBucketListItem(id: ID!): Boolean!
-  "Generates a pre-signed URL to upload a GPX file."
+
+  """Generates a pre-signed URL to upload a GPX file."""
   generateGpxUploadUrl(filename: String!): PresignedUrlResponse!
-  "Creates a new GPX track record and processes the uploaded file."
+
+  """Creates a new GPX track record and processes the uploaded file."""
   createGpxTrack(input: GPXTrackInput!): GPXTrack!
-  "Processes an uploaded GPX file and creates the track data."
-  processGpxFile(trackName: String!, tripId: ID!, objectName: String!): GPXTrack!
-  "Deletes a GPX track and its associated data."
+
+  """Deletes a GPX track and its associated data."""
   deleteGpxTrack(id: ID!): Boolean!
-  "Register a new user"
+
+  """Processes an uploaded GPX file and creates the track data."""
+  processGpxFile(trackName: String!, tripId: ID!, objectName: String!): GPXTrack!
+
+  """Register a new user"""
   register(input: UserInput!): User!
-  "Log in a user"
+
+  """Log in a user"""
   login(input: UserInput!): AuthResponse!
-  "Update user profile"
+
+  """Update user profile"""
   updateUser(input: UpdateUserInput!): User!
-  "Reset user password (production: secure this endpoint)"
+
+  """Reset user password (production: secure this endpoint)"""
   resetUserPassword(newPassword: String!, email: String!): AdminResponse!
-  "Create admin user if not exists"
+
+  """Create admin user if not exists"""
   ensureAdminUser(password: String!, email: String!): AdminResponse!
 }
-type TripMembership {
-  id: ID!
-  role: TripRole!
-}
-type AuthResponse {
-  token: String!
-  user: User!
-}
-"The role of a user in a trip"
-enum TripRole {
-  OWNER
-  EDITOR
-  VIEWER
-}
-"User permission levels for trips"
-enum Permission {
-  READ
-  WRITE
-  ADMIN
-}
-"New trip data"
+
+"""New trip data"""
 input TripInput {
   name: String!
   tripDescription: String
@@ -381,7 +463,8 @@ input TripInput {
   totalDistance: Float = 0
   gpsTrackingEnabled: Boolean = true
 }
-"Data to update an existing trip"
+
+"""Data to update an existing trip"""
 input UpdateTripInput {
   name: String
   tripDescription: String
@@ -393,7 +476,20 @@ input UpdateTripInput {
   totalDistance: Float
   gpsTrackingEnabled: Boolean
 }
-"New memory data"
+
+type TripMembership {
+  id: ID!
+  role: TripRole!
+}
+
+"""User permission levels for trips"""
+enum Permission {
+  READ
+  WRITE
+  ADMIN
+}
+
+"""New memory data"""
 input MemoryInput {
   title: String!
   content: String
@@ -402,18 +498,24 @@ input MemoryInput {
   longitude: Float
   address: String
   location: LocationInput
-  "The ID of the trip this memory belongs to"
+
+  """The ID of the trip this memory belongs to"""
   tripId: ID!
-  "A list of Tag IDs to associate with this memory"
+
+  """A list of Tag IDs to associate with this memory"""
   tagIds: [ID!]
 }
-"Represents a geographic location (latitude/longitude) plus optional name"
+
+"""
+Represents a geographic location (latitude/longitude) plus optional name
+"""
 input LocationInput {
   latitude: Float!
   longitude: Float!
   name: String
 }
-"Update memory data"
+
+"""Update memory data"""
 input UpdateMemoryInput {
   title: String
   content: String
@@ -422,29 +524,39 @@ input UpdateMemoryInput {
   longitude: Float
   location: LocationInput
   address: String
-  "A list of Tag IDs to associate with this memory"
+
+  """A list of Tag IDs to associate with this memory"""
   tagIds: [String!]
 }
-"Input data for creating a new MediaItem"
+
+"""Input data for creating a new MediaItem"""
 input MediaItemInput {
-  "The name of the object in the storage (e.g., from createUploadUrl)"
+  """The name of the object in the storage (e.g., from createUploadUrl)"""
   objectName: String!
-  "The name of the thumbnail object in the storage"
+
+  """The name of the thumbnail object in the storage"""
   thumbnailObjectName: String
-  "The ID of the memory this media item belongs to"
+
+  """The ID of the memory this media item belongs to"""
   memoryId: String!
-  "The type of media, e.g., 'image', 'video'."
+
+  """The type of media, e.g., 'image', 'video'."""
   mediaType: String!
-  "The timestamp of when the media was created"
+
+  """The timestamp of when the media was created"""
   timestamp: DateTime!
-  "The order of this item within the memory's media list"
+
+  """The order of this item within the memory's media list"""
   order: Int!
-  "File size in bytes"
+
+  """File size in bytes"""
   filesize: Int!
-  "For videos, the duration in seconds."
+
+  """For videos, the duration in seconds."""
   duration: Int
 }
-"Input data to create a new RoutePoint"
+
+"""Input data to create a new RoutePoint"""
 input RoutePointInput {
   latitude: Float!
   longitude: Float!
@@ -452,33 +564,39 @@ input RoutePointInput {
   speed: Float
   timestamp: DateTime!
 }
-"Input data for creating a new Tag"
+
+"""Input data for creating a new Tag"""
 input TagInput {
   name: String!
   emoji: String
   color: String
   tagDescription: String
-  "The ID of the category this tag belongs to"
+
+  """The ID of the category this tag belongs to"""
   categoryId: ID
 }
-"Update tag data"
+
+"""Update tag data"""
 input UpdateTagInput {
   name: String
   color: String
   categoryId: ID
 }
-"Input data for creating a new Tag Category"
+
+"""Input data for creating a new Tag Category"""
 input TagCategoryInput {
   name: String!
   emoji: String
   color: String
 }
-"Update tag category data"
+
+"""Update tag category data"""
 input UpdateTagCategoryInput {
   name: String
   color: String
   icon: String
 }
+
 input BucketListItemInput {
   name: String!
   country: String
@@ -490,34 +608,40 @@ input BucketListItemInput {
   longitude2: Float
   isDone: Boolean
 }
-"Input data for creating a new GPXTrack"
+
+"""Input data for creating a new GPXTrack"""
 input GPXTrackInput {
-  "The name of the GPX track"
+  """The name of the GPX track"""
   name: String!
-  "The name of the uploaded GPX file in the object storage"
+
+  """The name of the uploaded GPX file in the object storage"""
   gpxFileObjectName: String
   originalFilename: String
-  "The ID of the trip this GPX track belongs to"
+
+  """The ID of the trip this GPX track belongs to"""
   tripId: ID!
-  "Optional ID of the memory this GPX track is associated with"
+
+  """Optional ID of the memory this GPX track is associated with"""
   memoryId: ID
   creator: String
   trackType: String
 }
-"Input data for user registration and login"
+
+"""Input data for user registration and login"""
 input UserInput {
   email: String!
   password: String!
 }
-"Update user data"
+
+type AuthResponse {
+  token: String!
+  user: User!
+}
+
+"""Update user data"""
 input UpdateUserInput {
   username: String
   email: String
   firstName: String
   lastName: String
 }
-"Exposes a URL that specifies the behaviour of this scalar."
-directive @specifiedBy(
-    "The URL that specifies the behaviour of this scalar."
-    url: String!
-  ) on SCALAR

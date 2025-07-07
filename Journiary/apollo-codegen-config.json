@@ -8,6 +8,20 @@
       "**/*.graphqls"
     ]
   },
+  "schemaDownload": {
+    "downloadMethod": {
+      "introspection": {
+        "endpointURL": "http://localhost:4001/graphql",
+        "httpMethod": {
+          "POST": {}
+        },
+        "includeDeprecatedInputValues": false,
+        "outputFormat": "SDL"
+      }
+    },
+    "downloadTimeout": 60,
+    "outputPath": "./graphql/schema.graphqls"
+  },
   "output": {
     "testMocks": {
       "none": {}

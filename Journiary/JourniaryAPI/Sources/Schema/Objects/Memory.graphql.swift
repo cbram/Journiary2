@@ -4,9 +4,9 @@
 import ApolloAPI
 
 public extension Objects {
-  /// Represents the deletion of an entity
-  static let Deletion = ApolloAPI.Object(
-    typename: "Deletion",
+  /// Represents a single memory or event within a trip
+  static let Memory = ApolloAPI.Object(
+    typename: "Memory",
     implementedInterfaces: [],
     keyFields: nil
   )
