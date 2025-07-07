@@ -456,6 +456,239 @@ class NetworkProvider {
         }
     }
 
+    // MARK: - Tag Mutations
+
+    func createTag(input: TagInput) async throws -> (id: String, updatedAt: DateTime?) {
+        let mutation = CreateTagMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime?), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 15, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createTag"]))
+                        return
+                    }
+                    
+                    guard let tag = graphQLResult.data?.createTag else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 15, userInfo: [NSLocalizedDescriptionKey: "Failed to create tag, no data received."]))
+                        return
+                    }
+                    // Tag responses don't include updatedAt, so we return nil
+                    continuation.resume(returning: (id: tag.id, updatedAt: nil))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func updateTag(id: String, input: UpdateTagInput) async throws -> (id: String, updatedAt: DateTime?) {
+        let mutation = UpdateTagMutation(id: id, input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime?), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 16, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for updateTag"]))
+                        return
+                    }
+                    
+                    guard let tag = graphQLResult.data?.updateTag else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 16, userInfo: [NSLocalizedDescriptionKey: "Failed to update tag, no data received."]))
+                        return
+                    }
+                    // Tag responses don't include updatedAt, so we return nil
+                    continuation.resume(returning: (id: tag.id, updatedAt: nil))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteTag(id: String) async throws -> String {
+        let mutation = DeleteTagMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 17, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteTag"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.deleteTag, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 17, userInfo: [NSLocalizedDescriptionKey: "Failed to delete tag, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: - TagCategory Mutations
+
+    func createTagCategory(input: TagCategoryInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = CreateTagCategoryMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 18, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createTagCategory"]))
+                        return
+                    }
+                    
+                    guard let tagCategory = graphQLResult.data?.createTagCategory else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 18, userInfo: [NSLocalizedDescriptionKey: "Failed to create tag category, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: tagCategory.id, updatedAt: tagCategory.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func updateTagCategory(id: String, input: UpdateTagCategoryInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = UpdateTagCategoryMutation(id: id, input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 19, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for updateTagCategory"]))
+                        return
+                    }
+                    
+                    guard let tagCategory = graphQLResult.data?.updateTagCategory else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 19, userInfo: [NSLocalizedDescriptionKey: "Failed to update tag category, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: tagCategory.id, updatedAt: tagCategory.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteTagCategory(id: String) async throws -> String {
+        let mutation = DeleteTagCategoryMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 20, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteTagCategory"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.deleteTagCategory, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 20, userInfo: [NSLocalizedDescriptionKey: "Failed to delete tag category, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    // MARK: - BucketListItem Mutations
+
+    func createBucketListItem(input: BucketListItemInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = CreateBucketListItemMutation(input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 21, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for createBucketListItem"]))
+                        return
+                    }
+                    
+                    guard let bucketListItem = graphQLResult.data?.createBucketListItem else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 21, userInfo: [NSLocalizedDescriptionKey: "Failed to create bucket list item, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: bucketListItem.id, updatedAt: bucketListItem.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func updateBucketListItem(id: String, input: BucketListItemInput) async throws -> (id: String, updatedAt: DateTime) {
+        let mutation = UpdateBucketListItemMutation(id: id, input: input)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(id: String, updatedAt: DateTime), Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 22, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for updateBucketListItem"]))
+                        return
+                    }
+                    
+                    guard let bucketListItem = graphQLResult.data?.updateBucketListItem else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 22, userInfo: [NSLocalizedDescriptionKey: "Failed to update bucket list item, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: (id: bucketListItem.id, updatedAt: bucketListItem.updatedAt))
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func deleteBucketListItem(id: String) async throws -> String {
+        let mutation = DeleteBucketListItemMutation(id: id)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 23, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for deleteBucketListItem"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.deleteBucketListItem, success else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 23, userInfo: [NSLocalizedDescriptionKey: "Failed to delete bucket list item, server returned failure."]))
+                        return
+                    }
+                    continuation.resume(returning: id)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private func dateToDateTime(_ date: Date) -> DateTime {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

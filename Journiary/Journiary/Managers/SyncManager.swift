@@ -100,21 +100,39 @@ final class SyncManager {
         )
         
         // Upload MediaItems (string-based sync status)
-        try await uploadStringBasedEntities(
+        try await uploadStringBasedEntitiesForMediaItem(
             fetchRequest: MediaItem.fetchRequest(),
+            context: context
+        )
+        
+        // Upload GPXTracks (string-based sync status) 
+        try await uploadStringBasedEntitiesForGPX(
+            fetchRequest: GPXTrack.fetchRequest(),
+            context: context
+        )
+        
+        // Upload Tags (using special method since Tag responses don't include updatedAt)
+        try await uploadTagEntities(
+            fetchRequest: Tag.fetchRequest(),
+            context: context
+        )
+        
+        // Upload TagCategories (string-based sync status)
+        try await uploadStringBasedEntities(
+            fetchRequest: TagCategory.fetchRequest(),
             context: context,
             create: { input in
-                let result = try await self.networkProvider.createMediaItem(input: input as! MediaItemInput)
+                let result = try await self.networkProvider.createTagCategory(input: input as! TagCategoryInput)
                 return (result.id, result.updatedAt)
             }
         )
         
-        // Upload GPXTracks (string-based sync status) 
+        // Upload BucketListItems (string-based sync status)
         try await uploadStringBasedEntities(
-            fetchRequest: GPXTrack.fetchRequest(),
+            fetchRequest: BucketListItem.fetchRequest(),
             context: context,
             create: { input in
-                let result = try await self.networkProvider.createGPXTrack(input: input as! GPXTrackInput)
+                let result = try await self.networkProvider.createBucketListItem(input: input as! BucketListItemInput)
                 return (result.id, result.updatedAt)
             }
         )
@@ -167,6 +185,21 @@ final class SyncManager {
             try await self.deleteLocalObjects(entityName: "GPXTrack", serverIds: deletedIds.gpxTracks.map { $0 }, context: context)
         }
         
+        // Process tag deletions
+        if !deletedIds.tags.isEmpty {
+            try await self.deleteLocalObjects(entityName: "Tag", serverIds: deletedIds.tags.map { $0 }, context: context)
+        }
+        
+        // Process tag category deletions
+        if !deletedIds.tagCategories.isEmpty {
+            try await self.deleteLocalObjects(entityName: "TagCategory", serverIds: deletedIds.tagCategories.map { $0 }, context: context)
+        }
+        
+        // Process bucket list item deletions
+        if !deletedIds.bucketListItems.isEmpty {
+            try await self.deleteLocalObjects(entityName: "BucketListItem", serverIds: deletedIds.bucketListItems.map { $0 }, context: context)
+        }
+        
         // 3. Process creations and updates
         // The trips array is non-optional in the schema, so we can iterate directly.
         try await upsertTrips(syncData.trips, context: context)
@@ -187,6 +220,24 @@ final class SyncManager {
         let gpxTracks = syncData.gpxTracks
         if !gpxTracks.isEmpty {
             try await upsertGPXTracks(gpxTracks, context: context)
+        }
+        
+        // Process tags if they exist
+        let tags = syncData.tags
+        if !tags.isEmpty {
+            try await upsertTags(tags, context: context)
+        }
+        
+        // Process tag categories if they exist
+        let tagCategories = syncData.tagCategories
+        if !tagCategories.isEmpty {
+            try await upsertTagCategories(tagCategories, context: context)
+        }
+        
+        // Process bucket list items if they exist
+        let bucketListItems = syncData.bucketListItems
+        if !bucketListItems.isEmpty {
+            try await upsertBucketListItems(bucketListItems, context: context)
         }
         
         // 4. Save changes to the persistent store
@@ -272,7 +323,7 @@ final class SyncManager {
                 mediaItemToUpdate.duration = Double(remoteMediaItem.duration ?? 0)
                 mediaItemToUpdate.createdAt = self.dateTimeToDate(remoteMediaItem.createdAt) ?? Date()
                 mediaItemToUpdate.updatedAt = self.dateTimeToDate(remoteMediaItem.updatedAt) ?? Date()
-                mediaItemToUpdate.syncStatusEnum = .inSync
+                mediaItemToUpdate.syncStatus = String(SyncStatus.inSync.rawValue)
                 
                 // Handle Memory relationship
                 let memory = remoteMediaItem.memory
@@ -315,7 +366,7 @@ final class SyncManager {
                 gpxTrackToUpdate.trackType = remoteGPXTrack.trackType
                 gpxTrackToUpdate.createdAt = self.dateTimeToDate(remoteGPXTrack.createdAt) ?? Date()
                 gpxTrackToUpdate.updatedAt = self.dateTimeToDate(remoteGPXTrack.updatedAt) ?? Date()
-                gpxTrackToUpdate.syncStatusEnum = .inSync
+                gpxTrackToUpdate.syncStatus = String(SyncStatus.inSync.rawValue)
                 
                 // Handle Trip relationship (GPXTrack is connected to Trip via Memory)
                 let tripId = remoteGPXTrack.tripId
@@ -378,6 +429,12 @@ final class SyncManager {
             fetchRequest = MediaItem.fetchRequest() as! NSFetchRequest<NSManagedObject>
         case "GPXTrack":
             fetchRequest = GPXTrack.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        case "Tag":
+            fetchRequest = Tag.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        case "TagCategory":
+            fetchRequest = TagCategory.fetchRequest() as! NSFetchRequest<NSManagedObject>
+        case "BucketListItem":
+            fetchRequest = BucketListItem.fetchRequest() as! NSFetchRequest<NSManagedObject>
         default:
             print("Unknown entity type for deletion: \(entityName)")
             return
@@ -409,6 +466,7 @@ final class SyncManager {
 
         for object in objectsToUpload {
             let input = object.toGraphQLInput()
+            let objectID = object.objectID // Capture the ObjectID
             do {
                 var result: (id: String, updatedAt: DateTime)
 
@@ -422,9 +480,11 @@ final class SyncManager {
 
                 // Update local object with server data after successful upload
                 try await context.perform {
-                    object.serverId = result.id
-                    object.updatedAt = self.dateTimeToDate(result.updatedAt)
-                    object.syncStatus = .inSync
+                    if var managedObject = try? context.existingObject(with: objectID) as? T {
+                        managedObject.serverId = result.id
+                        managedObject.updatedAt = self.dateTimeToDate(result.updatedAt)
+                        managedObject.syncStatus = .inSync
+                    }
                 }
             } catch {
                 print("Failed to upload \(T.entity().name ?? "entity") with local ID \(object.objectID): \(error)")
@@ -432,7 +492,7 @@ final class SyncManager {
         }
     }
     
-    private func uploadStringBasedEntities<T: StringBasedSynchronizable>(
+    private func uploadStringBasedEntities<T: StringSynchronizable>(
         fetchRequest: NSFetchRequest<T>,
         context: NSManagedObjectContext,
         create: @escaping (Any) async throws -> (id: String, updatedAt: DateTime)
@@ -445,21 +505,26 @@ final class SyncManager {
 
         for object in objectsToUpload {
             let input = object.toGraphQLInput()
+            let objectID = object.objectID // Capture the ObjectID
             do {
                 let result = try await create(input)
                 print("Created \(T.entity().name ?? "entity"): \(result.id)")
 
                 // Update local object with server data after successful upload
                 try await context.perform {
-                    object.serverId = result.id
-                    object.updatedAt = self.dateTimeToDate(result.updatedAt)
-                    object.syncStatusEnum = .inSync
+                    if var managedObject = try? context.existingObject(with: objectID) as? T {
+                        managedObject.serverId = result.id
+                        managedObject.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                        managedObject.synchronizationStatus = .inSync
+                    }
                 }
             } catch {
                 print("Failed to upload \(T.entity().name ?? "entity") with local ID \(object.objectID): \(error)")
                 // Set status to failed upload
                 try await context.perform {
-                    object.syncStatusEnum = .needsUpload // Keep trying for now
+                    if var managedObject = try? context.existingObject(with: objectID) as? T {
+                        managedObject.synchronizationStatus = .needsUpload // Keep trying for now
+                    }
                 }
             }
         }
@@ -488,6 +553,15 @@ final class SyncManager {
                 case "GPXTrack":
                     _ = try await self.networkProvider.deleteGPXTrack(id: entityId)
                     print("Deleted GPX track with id: \(entityId) on server.")
+                case "Tag":
+                    _ = try await self.networkProvider.deleteTag(id: entityId)
+                    print("Deleted tag with id: \(entityId) on server.")
+                case "TagCategory":
+                    _ = try await self.networkProvider.deleteTagCategory(id: entityId)
+                    print("Deleted tag category with id: \(entityId) on server.")
+                case "BucketListItem":
+                    _ = try await self.networkProvider.deleteBucketListItem(id: entityId)
+                    print("Deleted bucket list item with id: \(entityId) on server.")
                 default:
                     print("Unknown entity type for deletion: \(entityName)")
                 }
@@ -517,6 +591,242 @@ final class SyncManager {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: dateTime)
+    }
+    
+    /// Special upload method for Tags since their responses don't include updatedAt
+    private func uploadTagEntities(
+        fetchRequest: NSFetchRequest<Tag>,
+        context: NSManagedObjectContext
+    ) async throws {
+        
+        let objectsToUpload = try await context.perform { () -> [Tag] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                var result: (id: String, updatedAt: DateTime?)
+
+                if let serverId = object.serverId, !serverId.isEmpty {
+                    result = try await networkProvider.updateTag(id: serverId, input: input as! UpdateTagInput)
+                    print("Updated Tag: \(result.id)")
+                } else {
+                    result = try await networkProvider.createTag(input: input as! TagInput)
+                    print("Created Tag: \(result.id)")
+                }
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    // For tags, we set updatedAt to current time since server doesn't return it
+                    object.setValue(Date(), forKey: "updatedAt")
+                    object.synchronizationStatus = .inSync
+                }
+            } catch {
+                print("Failed to upload Tag with local ID \(object.objectID): \(error)")
+            }
+        }
+    }
+    
+    /// Upload method for TagCategories with string-based sync status
+    private func uploadStringBasedTagCategoryEntities(
+        fetchRequest: NSFetchRequest<TagCategory>,
+        context: NSManagedObjectContext
+    ) async throws {
+        
+        let objectsToUpload = try await context.perform { () -> [TagCategory] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                var result: (id: String, updatedAt: DateTime)
+
+                if let serverId = object.serverId, !serverId.isEmpty {
+                    result = try await networkProvider.updateTagCategory(id: serverId, input: input as! UpdateTagCategoryInput)
+                    print("Updated TagCategory: \(result.id)")
+                } else {
+                    result = try await networkProvider.createTagCategory(input: input as! TagCategoryInput)
+                    print("Created TagCategory: \(result.id)")
+                }
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                    object.synchronizationStatus = .inSync
+                }
+            } catch {
+                print("Failed to upload TagCategory with local ID \(object.objectID): \(error)")
+            }
+        }
+    }
+    
+    /// Upload method for BucketListItems with string-based sync status
+    private func uploadStringBasedBucketListItemEntities(
+        fetchRequest: NSFetchRequest<BucketListItem>,
+        context: NSManagedObjectContext
+    ) async throws {
+        
+        let objectsToUpload = try await context.perform { () -> [BucketListItem] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                var result: (id: String, updatedAt: DateTime)
+
+                if let serverId = object.serverId, !serverId.isEmpty {
+                    result = try await networkProvider.updateBucketListItem(id: serverId, input: input as! BucketListItemInput)
+                    print("Updated BucketListItem: \(result.id)")
+                } else {
+                    result = try await networkProvider.createBucketListItem(input: input as! BucketListItemInput)
+                    print("Created BucketListItem: \(result.id)")
+                }
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                    object.synchronizationStatus = .inSync
+                }
+            } catch {
+                print("Failed to upload BucketListItem with local ID \(object.objectID): \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Entity Upsert Methods
+    
+    private func upsertTags(_ tags: [SyncQuery.Data.Sync.Tag], context: NSManagedObjectContext) async throws {
+        for remoteTag in tags {
+            try await context.perform {
+                let fetchRequest = Tag.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteTag.id)
+                fetchRequest.fetchLimit = 1
+
+                let localTag = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localTag = localTag, let localUpdatedAt = localTag.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteTag.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for Tag \(remoteTag.id), local version is newer or same.")
+                    return
+                }
+
+                let tagToUpdate = localTag ?? Tag(context: context)
+                
+                // Set ID if creating new entity
+                if localTag == nil {
+                    tagToUpdate.id = UUID()
+                }
+                
+                tagToUpdate.serverId = remoteTag.id
+                tagToUpdate.name = remoteTag.name
+                tagToUpdate.emoji = remoteTag.emoji
+                tagToUpdate.color = remoteTag.color
+                tagToUpdate.isSystemTag = remoteTag.isSystemTag
+                tagToUpdate.usageCount = Int32(remoteTag.usageCount)
+                tagToUpdate.createdAt = self.dateTimeToDate(remoteTag.createdAt) ?? Date()
+                tagToUpdate.updatedAt = self.dateTimeToDate(remoteTag.updatedAt) ?? Date()
+                tagToUpdate.syncStatus = String(SyncStatus.inSync.rawValue)
+                
+                // Set TagCategory relationship if categoryId is provided
+                if let categoryId = remoteTag.categoryId {
+                    let categoryFetchRequest = TagCategory.fetchRequest()
+                    categoryFetchRequest.predicate = NSPredicate(format: "serverId == %@", categoryId)
+                    categoryFetchRequest.fetchLimit = 1
+                    
+                    if let tagCategory = try context.fetch(categoryFetchRequest).first {
+                        tagToUpdate.category = tagCategory
+                    }
+                } else {
+                    tagToUpdate.category = nil
+                }
+            }
+        }
+    }
+    
+    private func upsertTagCategories(_ tagCategories: [SyncQuery.Data.Sync.TagCategory], context: NSManagedObjectContext) async throws {
+        for remoteTagCategory in tagCategories {
+            try await context.perform {
+                let fetchRequest = TagCategory.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteTagCategory.id)
+                fetchRequest.fetchLimit = 1
+
+                let localTagCategory = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localTagCategory = localTagCategory, let localUpdatedAt = localTagCategory.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteTagCategory.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for TagCategory \(remoteTagCategory.id), local version is newer or same.")
+                    return
+                }
+
+                let tagCategoryToUpdate = localTagCategory ?? TagCategory(context: context)
+                
+                // Set ID if creating new entity
+                if localTagCategory == nil {
+                    tagCategoryToUpdate.id = UUID()
+                }
+                
+                tagCategoryToUpdate.serverId = remoteTagCategory.id
+                tagCategoryToUpdate.name = remoteTagCategory.name
+                tagCategoryToUpdate.displayName = remoteTagCategory.displayName
+                tagCategoryToUpdate.emoji = remoteTagCategory.emoji
+                tagCategoryToUpdate.color = remoteTagCategory.color
+                tagCategoryToUpdate.isSystemCategory = remoteTagCategory.isSystemCategory
+                tagCategoryToUpdate.sortOrder = Int32(remoteTagCategory.sortOrder)
+                tagCategoryToUpdate.isExpanded = remoteTagCategory.isExpanded
+                tagCategoryToUpdate.createdAt = self.dateTimeToDate(remoteTagCategory.createdAt) ?? Date()
+                tagCategoryToUpdate.updatedAt = self.dateTimeToDate(remoteTagCategory.updatedAt) ?? Date()
+                tagCategoryToUpdate.syncStatus = String(SyncStatus.inSync.rawValue)
+            }
+        }
+    }
+    
+    private func upsertBucketListItems(_ bucketListItems: [SyncQuery.Data.Sync.BucketListItem], context: NSManagedObjectContext) async throws {
+        for remoteBucketListItem in bucketListItems {
+            try await context.perform {
+                let fetchRequest = BucketListItem.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteBucketListItem.id)
+                fetchRequest.fetchLimit = 1
+
+                let localBucketListItem = try context.fetch(fetchRequest).first
+
+                // Last-Write-Wins: only update if server data is newer
+                if let localBucketListItem = localBucketListItem, let localUpdatedAt = localBucketListItem.updatedAt, let remoteUpdatedAt = self.dateTimeToDate(remoteBucketListItem.updatedAt), remoteUpdatedAt <= localUpdatedAt {
+                    print("Skipping update for BucketListItem \(remoteBucketListItem.id), local version is newer or same.")
+                    return
+                }
+
+                let bucketListItemToUpdate = localBucketListItem ?? BucketListItem(context: context)
+                
+                // Set ID if creating new entity
+                if localBucketListItem == nil {
+                    bucketListItemToUpdate.id = UUID()
+                }
+                
+                bucketListItemToUpdate.serverId = remoteBucketListItem.id
+                bucketListItemToUpdate.name = remoteBucketListItem.name
+                bucketListItemToUpdate.country = remoteBucketListItem.country
+                bucketListItemToUpdate.region = remoteBucketListItem.region
+                bucketListItemToUpdate.type = remoteBucketListItem.type
+                bucketListItemToUpdate.latitude1 = remoteBucketListItem.latitude1 ?? 0.0
+                bucketListItemToUpdate.longitude1 = remoteBucketListItem.longitude1 ?? 0.0
+                bucketListItemToUpdate.latitude2 = remoteBucketListItem.latitude2 ?? 0.0
+                bucketListItemToUpdate.longitude2 = remoteBucketListItem.longitude2 ?? 0.0
+                bucketListItemToUpdate.isDone = remoteBucketListItem.isDone
+                bucketListItemToUpdate.completedAt = self.dateTimeToDate(remoteBucketListItem.completedAt)
+                bucketListItemToUpdate.createdAt = self.dateTimeToDate(remoteBucketListItem.createdAt) ?? Date()
+                bucketListItemToUpdate.updatedAt = self.dateTimeToDate(remoteBucketListItem.updatedAt) ?? Date()
+                bucketListItemToUpdate.syncStatus = String(SyncStatus.inSync.rawValue)
+            }
+        }
     }
     
     // MARK: - File Synchronization Phase
@@ -722,7 +1032,7 @@ final class SyncManager {
     private func findMediaItemsNeedingUpload(context: NSManagedObjectContext) async throws -> [MediaItem] {
         return try await context.perform {
             let fetchRequest: NSFetchRequest<MediaItem> = MediaItem.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND filename != nil AND serverID == nil", "1") // 1 = needsUpload
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND filename != nil AND serverID == nil", String(SyncStatus.needsUpload.rawValue)) // 1 = needsUpload
             return try context.fetch(fetchRequest)
         }
     }
@@ -731,7 +1041,7 @@ final class SyncManager {
     private func findGPXTracksNeedingUpload(context: NSManagedObjectContext) async throws -> [GPXTrack] {
         return try await context.perform {
             let fetchRequest: NSFetchRequest<GPXTrack> = GPXTrack.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND localFileURL != nil AND serverID == nil", "1") // 1 = needsUpload
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND localFileURL != nil AND serverID == nil", String(SyncStatus.needsUpload.rawValue)) // 1 = needsUpload
             return try context.fetch(fetchRequest)
         }
     }
@@ -947,5 +1257,67 @@ extension GPXTrack: StringBasedSynchronizable {
             creator: self.creator != nil ? GraphQLNullable<String>.some(self.creator!) : GraphQLNullable<String>.none,
             trackType: self.trackType != nil ? GraphQLNullable<String>.some(self.trackType!) : GraphQLNullable<String>.none
         )
+    }
+}
+
+// MARK: - Missing Upload Methods for MediaItem and GPXTrack
+
+extension SyncManager {
+    /// Upload method for MediaItems with string-based sync status
+    private func uploadStringBasedEntitiesForMediaItem(
+        fetchRequest: NSFetchRequest<MediaItem>,
+        context: NSManagedObjectContext
+    ) async throws {
+        
+        let objectsToUpload = try await context.perform { () -> [MediaItem] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                let result = try await networkProvider.createMediaItem(input: input as! MediaItemInput)
+                print("Created MediaItem: \(result.id)")
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                    object.syncStatusEnum = .inSync
+                }
+            } catch {
+                print("Failed to upload MediaItem with local ID \(object.objectID): \(error)")
+            }
+        }
+    }
+    
+    /// Upload method for GPXTracks with string-based sync status
+    private func uploadStringBasedEntitiesForGPX(
+        fetchRequest: NSFetchRequest<GPXTrack>,
+        context: NSManagedObjectContext
+    ) async throws {
+        
+        let objectsToUpload = try await context.perform { () -> [GPXTrack] in
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
+            return try context.fetch(fetchRequest)
+        }
+
+        for object in objectsToUpload {
+            let input = object.toGraphQLInput()
+            do {
+                let result = try await networkProvider.createGPXTrack(input: input as! GPXTrackInput)
+                print("Created GPXTrack: \(result.id)")
+
+                // Update local object with server data after successful upload
+                try await context.perform {
+                    object.serverId = result.id
+                    object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                    object.syncStatusEnum = .inSync
+                }
+            } catch {
+                print("Failed to upload GPXTrack with local ID \(object.objectID): \(error)")
+            }
+        }
     }
 }
