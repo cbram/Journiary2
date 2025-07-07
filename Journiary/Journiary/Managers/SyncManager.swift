@@ -373,7 +373,7 @@ final class SyncManager {
                 let tripFetchRequest = Trip.fetchRequest()
                 tripFetchRequest.predicate = NSPredicate(format: "serverId == %@", tripId)
                 tripFetchRequest.fetchLimit = 1
-                if let trip = try context.fetch(tripFetchRequest).first {
+                if try context.fetch(tripFetchRequest).first != nil {
                     // Note: GPXTrack doesn't have direct trip relation in Core Data
                     // The relationship is established via Memory
                 }
@@ -479,11 +479,14 @@ final class SyncManager {
                 }
 
                 // Update local object with server data after successful upload
-                try await context.perform {
-                    if var managedObject = try? context.existingObject(with: objectID) as? T {
+                await context.perform {
+                    do {
+                        let managedObject = try context.existingObject(with: objectID) as! T
                         managedObject.serverId = result.id
                         managedObject.updatedAt = self.dateTimeToDate(result.updatedAt)
                         managedObject.syncStatus = .inSync
+                    } catch {
+                        print("Failed to update local object after successful upload: \(error)")
                     }
                 }
             } catch {
@@ -511,19 +514,23 @@ final class SyncManager {
                 print("Created \(T.entity().name ?? "entity"): \(result.id)")
 
                 // Update local object with server data after successful upload
-                try await context.perform {
-                    if var managedObject = try? context.existingObject(with: objectID) as? T {
-                        managedObject.serverId = result.id
-                        managedObject.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
-                        managedObject.synchronizationStatus = .inSync
+                await context.perform {
+                    do {
+                        if var managedObject = try? context.existingObject(with: objectID) as? T {
+                            managedObject.serverId = result.id
+                            managedObject.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
+                            managedObject.synchronizationStatus = .inSync
+                        }
                     }
                 }
             } catch {
                 print("Failed to upload \(T.entity().name ?? "entity") with local ID \(object.objectID): \(error)")
                 // Set status to failed upload
-                try await context.perform {
-                    if var managedObject = try? context.existingObject(with: objectID) as? T {
-                        managedObject.synchronizationStatus = .needsUpload // Keep trying for now
+                await context.perform {
+                    do {
+                        if var managedObject = try? context.existingObject(with: objectID) as? T {
+                            managedObject.synchronizationStatus = .needsUpload // Keep trying for now
+                        }
                     }
                 }
             }
@@ -567,7 +574,7 @@ final class SyncManager {
                 }
                 
                 // If server deletion was successful, delete the log entry
-                try await context.perform {
+                await context.perform {
                     context.delete(deletion)
                 }
             } catch {
@@ -618,7 +625,7 @@ final class SyncManager {
                 }
 
                 // Update local object with server data after successful upload
-                try await context.perform {
+                await context.perform {
                     object.serverId = result.id
                     // For tags, we set updatedAt to current time since server doesn't return it
                     object.setValue(Date(), forKey: "updatedAt")
@@ -655,7 +662,7 @@ final class SyncManager {
                 }
 
                 // Update local object with server data after successful upload
-                try await context.perform {
+                await context.perform {
                     object.serverId = result.id
                     object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
                     object.synchronizationStatus = .inSync
@@ -691,7 +698,7 @@ final class SyncManager {
                 }
 
                 // Update local object with server data after successful upload
-                try await context.perform {
+                await context.perform {
                     object.serverId = result.id
                     object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
                     object.synchronizationStatus = .inSync
@@ -1281,7 +1288,7 @@ extension SyncManager {
                 print("Created MediaItem: \(result.id)")
 
                 // Update local object with server data after successful upload
-                try await context.perform {
+                await context.perform {
                     object.serverId = result.id
                     object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
                     object.syncStatusEnum = .inSync
@@ -1310,7 +1317,7 @@ extension SyncManager {
                 print("Created GPXTrack: \(result.id)")
 
                 // Update local object with server data after successful upload
-                try await context.perform {
+                await context.perform {
                     object.serverId = result.id
                     object.setValue(self.dateTimeToDate(result.updatedAt), forKey: "updatedAt")
                     object.syncStatusEnum = .inSync

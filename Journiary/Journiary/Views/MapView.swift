@@ -70,7 +70,8 @@ struct MapView: View {
     // Kartenwahl (wird jetzt aus UserDefaults gelesen)
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     
-    var tripToEdit: Trip? = nil
+    // Trip to edit (for track editing mode)
+    var tripToEdit: Trip?
     
     var body: some View {
         ZStack {

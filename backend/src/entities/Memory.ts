@@ -37,7 +37,7 @@ export class Memory {
      * Legacy-Feldname: `timestamp` – Neuer Alias: `date`
      */
     @Field()
-    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
+    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
     timestamp!: Date;
 
     @Field(() => Date, { name: "date" })

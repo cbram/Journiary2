@@ -82,7 +82,7 @@ struct TripView: View {
                 }
             }
             .refreshable {
-                await updateCurrentLocation()
+                await syncAndUpdateLocation()
             }
         }
         .id(refreshID)
@@ -194,6 +194,16 @@ struct TripView: View {
         } else {
             return String(format: "%dm", minutes)
         }
+    }
+    
+    @MainActor
+    private func syncAndUpdateLocation() async {
+        print("TripView: Initiating sync and location update...")
+        // Sync zuerst ausführen
+        await SyncManager.shared.sync()
+        // Dann Location aktualisieren
+        await updateCurrentLocation()
+        print("TripView: Sync and location update completed.")
     }
     
     @MainActor

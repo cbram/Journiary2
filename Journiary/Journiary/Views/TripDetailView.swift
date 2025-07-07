@@ -158,10 +158,11 @@ struct TripDetailView: View {
             }
             .sheet(isPresented: $showMapEditView) {
                 MapView(tripToEdit: trip)
+                    .environmentObject(locationManager)
             }
             .sheet(isPresented: $showingMemoriesSheet) {
                 NavigationView {
-                    MemoriesView(trip: trip, oldestFirst: true)
+                    MemoriesView(trip: trip)
                 }
             }
     }

@@ -29,6 +29,9 @@ struct BucketListMemoriesView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                await syncData()
+            }
             .navigationTitle("Erinnerungen")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -255,7 +258,7 @@ struct BucketListMemoriesView: View {
             if let firstMemory = bucketListItem.sortedMemories.first,
                let trip = firstMemory.trip {
                 NavigationView {
-                    MemoriesView(trip: trip, focusedMemory: firstMemory, oldestFirst: true)
+                    MemoriesView(trip: trip, focusedMemory: firstMemory)
                         .navigationTitle("Timeline")
                         .navigationBarTitleDisplayMode(.inline)
                 }
@@ -263,6 +266,14 @@ struct BucketListMemoriesView: View {
                 .presentationDragIndicator(.visible)
             }
         }
+    }
+    
+    // MARK: - Sync Functions
+    
+    private func syncData() async {
+        print("BucketListMemoriesView: Initiating sync...")
+        await SyncManager.shared.sync()
+        print("BucketListMemoriesView: Sync completed.")
     }
     
     // MARK: - Timeline Button

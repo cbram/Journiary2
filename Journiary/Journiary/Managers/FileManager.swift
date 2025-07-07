@@ -67,17 +67,13 @@ final class MediaFileManager {
     /// - Parameter uploadTasks: Array of upload tasks with file info and URLs
     /// - Returns: Array of successful upload results
     func uploadFilesBatch(uploadTasks: [FileUploadTask]) async throws -> [FileUploadResult] {
-        var results: [FileUploadResult] = []
-        
         // Process uploads concurrently but limit concurrency to avoid overwhelming MinIO
-        let semaphore = DispatchSemaphore(value: 3) // Max 3 concurrent uploads
-        
-        await withTaskGroup(of: FileUploadResult.self) { group in
+        return await withTaskGroup(of: FileUploadResult.self, returning: [FileUploadResult].self) { group in
+            var results: [FileUploadResult] = []
+            
+            // Add all tasks to the group
             for task in uploadTasks {
                 group.addTask {
-                    await semaphore.wait()
-                    defer { semaphore.signal() }
-                    
                     do {
                         let success = try await self.uploadFile(
                             fileURL: task.fileURL,
@@ -91,12 +87,13 @@ final class MediaFileManager {
                 }
             }
             
+            // Collect all results
             for await result in group {
                 results.append(result)
             }
+            
+            return results
         }
-        
-        return results
     }
     
     // MARK: - Download Methods
@@ -152,17 +149,13 @@ final class MediaFileManager {
     /// - Parameter downloadTasks: Array of download tasks with URLs and destinations
     /// - Returns: Array of successful download results
     func downloadFilesBatch(downloadTasks: [FileDownloadTask]) async throws -> [FileDownloadResult] {
-        var results: [FileDownloadResult] = []
-        
-        // Process downloads concurrently but limit concurrency
-        let semaphore = DispatchSemaphore(value: 3) // Max 3 concurrent downloads
-        
-        await withTaskGroup(of: FileDownloadResult.self) { group in
+        // Process downloads concurrently 
+        return await withTaskGroup(of: FileDownloadResult.self, returning: [FileDownloadResult].self) { group in
+            var results: [FileDownloadResult] = []
+            
+            // Add all tasks to the group
             for task in downloadTasks {
                 group.addTask {
-                    await semaphore.wait()
-                    defer { semaphore.signal() }
-                    
                     do {
                         let success = try await self.downloadFile(
                             downloadURL: task.downloadURL,
@@ -175,12 +168,13 @@ final class MediaFileManager {
                 }
             }
             
+            // Collect all results
             for await result in group {
                 results.append(result)
             }
+            
+            return results
         }
-        
-        return results
     }
     
     // MARK: - Utility Methods

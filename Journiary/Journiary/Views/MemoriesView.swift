@@ -180,7 +180,7 @@ struct MemoriesView: View {
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(sortedMemories, id: \ .objectID) { memory in
+                    ForEach(sortedMemories, id: \.objectID) { memory in
                         MemoryCard(memory: memory) {
                             // Sicherstellen, dass das Memory-Objekt noch gültig ist
                             guard !memory.isFault && memory.managedObjectContext != nil else {
@@ -203,6 +203,9 @@ struct MemoriesView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                await syncData()
+            }
             .onAppear {
                 // Scroll zur fokussierten Memory, falls vorhanden
                 if let focusedMemory = focusedMemory {
@@ -214,6 +217,14 @@ struct MemoriesView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Sync Functions
+    
+    private func syncData() async {
+        print("MemoriesView: Initiating sync...")
+        await SyncManager.shared.sync()
+        print("MemoriesView: Sync completed.")
     }
     
     // MARK: - Debug Functions

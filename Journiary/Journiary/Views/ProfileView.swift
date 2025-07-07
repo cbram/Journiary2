@@ -40,6 +40,9 @@ struct ProfileView: View {
                 }
                 .padding()
             }
+            .refreshable {
+                await syncData()
+            }
             .navigationTitle("Profil")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -133,6 +136,14 @@ struct ProfileView: View {
                 )
             }
         }
+    }
+    
+    // MARK: - Sync Functions
+    
+    private func syncData() async {
+        print("ProfileView: Initiating sync...")
+        await SyncManager.shared.sync()
+        print("ProfileView: Sync completed.")
     }
     
     // MARK: - Computed Properties
