@@ -84,7 +84,7 @@ export class GPXTrack {
     createdAt!: Date;
 
     @Field()
-    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
     updatedAt!: Date;
 
     @ManyToOne(() => Trip, trip => trip.gpxTracks)

@@ -372,6 +372,90 @@ class NetworkProvider {
         }
     }
 
+    // MARK: - File Synchronization Methods
+
+    func generateBatchUploadUrls(uploadRequests: [JourniaryAPI.UploadRequest], expiresIn: Int? = nil) async throws -> GenerateBatchUploadUrlsMutation.Data.GenerateBatchUploadUrls {
+        let mutation = GenerateBatchUploadUrlsMutation(
+            uploadRequests: uploadRequests, 
+            expiresIn: expiresIn != nil ? GraphQLNullable.some(expiresIn!) : GraphQLNullable.none
+        )
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<GenerateBatchUploadUrlsMutation.Data.GenerateBatchUploadUrls, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 12, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for generateBatchUploadUrls"]))
+                        return
+                    }
+                    
+                    guard let uploadData = graphQLResult.data?.generateBatchUploadUrls else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 12, userInfo: [NSLocalizedDescriptionKey: "Failed to generate batch upload URLs, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: uploadData)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func generateBatchDownloadUrls(mediaItemIds: [String]? = nil, gpxTrackIds: [String]? = nil, expiresIn: Int? = nil) async throws -> GenerateBatchDownloadUrlsQuery.Data.GenerateBatchDownloadUrls {
+        let query = GenerateBatchDownloadUrlsQuery(
+            mediaItemIds: mediaItemIds != nil ? GraphQLNullable.some(mediaItemIds!.map { JourniaryAPI.ID($0) }) : GraphQLNullable.none,
+            gpxTrackIds: gpxTrackIds != nil ? GraphQLNullable.some(gpxTrackIds!.map { JourniaryAPI.ID($0) }) : GraphQLNullable.none,
+            expiresIn: expiresIn != nil ? GraphQLNullable.some(expiresIn!) : GraphQLNullable.none
+        )
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<GenerateBatchDownloadUrlsQuery.Data.GenerateBatchDownloadUrls, Error>) in
+            apollo.fetch(query: query, cachePolicy: .fetchIgnoringCacheData) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 13, userInfo: [NSLocalizedDescriptionKey: "GraphQL query failed for generateBatchDownloadUrls"]))
+                        return
+                    }
+                    
+                    guard let downloadData = graphQLResult.data?.generateBatchDownloadUrls else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 13, userInfo: [NSLocalizedDescriptionKey: "Failed to generate batch download URLs, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: downloadData)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    func markFileUploadComplete(entityId: String, entityType: String, objectName: String) async throws -> Bool {
+        let mutation = MarkFileUploadCompleteMutation(entityId: JourniaryAPI.ID(entityId), entityType: entityType, objectName: objectName)
+        
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            apollo.perform(mutation: mutation) { result in
+                switch result {
+                case .success(let graphQLResult):
+                    if let errors = graphQLResult.errors {
+                        continuation.resume(throwing: errors.first ?? NSError(domain: "GraphQLError", code: 14, userInfo: [NSLocalizedDescriptionKey: "GraphQL mutation failed for markFileUploadComplete"]))
+                        return
+                    }
+                    
+                    guard let success = graphQLResult.data?.markFileUploadComplete else {
+                        continuation.resume(throwing: NSError(domain: "NetworkProviderError", code: 14, userInfo: [NSLocalizedDescriptionKey: "Failed to mark file upload complete, no data received."]))
+                        return
+                    }
+                    continuation.resume(returning: success)
+                    
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private func dateToDateTime(_ date: Date) -> DateTime {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

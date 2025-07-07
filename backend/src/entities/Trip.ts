@@ -59,11 +59,11 @@ export class Trip {
     gpsTrackingEnabled!: boolean;
 
     @Field()
-    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
     createdAt!: Date;
 
     @Field()
-    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
     updatedAt!: Date;
 
     @ManyToOne(() => User, user => user.ownedTrips)

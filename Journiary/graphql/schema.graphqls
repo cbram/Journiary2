@@ -72,6 +72,9 @@ type Query {
   """Get all users for debugging (production: remove this)"""
   listUsers: AdminResponse!
   sync(lastSyncedAt: DateTime!): SyncResponse!
+  
+  """Generate batch download URLs for media files and GPX tracks"""
+  generateBatchDownloadUrls(mediaItemIds: [ID!], gpxTrackIds: [ID!], expiresIn: Int): FileSyncResponse!
 }
 
 """Represents a single journey or trip"""
@@ -372,6 +375,39 @@ type DeletedIds {
   bucketListItems: [ID!]!
 }
 
+input UploadRequest {
+  entityId: ID!
+  entityType: String!
+  objectName: String!
+  mimeType: String!
+}
+
+type FileDownloadUrl {
+  entityId: ID!
+  entityType: String!
+  objectName: String!
+  downloadUrl: String!
+  expiresIn: Int!
+}
+
+type FileSyncResponse {
+  downloadUrls: [FileDownloadUrl!]!
+  generatedAt: DateTime!
+}
+
+type BulkUploadUrl {
+  entityId: ID!
+  entityType: String!
+  objectName: String!
+  uploadUrl: String!
+  expiresIn: Int!
+}
+
+type BulkUploadResponse {
+  uploadUrls: [BulkUploadUrl!]!
+  generatedAt: DateTime!
+}
+
 type Mutation {
   """Create a new trip"""
   createTrip(input: TripInput!): Trip!
@@ -455,6 +491,12 @@ type Mutation {
 
   """Create admin user if not exists"""
   ensureAdminUser(password: String!, email: String!): AdminResponse!
+
+  """Generate batch upload URLs for media files and GPX tracks"""
+  generateBatchUploadUrls(uploadRequests: [UploadRequest!]!, expiresIn: Int): BulkUploadResponse!
+
+  """Mark file upload as completed and update entity"""
+  markFileUploadComplete(entityId: ID!, entityType: String!, objectName: String!): Boolean!
 }
 
 """New trip data"""

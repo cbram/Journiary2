@@ -22,7 +22,11 @@ public enum SchemaMetadata: ApolloAPI.SchemaMetadata {
     switch typename {
     case "AuthResponse": return JourniaryAPI.Objects.AuthResponse
     case "BucketListItem": return JourniaryAPI.Objects.BucketListItem
+    case "BulkUploadResponse": return JourniaryAPI.Objects.BulkUploadResponse
+    case "BulkUploadUrl": return JourniaryAPI.Objects.BulkUploadUrl
     case "DeletedIds": return JourniaryAPI.Objects.DeletedIds
+    case "FileDownloadUrl": return JourniaryAPI.Objects.FileDownloadUrl
+    case "FileSyncResponse": return JourniaryAPI.Objects.FileSyncResponse
     case "GPXTrack": return JourniaryAPI.Objects.GPXTrack
     case "MediaItem": return JourniaryAPI.Objects.MediaItem
     case "Memory": return JourniaryAPI.Objects.Memory

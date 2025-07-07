@@ -1,0 +1,12 @@
+mutation GenerateBatchUploadUrls($uploadRequests: [UploadRequest!]!, $expiresIn: Int) {
+    generateBatchUploadUrls(uploadRequests: $uploadRequests, expiresIn: $expiresIn) {
+        uploadUrls {
+            entityId
+            entityType
+            objectName
+            uploadUrl
+            expiresIn
+        }
+        generatedAt
+    }
+} 

@@ -51,14 +51,14 @@ export class BucketListItem {
     createdAt!: Date;
 
     @Field()
-    @Column({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" })
+    @Column({ type: "datetime", default: () => "CURRENT_TIMESTAMP" })
     updatedAt!: Date;
 
     @ManyToOne(() => User, user => user.createdBucketListItems)
     creator!: User;
 
     @Field({ nullable: true })
-    @Column({ type: "timestamp", nullable: true })
+    @Column({ type: "datetime", nullable: true })
     completedAt?: Date;
 
     @Field(() => [Memory], { nullable: true })

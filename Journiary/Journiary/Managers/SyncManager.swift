@@ -29,9 +29,10 @@ final class SyncManager {
 
     /// Initiates the synchronization cycle.
     ///
-    /// The process consists of two main phases:
+    /// The process consists of three main phases:
     /// 1.  **Upload Phase:** Local changes are sent to the server.
     /// 2.  **Download Phase:** Remote changes are fetched from the server and applied locally.
+    /// 3.  **File Sync Phase:** Upload and download files asynchronously.
     ///
     /// If any step in the cycle fails, the entire process is aborted,
     /// and the `lastSyncedAt` timestamp is not updated to ensure data consistency.
@@ -46,6 +47,11 @@ final class SyncManager {
             if let serverTimestamp = self.dateTimeToDate(syncData.serverTimestamp) {
                 self.lastSyncedAt = serverTimestamp
                 print("Sync completed successfully. New lastSyncedAt: \(serverTimestamp)")
+                
+                // Start file synchronization asynchronously (doesn't block the main sync)
+                Task {
+                    await self.fileSyncPhase()
+                }
             } else {
                 print("Sync completed, but server timestamp was invalid.")
             }
@@ -252,6 +258,11 @@ final class SyncManager {
 
                 let mediaItemToUpdate = localMediaItem ?? MediaItem(context: context)
                 
+                // Set ID if creating new entity
+                if localMediaItem == nil {
+                    mediaItemToUpdate.id = UUID()
+                }
+                
                 mediaItemToUpdate.serverID = remoteMediaItem.id
                 mediaItemToUpdate.filename = remoteMediaItem.filename
                 mediaItemToUpdate.mediaType = remoteMediaItem.mimeType
@@ -291,6 +302,11 @@ final class SyncManager {
                 }
 
                 let gpxTrackToUpdate = localGPXTrack ?? GPXTrack(context: context)
+                
+                // Set ID if creating new entity
+                if localGPXTrack == nil {
+                    gpxTrackToUpdate.id = UUID()
+                }
                 
                 gpxTrackToUpdate.serverID = remoteGPXTrack.id
                 gpxTrackToUpdate.name = remoteGPXTrack.name
@@ -501,6 +517,253 @@ final class SyncManager {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.date(from: dateTime)
+    }
+    
+    // MARK: - File Synchronization Phase
+    
+    /// **Phase 3: File Synchronization**
+    ///
+    /// This phase handles the asynchronous upload and download of files (MediaItems and GPXTracks)
+    /// using presigned URLs. It runs independently from the main sync cycle to avoid blocking
+    /// the metadata synchronization.
+    private func fileSyncPhase() async {
+        print("Starting file synchronization phase...")
+        
+        do {
+            // Step 1: Upload pending files
+            try await uploadPendingFiles()
+            
+            // Step 2: Download missing files  
+            try await downloadMissingFiles()
+            
+            print("File synchronization completed successfully.")
+        } catch {
+            print("File synchronization failed: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Uploads files that are pending upload to MinIO.
+    private func uploadPendingFiles() async throws {
+        print("Uploading pending files...")
+        
+        let context = persistenceController.container.newBackgroundContext()
+        let fileManager = MediaFileManager.shared
+        
+        // Find MediaItems and GPXTracks that need file upload
+        let mediaItemsToUpload = try await findMediaItemsNeedingUpload(context: context)
+        let gpxTracksToUpload = try await findGPXTracksNeedingUpload(context: context)
+        
+        // Combine all upload requests
+        var uploadRequests: [JourniaryAPI.UploadRequest] = []
+        var uploadTasks: [FileUploadTask] = []
+        
+        // Process MediaItems
+        for mediaItem in mediaItemsToUpload {
+            if let localFileURL = getLocalFileURL(for: mediaItem) {
+                let fileExtension = localFileURL.pathExtension
+                let objectName = fileManager.generateObjectName(entityType: "MediaItem", fileExtension: fileExtension)
+                let mimeType = fileManager.mimeType(for: fileExtension)
+                
+                let uploadRequest = JourniaryAPI.UploadRequest(
+                    entityId: mediaItem.id?.uuidString ?? UUID().uuidString,
+                    entityType: "MediaItem",
+                    objectName: objectName,
+                    mimeType: mimeType
+                )
+                uploadRequests.append(uploadRequest)
+                
+                let uploadTask = FileUploadTask(
+                    entityId: mediaItem.id?.uuidString ?? UUID().uuidString,
+                    entityType: "MediaItem",
+                    fileURL: localFileURL,
+                    uploadURL: "", // Will be filled after getting presigned URLs
+                    objectName: objectName,
+                    mimeType: mimeType
+                )
+                uploadTasks.append(uploadTask)
+            }
+        }
+        
+        // Process GPXTracks
+        for gpxTrack in gpxTracksToUpload {
+            if let localFileURL = getLocalFileURL(for: gpxTrack) {
+                let fileExtension = localFileURL.pathExtension
+                let objectName = fileManager.generateObjectName(entityType: "GPXTrack", fileExtension: fileExtension)
+                let mimeType = fileManager.mimeType(for: fileExtension)
+                
+                let uploadRequest = JourniaryAPI.UploadRequest(
+                    entityId: gpxTrack.id?.uuidString ?? UUID().uuidString,
+                    entityType: "GPXTrack", 
+                    objectName: objectName,
+                    mimeType: mimeType
+                )
+                uploadRequests.append(uploadRequest)
+                
+                let uploadTask = FileUploadTask(
+                    entityId: gpxTrack.id?.uuidString ?? UUID().uuidString,
+                    entityType: "GPXTrack",
+                    fileURL: localFileURL,
+                    uploadURL: "", // Will be filled after getting presigned URLs
+                    objectName: objectName,
+                    mimeType: mimeType
+                )
+                uploadTasks.append(uploadTask)
+            }
+        }
+        
+        if uploadRequests.isEmpty {
+            print("No files to upload.")
+            return
+        }
+        
+        // Get presigned upload URLs
+        let uploadResponse = try await networkProvider.generateBatchUploadUrls(uploadRequests: uploadRequests)
+        
+        // Match upload tasks with their URLs
+        var completedTasks: [FileUploadTask] = []
+        for uploadUrl in uploadResponse.uploadUrls {
+            if let taskIndex = uploadTasks.firstIndex(where: { $0.entityId == uploadUrl.entityId && $0.entityType == uploadUrl.entityType }) {
+                var task = uploadTasks[taskIndex]
+                task = FileUploadTask(
+                    entityId: task.entityId,
+                    entityType: task.entityType,
+                    fileURL: task.fileURL,
+                    uploadURL: uploadUrl.uploadUrl,
+                    objectName: task.objectName,
+                    mimeType: task.mimeType
+                )
+                completedTasks.append(task)
+            }
+        }
+        
+        // Upload files to MinIO
+        let uploadResults = try await fileManager.uploadFilesBatch(uploadTasks: completedTasks)
+        
+        // Mark successful uploads as complete
+        for result in uploadResults {
+            if result.success {
+                let success = try await networkProvider.markFileUploadComplete(
+                    entityId: result.task.entityId,
+                    entityType: result.task.entityType,
+                    objectName: result.task.objectName
+                )
+                if success {
+                    print("✅ Marked upload complete for \(result.task.entityType) \(result.task.entityId)")
+                } else {
+                    print("❌ Failed to mark upload complete for \(result.task.entityType) \(result.task.entityId)")
+                }
+            } else {
+                print("❌ Upload failed for \(result.task.entityType) \(result.task.entityId): \(result.error?.localizedDescription ?? "Unknown error")")
+            }
+        }
+        
+        print("File upload phase completed.")
+    }
+    
+    /// Downloads files that are missing locally.
+    private func downloadMissingFiles() async throws {
+        print("Downloading missing files...")
+        
+        let context = persistenceController.container.newBackgroundContext()
+        let fileManager = MediaFileManager.shared
+        
+        // Find MediaItems and GPXTracks that need file download
+        let mediaItemsToDownload = try await findMediaItemsNeedingDownload(context: context)
+        let gpxTracksToDownload = try await findGPXTracksNeedingDownload(context: context)
+        
+        // Prepare download requests
+        let mediaItemIds = mediaItemsToDownload.compactMap { $0.id?.uuidString }
+        let gpxTrackIds = gpxTracksToDownload.compactMap { $0.id?.uuidString }
+        
+        if mediaItemIds.isEmpty && gpxTrackIds.isEmpty {
+            print("No files to download.")
+            return
+        }
+        
+        // Get presigned download URLs
+        let downloadResponse = try await networkProvider.generateBatchDownloadUrls(
+            mediaItemIds: mediaItemIds.isEmpty ? nil : mediaItemIds,
+            gpxTrackIds: gpxTrackIds.isEmpty ? nil : gpxTrackIds
+        )
+        
+        // Prepare download tasks
+        var downloadTasks: [FileDownloadTask] = []
+        for downloadUrl in downloadResponse.downloadUrls {
+            let destinationURL = fileManager.localFileURL(for: downloadUrl.objectName, entityType: downloadUrl.entityType)
+            
+            let downloadTask = FileDownloadTask(
+                entityId: downloadUrl.entityId,
+                entityType: downloadUrl.entityType,
+                downloadURL: downloadUrl.downloadUrl,
+                destinationURL: destinationURL,
+                objectName: downloadUrl.objectName
+            )
+            downloadTasks.append(downloadTask)
+        }
+        
+        // Download files from MinIO
+        let downloadResults = try await fileManager.downloadFilesBatch(downloadTasks: downloadTasks)
+        
+        // Log results
+        for result in downloadResults {
+            if result.success {
+                print("✅ Downloaded \(result.task.entityType) \(result.task.entityId)")
+            } else {
+                print("❌ Download failed for \(result.task.entityType) \(result.task.entityId): \(result.error?.localizedDescription ?? "Unknown error")")
+            }
+        }
+        
+        print("File download phase completed.")
+    }
+    
+    // MARK: - Helper Methods for File Synchronization
+    
+    /// Finds MediaItems that need file upload.
+    private func findMediaItemsNeedingUpload(context: NSManagedObjectContext) async throws -> [MediaItem] {
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<MediaItem> = MediaItem.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND filename != nil AND serverID == nil", "1") // 1 = needsUpload
+            return try context.fetch(fetchRequest)
+        }
+    }
+    
+    /// Finds GPXTracks that need file upload.
+    private func findGPXTracksNeedingUpload(context: NSManagedObjectContext) async throws -> [GPXTrack] {
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<GPXTrack> = GPXTrack.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@ AND localFileURL != nil AND serverID == nil", "1") // 1 = needsUpload
+            return try context.fetch(fetchRequest)
+        }
+    }
+    
+    /// Finds MediaItems that need file download.
+    private func findMediaItemsNeedingDownload(context: NSManagedObjectContext) async throws -> [MediaItem] {
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<MediaItem> = MediaItem.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "serverID != nil AND filename != nil AND localFileURL == nil")
+            return try context.fetch(fetchRequest)
+        }
+    }
+    
+    /// Finds GPXTracks that need file download.
+    private func findGPXTracksNeedingDownload(context: NSManagedObjectContext) async throws -> [GPXTrack] {
+        return try await context.perform {
+            let fetchRequest: NSFetchRequest<GPXTrack> = GPXTrack.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "serverID != nil AND originalFilename != nil AND localFileURL == nil")
+            return try context.fetch(fetchRequest)
+        }
+    }
+    
+    /// Gets the local file URL for a MediaItem.
+    private func getLocalFileURL(for mediaItem: MediaItem) -> URL? {
+        guard let localFileURL = mediaItem.localFileURL else { return nil }
+        return URL(string: localFileURL)
+    }
+    
+    /// Gets the local file URL for a GPXTrack.
+    private func getLocalFileURL(for gpxTrack: GPXTrack) -> URL? {
+        guard let localFileURL = gpxTrack.localFileURL else { return nil }
+        return URL(string: localFileURL)
     }
 }
 

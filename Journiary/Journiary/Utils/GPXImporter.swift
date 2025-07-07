@@ -206,6 +206,9 @@ class GPXImporter {
         gpxTrack.creator = trackData.creator
         gpxTrack.trackType = customTrackType ?? trackData.trackType
         gpxTrack.importedAt = Date()
+        gpxTrack.createdAt = Date()
+        gpxTrack.updatedAt = Date()
+        gpxTrack.syncStatus = "1" // needsUpload
         
         // Statistiken berechnen und speichern
         let stats = calculateStatistics(for: trackData)

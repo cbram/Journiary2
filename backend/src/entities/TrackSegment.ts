@@ -27,7 +27,7 @@ export class TrackSegment {
     @Column({ nullable: true })
     segmentType?: string;
 
-    @Column({ type: "bytea", nullable: true })
+    @Column({ type: "blob", nullable: true })
     encodedData?: Buffer;
 
     @Field(() => Float, { nullable: true })

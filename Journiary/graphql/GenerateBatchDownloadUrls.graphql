@@ -1,0 +1,12 @@
+query GenerateBatchDownloadUrls($mediaItemIds: [ID!], $gpxTrackIds: [ID!], $expiresIn: Int) {
+    generateBatchDownloadUrls(mediaItemIds: $mediaItemIds, gpxTrackIds: $gpxTrackIds, expiresIn: $expiresIn) {
+        downloadUrls {
+            entityId
+            entityType
+            objectName
+            downloadUrl
+            expiresIn
+        }
+        generatedAt
+    }
+} 
