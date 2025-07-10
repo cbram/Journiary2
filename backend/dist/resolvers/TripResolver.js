@@ -108,7 +108,7 @@ let TripResolver = class TripResolver {
             tripId: tripId,
             userId: membership.user.id,
             role: membership.role,
-            status: "accepted", // Default status for existing memberships
+            status: "accepted",
             user: membership.user,
             trip: undefined,
             createdAt: new Date() // TripMembership doesn't have createdAt, so use current date
@@ -346,7 +346,6 @@ let TripResolver = class TripResolver {
         return trip;
     }
 };
-exports.TripResolver = TripResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [Trip_1.Trip], { description: "Get all trips the logged-in user is a member of" }),
     __param(0, (0, type_graphql_1.Ctx)()),
@@ -444,6 +443,7 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], TripResolver.prototype, "claimTrip", null);
-exports.TripResolver = TripResolver = __decorate([
+TripResolver = __decorate([
     (0, type_graphql_1.Resolver)(Trip_1.Trip)
 ], TripResolver);
+exports.TripResolver = TripResolver;

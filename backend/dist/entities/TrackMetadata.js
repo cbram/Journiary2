@@ -15,7 +15,6 @@ const typeorm_1 = require("typeorm");
 const TrackSegment_1 = require("./TrackSegment");
 let TrackMetadata = class TrackMetadata {
 };
-exports.TrackMetadata = TrackMetadata;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -76,7 +75,8 @@ __decorate([
     (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", TrackSegment_1.TrackSegment)
 ], TrackMetadata.prototype, "trackSegment", void 0);
-exports.TrackMetadata = TrackMetadata = __decorate([
+TrackMetadata = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents metadata for a track segment" }),
     (0, typeorm_1.Entity)()
 ], TrackMetadata);
+exports.TrackMetadata = TrackMetadata;

@@ -13,7 +13,6 @@ exports.TripInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let TripInput = class TripInput {
 };
-exports.TripInput = TripInput;
 __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", String)
@@ -50,6 +49,7 @@ __decorate([
     (0, type_graphql_1.Field)({ defaultValue: true }),
     __metadata("design:type", Boolean)
 ], TripInput.prototype, "gpsTrackingEnabled", void 0);
-exports.TripInput = TripInput = __decorate([
+TripInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "New trip data" })
 ], TripInput);
+exports.TripInput = TripInput;

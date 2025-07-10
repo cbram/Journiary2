@@ -130,7 +130,6 @@ let UserResolver = class UserResolver {
         return user;
     }
 };
-exports.UserResolver = UserResolver;
 __decorate([
     (0, type_graphql_1.Mutation)(() => User_1.User, { description: "Register a new user" }),
     __param(0, (0, type_graphql_1.Arg)("input")),
@@ -160,6 +159,7 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "getCurrentUser", null);
-exports.UserResolver = UserResolver = __decorate([
+UserResolver = __decorate([
     (0, type_graphql_1.Resolver)(User_1.User)
 ], UserResolver);
+exports.UserResolver = UserResolver;

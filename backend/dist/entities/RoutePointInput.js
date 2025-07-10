@@ -13,7 +13,6 @@ exports.RoutePointInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let RoutePointInput = class RoutePointInput {
 };
-exports.RoutePointInput = RoutePointInput;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.Float),
     __metadata("design:type", Number)
@@ -38,6 +37,7 @@ __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID, { description: "The ID of the trip this route point belongs to" }),
     __metadata("design:type", String)
 ], RoutePointInput.prototype, "tripId", void 0);
-exports.RoutePointInput = RoutePointInput = __decorate([
+RoutePointInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data to create a new RoutePoint" })
 ], RoutePointInput);
+exports.RoutePointInput = RoutePointInput;

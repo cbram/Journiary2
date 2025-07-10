@@ -13,7 +13,6 @@ exports.BulkTripUpdateInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let BulkTripUpdateInput = class BulkTripUpdateInput {
 };
-exports.BulkTripUpdateInput = BulkTripUpdateInput;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     __metadata("design:type", String)
@@ -42,6 +41,7 @@ __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", Date)
 ], BulkTripUpdateInput.prototype, "updatedAt", void 0);
-exports.BulkTripUpdateInput = BulkTripUpdateInput = __decorate([
+BulkTripUpdateInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Bulk update trip data" })
 ], BulkTripUpdateInput);
+exports.BulkTripUpdateInput = BulkTripUpdateInput;

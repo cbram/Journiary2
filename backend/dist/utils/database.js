@@ -30,8 +30,8 @@ exports.AppDataSource = new typeorm_1.DataSource(isLocalDevelopment ? {
     // SQLite-Konfiguration für lokale Entwicklung
     type: "sqlite",
     database: "./journiary-dev.sqlite",
-    synchronize: true, // DEV only: automatisch Schema erstellen
-    logging: false, // Weniger Logs für lokale Entwicklung
+    synchronize: true,
+    logging: false,
     entities: [
         Trip_1.Trip,
         Memory_1.Memory,

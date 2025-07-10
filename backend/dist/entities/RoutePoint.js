@@ -17,7 +17,6 @@ const TrackSegment_1 = require("./TrackSegment");
 const User_1 = require("./User");
 let RoutePoint = class RoutePoint {
 };
-exports.RoutePoint = RoutePoint;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -65,7 +64,8 @@ __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)
 ], RoutePoint.prototype, "created_at", void 0);
-exports.RoutePoint = RoutePoint = __decorate([
+RoutePoint = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a single GPS point on a route" }),
     (0, typeorm_1.Entity)()
 ], RoutePoint);
+exports.RoutePoint = RoutePoint;

@@ -13,7 +13,6 @@ exports.UpdateUserInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let UpdateUserInput = class UpdateUserInput {
 };
-exports.UpdateUserInput = UpdateUserInput;
 __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
@@ -30,6 +29,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], UpdateUserInput.prototype, "lastName", void 0);
-exports.UpdateUserInput = UpdateUserInput = __decorate([
+UpdateUserInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Update user data" })
 ], UpdateUserInput);
+exports.UpdateUserInput = UpdateUserInput;

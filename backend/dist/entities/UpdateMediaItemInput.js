@@ -13,7 +13,6 @@ exports.UpdateMediaItemInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let UpdateMediaItemInput = class UpdateMediaItemInput {
 };
-exports.UpdateMediaItemInput = UpdateMediaItemInput;
 __decorate([
     (0, type_graphql_1.Field)({ nullable: true, description: "The name of the object in the storage (e.g., from createUploadUrl)" }),
     __metadata("design:type", String)
@@ -42,6 +41,7 @@ __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.Int, { nullable: true, description: "For videos, the duration in seconds." }),
     __metadata("design:type", Number)
 ], UpdateMediaItemInput.prototype, "duration", void 0);
-exports.UpdateMediaItemInput = UpdateMediaItemInput = __decorate([
+UpdateMediaItemInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data for updating a MediaItem" })
 ], UpdateMediaItemInput);
+exports.UpdateMediaItemInput = UpdateMediaItemInput;

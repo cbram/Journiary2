@@ -14,7 +14,6 @@ const typeorm_1 = require("typeorm");
 // ConflictLog-Entity
 let ConflictLog = class ConflictLog extends typeorm_1.BaseEntity {
 };
-exports.ConflictLog = ConflictLog;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
     __metadata("design:type", String)
@@ -63,13 +62,13 @@ __decorate([
     (0, typeorm_1.Column)('jsonb', { nullable: true }),
     __metadata("design:type", Object)
 ], ConflictLog.prototype, "metadata", void 0);
-exports.ConflictLog = ConflictLog = __decorate([
+ConflictLog = __decorate([
     (0, typeorm_1.Entity)('conflict_logs')
 ], ConflictLog);
+exports.ConflictLog = ConflictLog;
 // Device-Registry-Entity
 let DeviceRegistry = class DeviceRegistry extends typeorm_1.BaseEntity {
 };
-exports.DeviceRegistry = DeviceRegistry;
 __decorate([
     (0, typeorm_1.PrimaryGeneratedColumn)('uuid'),
     __metadata("design:type", String)
@@ -102,6 +101,7 @@ __decorate([
     (0, typeorm_1.Column)('jsonb', { nullable: true }),
     __metadata("design:type", Object)
 ], DeviceRegistry.prototype, "metadata", void 0);
-exports.DeviceRegistry = DeviceRegistry = __decorate([
+DeviceRegistry = __decorate([
     (0, typeorm_1.Entity)('device_registry')
 ], DeviceRegistry);
+exports.DeviceRegistry = DeviceRegistry;

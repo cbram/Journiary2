@@ -16,13 +16,13 @@ let HelloWorldResolver = class HelloWorldResolver {
         return "Hello World!";
     }
 };
-exports.HelloWorldResolver = HelloWorldResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => String),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", String)
 ], HelloWorldResolver.prototype, "hello", null);
-exports.HelloWorldResolver = HelloWorldResolver = __decorate([
+HelloWorldResolver = __decorate([
     (0, type_graphql_1.Resolver)()
 ], HelloWorldResolver);
+exports.HelloWorldResolver = HelloWorldResolver;

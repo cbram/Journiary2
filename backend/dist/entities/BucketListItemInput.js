@@ -13,7 +13,6 @@ exports.BucketListItemInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let BucketListItemInput = class BucketListItemInput {
 };
-exports.BucketListItemInput = BucketListItemInput;
 __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", String)
@@ -50,6 +49,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", Boolean)
 ], BucketListItemInput.prototype, "isDone", void 0);
-exports.BucketListItemInput = BucketListItemInput = __decorate([
+BucketListItemInput = __decorate([
     (0, type_graphql_1.InputType)()
 ], BucketListItemInput);
+exports.BucketListItemInput = BucketListItemInput;

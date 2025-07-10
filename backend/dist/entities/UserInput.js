@@ -14,7 +14,6 @@ const type_graphql_1 = require("type-graphql");
 const class_validator_1 = require("class-validator");
 let UserInput = class UserInput {
 };
-exports.UserInput = UserInput;
 __decorate([
     (0, type_graphql_1.Field)(),
     (0, class_validator_1.IsEmail)(),
@@ -25,6 +24,7 @@ __decorate([
     (0, class_validator_1.Length)(8, 255, { message: "Password must be between 8 and 255 characters" }),
     __metadata("design:type", String)
 ], UserInput.prototype, "password", void 0);
-exports.UserInput = UserInput = __decorate([
+UserInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data for user registration and login" })
 ], UserInput);
+exports.UserInput = UserInput;

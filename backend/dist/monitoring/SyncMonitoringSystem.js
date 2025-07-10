@@ -373,10 +373,10 @@ class SyncMonitoringSystem extends events_1.EventEmitter {
     }
     getDefaultAlertThresholds() {
         return {
-            slowOperationThreshold: 30000, // 30 Sekunden
-            highMemoryThreshold: 100 * 1024 * 1024, // 100MB
-            lowThroughputThreshold: 0.5, // 0.5 entities/s
-            highErrorRateThreshold: 0.05, // 5%
+            slowOperationThreshold: 30000,
+            highMemoryThreshold: 100 * 1024 * 1024,
+            lowThroughputThreshold: 0.5,
+            highErrorRateThreshold: 0.05,
             criticalErrorRateThreshold: 0.1 // 10%
         };
     }
@@ -469,8 +469,8 @@ class SyncMonitoringSystem extends events_1.EventEmitter {
     async checkMemoryUsage() {
         // Implementierung für Memory-Usage-Checks
         return {
-            used: 512 * 1024 * 1024, // 512MB
-            total: 2 * 1024 * 1024 * 1024, // 2GB
+            used: 512 * 1024 * 1024,
+            total: 2 * 1024 * 1024 * 1024,
             percentage: 25,
             health: 'healthy'
         };
@@ -486,8 +486,8 @@ class SyncMonitoringSystem extends events_1.EventEmitter {
     async checkDiskSpace() {
         // Implementierung für Disk-Space-Checks
         return {
-            used: 50 * 1024 * 1024 * 1024, // 50GB
-            total: 500 * 1024 * 1024 * 1024, // 500GB
+            used: 50 * 1024 * 1024 * 1024,
+            total: 500 * 1024 * 1024 * 1024,
             percentage: 10,
             health: 'healthy'
         };

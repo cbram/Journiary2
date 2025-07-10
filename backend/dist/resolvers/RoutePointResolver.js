@@ -46,7 +46,6 @@ let RoutePointResolver = class RoutePointResolver {
         return await routePointRepository.save(newRoutePoints);
     }
 };
-exports.RoutePointResolver = RoutePointResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [RoutePoint_1.RoutePoint]),
     __param(0, (0, type_graphql_1.Arg)("tripId", () => type_graphql_1.ID)),
@@ -64,6 +63,7 @@ __decorate([
     __metadata("design:paramtypes", [String, Array, Object]),
     __metadata("design:returntype", Promise)
 ], RoutePointResolver.prototype, "createRoutePoints", null);
-exports.RoutePointResolver = RoutePointResolver = __decorate([
+RoutePointResolver = __decorate([
     (0, type_graphql_1.Resolver)(RoutePoint_1.RoutePoint)
 ], RoutePointResolver);
+exports.RoutePointResolver = RoutePointResolver;

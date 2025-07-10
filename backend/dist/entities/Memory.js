@@ -37,7 +37,6 @@ let Memory = class Memory {
         return this.creator?.id ?? "unknown";
     }
 };
-exports.Memory = Memory;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -142,7 +141,8 @@ __decorate([
     __metadata("design:type", String),
     __metadata("design:paramtypes", [])
 ], Memory.prototype, "userId", null);
-exports.Memory = Memory = __decorate([
+Memory = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a single memory or event within a trip" }),
     (0, typeorm_1.Entity)()
 ], Memory);
+exports.Memory = Memory;

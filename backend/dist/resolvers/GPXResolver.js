@@ -295,7 +295,6 @@ let GPXResolver = class GPXResolver {
         return await gpxTrackRepository.save(newGpxTrack);
     }
 };
-exports.GPXResolver = GPXResolver;
 __decorate([
     (0, type_graphql_1.FieldResolver)(() => String, { nullable: true }),
     __param(0, (0, type_graphql_1.Root)()),
@@ -362,6 +361,7 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], GPXResolver.prototype, "processGpxFile", null);
-exports.GPXResolver = GPXResolver = __decorate([
+GPXResolver = __decorate([
     (0, type_graphql_1.Resolver)(GPXTrack_1.GPXTrack)
 ], GPXResolver);
+exports.GPXResolver = GPXResolver;

@@ -7,7 +7,7 @@ var SyncDirection;
     SyncDirection["UPLOAD"] = "UPLOAD";
     SyncDirection["DOWNLOAD"] = "DOWNLOAD";
     SyncDirection["BIDIRECTIONAL"] = "BIDIRECTIONAL";
-})(SyncDirection || (exports.SyncDirection = SyncDirection = {}));
+})(SyncDirection = exports.SyncDirection || (exports.SyncDirection = {}));
 (0, type_graphql_1.registerEnumType)(SyncDirection, {
     name: "SyncDirection",
     description: "Synchronization direction",

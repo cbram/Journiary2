@@ -13,7 +13,6 @@ exports.TagInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let TagInput = class TagInput {
 };
-exports.TagInput = TagInput;
 __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", String)
@@ -34,6 +33,7 @@ __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID, { nullable: true, description: "The ID of the category this tag belongs to" }),
     __metadata("design:type", String)
 ], TagInput.prototype, "categoryId", void 0);
-exports.TagInput = TagInput = __decorate([
+TagInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data for creating a new Tag" })
 ], TagInput);
+exports.TagInput = TagInput;

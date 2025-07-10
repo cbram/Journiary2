@@ -17,7 +17,6 @@ const TrackSegment_1 = require("./TrackSegment");
 const Memory_1 = require("./Memory");
 let GPXTrack = class GPXTrack {
 };
-exports.GPXTrack = GPXTrack;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -140,7 +139,8 @@ __decorate([
     (0, typeorm_1.OneToOne)(() => Memory_1.Memory, memory => memory.gpxTrack, { nullable: true }),
     __metadata("design:type", Memory_1.Memory)
 ], GPXTrack.prototype, "memory", void 0);
-exports.GPXTrack = GPXTrack = __decorate([
+GPXTrack = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a GPX track, which is a collection of track segments" }),
     (0, typeorm_1.Entity)()
 ], GPXTrack);
+exports.GPXTrack = GPXTrack;

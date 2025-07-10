@@ -20,7 +20,6 @@ const User_1 = require("./User");
 const TripMembership_1 = require("./TripMembership");
 let Trip = class Trip {
 };
-exports.Trip = Trip;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -118,7 +117,8 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => TrackSegment_1.TrackSegment, segment => segment.trip),
     __metadata("design:type", Array)
 ], Trip.prototype, "trackSegments", void 0);
-exports.Trip = Trip = __decorate([
+Trip = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a single journey or trip" }),
     (0, typeorm_1.Entity)()
 ], Trip);
+exports.Trip = Trip;

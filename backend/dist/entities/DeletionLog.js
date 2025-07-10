@@ -13,7 +13,6 @@ exports.DeletionLog = void 0;
 const typeorm_1 = require("typeorm");
 let DeletionLog = class DeletionLog {
 };
-exports.DeletionLog = DeletionLog;
 __decorate([
     (0, typeorm_1.PrimaryColumn)(),
     __metadata("design:type", String)
@@ -37,6 +36,7 @@ __decorate([
     (0, typeorm_1.Index)(),
     __metadata("design:type", String)
 ], DeletionLog.prototype, "ownerId", void 0);
-exports.DeletionLog = DeletionLog = __decorate([
+DeletionLog = __decorate([
     (0, typeorm_1.Entity)()
 ], DeletionLog);
+exports.DeletionLog = DeletionLog;

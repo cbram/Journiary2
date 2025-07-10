@@ -13,7 +13,6 @@ exports.UpdateTripInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let UpdateTripInput = class UpdateTripInput {
 };
-exports.UpdateTripInput = UpdateTripInput;
 __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
@@ -50,6 +49,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", Boolean)
 ], UpdateTripInput.prototype, "gpsTrackingEnabled", void 0);
-exports.UpdateTripInput = UpdateTripInput = __decorate([
+UpdateTripInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Data to update an existing trip" })
 ], UpdateTripInput);
+exports.UpdateTripInput = UpdateTripInput;

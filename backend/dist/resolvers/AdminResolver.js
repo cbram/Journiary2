@@ -67,7 +67,7 @@ let AdminResolver = class AdminResolver {
             const userInfos = allUsers.map(user => ({
                 id: user.id,
                 email: user.email,
-                passwordHash: user.password.substring(0, 20) + "...", // Only show first 20 chars for security
+                passwordHash: user.password.substring(0, 20) + "...",
                 createdAt: user.createdAt
             }));
             return {
@@ -182,7 +182,6 @@ let AdminResolver = class AdminResolver {
         }
     }
 };
-exports.AdminResolver = AdminResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => AdminResponse, { description: "Get all users for debugging (production: remove this)" }),
     __metadata("design:type", Function),
@@ -205,6 +204,7 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], AdminResolver.prototype, "ensureAdminUser", null);
-exports.AdminResolver = AdminResolver = __decorate([
+AdminResolver = __decorate([
     (0, type_graphql_1.Resolver)()
 ], AdminResolver);
+exports.AdminResolver = AdminResolver;

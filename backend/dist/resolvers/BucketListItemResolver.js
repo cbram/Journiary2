@@ -90,7 +90,6 @@ let BucketListItemResolver = class BucketListItemResolver {
         }
     }
 };
-exports.BucketListItemResolver = BucketListItemResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [BucketListItem_1.BucketListItem]),
     __param(0, (0, type_graphql_1.Ctx)()),
@@ -132,6 +131,7 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], BucketListItemResolver.prototype, "deleteBucketListItem", null);
-exports.BucketListItemResolver = BucketListItemResolver = __decorate([
+BucketListItemResolver = __decorate([
     (0, type_graphql_1.Resolver)(BucketListItem_1.BucketListItem)
 ], BucketListItemResolver);
+exports.BucketListItemResolver = BucketListItemResolver;

@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var Tag_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Tag = void 0;
 const type_graphql_1 = require("type-graphql");
@@ -15,9 +16,8 @@ const typeorm_1 = require("typeorm");
 const TagCategory_1 = require("./TagCategory");
 const Memory_1 = require("./Memory");
 const User_1 = require("./User");
-let Tag = class Tag {
+let Tag = Tag_1 = class Tag {
 };
-exports.Tag = Tag;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -97,8 +97,8 @@ __decorate([
     __metadata("design:type", Array)
 ], Tag.prototype, "memories", void 0);
 __decorate([
-    (0, type_graphql_1.Field)(() => [Tag], { nullable: true }),
-    (0, typeorm_1.ManyToMany)(() => Tag),
+    (0, type_graphql_1.Field)(() => [Tag_1], { nullable: true }),
+    (0, typeorm_1.ManyToMany)(() => Tag_1),
     (0, typeorm_1.JoinTable)({
         name: "tag_related_tags",
         joinColumn: { name: "tag_id", referencedColumnName: "id" },
@@ -106,7 +106,8 @@ __decorate([
     }),
     __metadata("design:type", Array)
 ], Tag.prototype, "relatedTags", void 0);
-exports.Tag = Tag = __decorate([
+Tag = Tag_1 = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "A tag to categorize memories" }),
     (0, typeorm_1.Entity)()
 ], Tag);
+exports.Tag = Tag;

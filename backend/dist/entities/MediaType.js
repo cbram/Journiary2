@@ -8,7 +8,7 @@ var MediaType;
     MediaType["VIDEO"] = "VIDEO";
     MediaType["AUDIO"] = "AUDIO";
     MediaType["DOCUMENT"] = "DOCUMENT";
-})(MediaType || (exports.MediaType = MediaType = {}));
+})(MediaType = exports.MediaType || (exports.MediaType = {}));
 (0, type_graphql_1.registerEnumType)(MediaType, {
     name: "MediaType",
     description: "Types of media files",

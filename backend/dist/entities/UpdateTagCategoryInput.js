@@ -13,7 +13,6 @@ exports.UpdateTagCategoryInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let UpdateTagCategoryInput = class UpdateTagCategoryInput {
 };
-exports.UpdateTagCategoryInput = UpdateTagCategoryInput;
 __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
@@ -26,6 +25,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], UpdateTagCategoryInput.prototype, "icon", void 0);
-exports.UpdateTagCategoryInput = UpdateTagCategoryInput = __decorate([
+UpdateTagCategoryInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Update tag category data" })
 ], UpdateTagCategoryInput);
+exports.UpdateTagCategoryInput = UpdateTagCategoryInput;

@@ -13,7 +13,6 @@ exports.Location = void 0;
 const type_graphql_1 = require("type-graphql");
 let Location = class Location {
 };
-exports.Location = Location;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.Float),
     __metadata("design:type", Number)
@@ -26,6 +25,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], Location.prototype, "name", void 0);
-exports.Location = Location = __decorate([
+Location = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], Location);
+exports.Location = Location;

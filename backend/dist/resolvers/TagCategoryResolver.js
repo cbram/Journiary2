@@ -79,7 +79,6 @@ let TagCategoryResolver = class TagCategoryResolver {
         }
     }
 };
-exports.TagCategoryResolver = TagCategoryResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [TagCategory_1.TagCategory]),
     __metadata("design:type", Function),
@@ -111,6 +110,7 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], TagCategoryResolver.prototype, "deleteTagCategory", null);
-exports.TagCategoryResolver = TagCategoryResolver = __decorate([
+TagCategoryResolver = __decorate([
     (0, type_graphql_1.Resolver)(TagCategory_1.TagCategory)
 ], TagCategoryResolver);
+exports.TagCategoryResolver = TagCategoryResolver;

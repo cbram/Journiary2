@@ -328,7 +328,6 @@ let ConflictAwareSyncResolver = class ConflictAwareSyncResolver extends Optimize
         }
     }
 };
-exports.ConflictAwareSyncResolver = ConflictAwareSyncResolver;
 __decorate([
     (0, type_graphql_2.Authorized)(),
     (0, type_graphql_1.Mutation)(() => String) // Vereinfachter Return-Type für GraphQL
@@ -350,7 +349,8 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], ConflictAwareSyncResolver.prototype, "getConflictResolutionMetrics", null);
-exports.ConflictAwareSyncResolver = ConflictAwareSyncResolver = __decorate([
+ConflictAwareSyncResolver = __decorate([
     (0, type_graphql_1.Resolver)(),
     __metadata("design:paramtypes", [])
 ], ConflictAwareSyncResolver);
+exports.ConflictAwareSyncResolver = ConflictAwareSyncResolver;

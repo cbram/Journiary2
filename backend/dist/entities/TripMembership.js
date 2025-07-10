@@ -19,14 +19,13 @@ var TripRole;
     TripRole["OWNER"] = "owner";
     TripRole["EDITOR"] = "editor";
     TripRole["VIEWER"] = "viewer";
-})(TripRole || (exports.TripRole = TripRole = {}));
+})(TripRole = exports.TripRole || (exports.TripRole = {}));
 (0, type_graphql_1.registerEnumType)(TripRole, {
     name: "TripRole",
     description: "The role of a user in a trip",
 });
 let TripMembership = class TripMembership {
 };
-exports.TripMembership = TripMembership;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -49,8 +48,9 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], TripMembership.prototype, "role", void 0);
-exports.TripMembership = TripMembership = __decorate([
+TripMembership = __decorate([
     (0, type_graphql_1.ObjectType)(),
     (0, typeorm_1.Entity)(),
     (0, typeorm_1.Unique)(["user", "trip"]) // A user can only have one role per trip
 ], TripMembership);
+exports.TripMembership = TripMembership;

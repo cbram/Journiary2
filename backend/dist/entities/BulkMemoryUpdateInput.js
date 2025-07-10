@@ -13,7 +13,6 @@ exports.BulkMemoryUpdateInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let BulkMemoryUpdateInput = class BulkMemoryUpdateInput {
 };
-exports.BulkMemoryUpdateInput = BulkMemoryUpdateInput;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     __metadata("design:type", String)
@@ -50,6 +49,7 @@ __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", Date)
 ], BulkMemoryUpdateInput.prototype, "updatedAt", void 0);
-exports.BulkMemoryUpdateInput = BulkMemoryUpdateInput = __decorate([
+BulkMemoryUpdateInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Bulk update memory data" })
 ], BulkMemoryUpdateInput);
+exports.BulkMemoryUpdateInput = BulkMemoryUpdateInput;

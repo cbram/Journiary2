@@ -13,7 +13,6 @@ exports.LocationInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let LocationInput = class LocationInput {
 };
-exports.LocationInput = LocationInput;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.Float),
     __metadata("design:type", Number)
@@ -26,6 +25,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], LocationInput.prototype, "name", void 0);
-exports.LocationInput = LocationInput = __decorate([
+LocationInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Represents a geographic location (latitude/longitude) plus optional name" })
 ], LocationInput);
+exports.LocationInput = LocationInput;

@@ -11,9 +11,13 @@ services:
       - DATABASE_URL=postgres://travelcompanion:travelcompanion@db:5432/journiary
       - MINIO_URL=minio
       - MINIO_PORT=9000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
       - JWT_SECRET=a_super_secret_and_long_key_for_dev_that_should_be_replaced_in_prod_12345
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - journiary-network
@@ -46,6 +50,21 @@ services:
       - "9001:9001"
     volumes:
       - ./minio-data:/data
+    networks:
+      - journiary-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - ./redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - journiary-network
 

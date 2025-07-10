@@ -16,7 +16,6 @@ const Tag_1 = require("./Tag");
 const User_1 = require("./User");
 let TagCategory = class TagCategory {
 };
-exports.TagCategory = TagCategory;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -76,7 +75,8 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => Tag_1.Tag, tag => tag.category),
     __metadata("design:type", Array)
 ], TagCategory.prototype, "tags", void 0);
-exports.TagCategory = TagCategory = __decorate([
+TagCategory = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a category for grouping tags" }),
     (0, typeorm_1.Entity)()
 ], TagCategory);
+exports.TagCategory = TagCategory;

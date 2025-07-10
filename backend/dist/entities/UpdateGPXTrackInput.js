@@ -13,7 +13,6 @@ exports.UpdateGPXTrackInput = void 0;
 const type_graphql_1 = require("type-graphql");
 let UpdateGPXTrackInput = class UpdateGPXTrackInput {
 };
-exports.UpdateGPXTrackInput = UpdateGPXTrackInput;
 __decorate([
     (0, type_graphql_1.Field)({ nullable: true, description: "The name of the GPX track" }),
     __metadata("design:type", String)
@@ -38,6 +37,7 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], UpdateGPXTrackInput.prototype, "trackType", void 0);
-exports.UpdateGPXTrackInput = UpdateGPXTrackInput = __decorate([
+UpdateGPXTrackInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data for updating a GPXTrack" })
 ], UpdateGPXTrackInput);
+exports.UpdateGPXTrackInput = UpdateGPXTrackInput;

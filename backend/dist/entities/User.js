@@ -71,7 +71,6 @@ let User = class User extends typeorm_1.BaseEntity {
         this.isActive = true;
     }
 };
-exports.User = User;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -187,7 +186,8 @@ __decorate([
     __metadata("design:type", Boolean),
     __metadata("design:paramtypes", [])
 ], User.prototype, "isOnline", null);
-exports.User = User = __decorate([
+User = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a user of the application" }),
     (0, typeorm_1.Entity)()
 ], User);
+exports.User = User;

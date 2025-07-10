@@ -261,7 +261,6 @@ let MemoryResolver = class MemoryResolver {
         };
     }
 };
-exports.MemoryResolver = MemoryResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [Memory_1.Memory], { description: "Get all memories for trips the user is a member of" }),
     __param(0, (0, type_graphql_1.Ctx)()),
@@ -326,6 +325,7 @@ __decorate([
     __metadata("design:paramtypes", [Memory_1.Memory]),
     __metadata("design:returntype", Object)
 ], MemoryResolver.prototype, "location", null);
-exports.MemoryResolver = MemoryResolver = __decorate([
+MemoryResolver = __decorate([
     (0, type_graphql_1.Resolver)(() => Memory_1.Memory)
 ], MemoryResolver);
+exports.MemoryResolver = MemoryResolver;

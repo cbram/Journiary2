@@ -360,7 +360,6 @@ let SyncResolver = class SyncResolver {
         }
     }
 };
-exports.SyncResolver = SyncResolver;
 __decorate([
     (0, type_graphql_1.Authorized)(),
     (0, type_graphql_1.Query)(() => SyncResponse_1.SyncResponse),
@@ -402,6 +401,7 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], SyncResolver.prototype, "markFileUploadComplete", null);
-exports.SyncResolver = SyncResolver = __decorate([
+SyncResolver = __decorate([
     (0, type_graphql_1.Resolver)()
 ], SyncResolver);
+exports.SyncResolver = SyncResolver;

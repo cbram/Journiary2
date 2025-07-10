@@ -16,7 +16,6 @@ const Memory_1 = require("./Memory");
 const User_1 = require("./User");
 let BucketListItem = class BucketListItem {
 };
-exports.BucketListItem = BucketListItem;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -91,7 +90,8 @@ __decorate([
     (0, typeorm_1.OneToMany)(() => Memory_1.Memory, memory => memory.bucketListItem),
     __metadata("design:type", Array)
 ], BucketListItem.prototype, "memories", void 0);
-exports.BucketListItem = BucketListItem = __decorate([
+BucketListItem = __decorate([
     (0, type_graphql_1.ObjectType)(),
     (0, typeorm_1.Entity)()
 ], BucketListItem);
+exports.BucketListItem = BucketListItem;

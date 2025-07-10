@@ -16,7 +16,6 @@ const Memory_1 = require("./Memory");
 const User_1 = require("./User");
 let MediaItem = class MediaItem {
 };
-exports.MediaItem = MediaItem;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -76,7 +75,8 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], MediaItem.prototype, "updatedAt", void 0);
-exports.MediaItem = MediaItem = __decorate([
+MediaItem = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "Represents a media file (photo, video, etc.) associated with a memory" }),
     (0, typeorm_1.Entity)()
 ], MediaItem);
+exports.MediaItem = MediaItem;

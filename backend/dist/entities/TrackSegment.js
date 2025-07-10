@@ -18,7 +18,6 @@ const TrackMetadata_1 = require("./TrackMetadata");
 const Trip_1 = require("./Trip");
 let TrackSegment = class TrackSegment {
 };
-exports.TrackSegment = TrackSegment;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     (0, typeorm_1.PrimaryGeneratedColumn)("uuid"),
@@ -97,7 +96,8 @@ __decorate([
     (0, typeorm_1.OneToOne)(() => TrackMetadata_1.TrackMetadata, metadata => metadata.trackSegment, { cascade: true, nullable: true }),
     __metadata("design:type", TrackMetadata_1.TrackMetadata)
 ], TrackSegment.prototype, "metadata", void 0);
-exports.TrackSegment = TrackSegment = __decorate([
+TrackSegment = __decorate([
     (0, type_graphql_1.ObjectType)({ description: "A continuous segment of a GPX track, containing a series of points." }),
     (0, typeorm_1.Entity)()
 ], TrackSegment);
+exports.TrackSegment = TrackSegment;

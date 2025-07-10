@@ -175,7 +175,6 @@ let MediaItemResolver = class MediaItemResolver {
         return mediaItem.filesize;
     }
 };
-exports.MediaItemResolver = MediaItemResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => PresignedUrlResponse_1.PresignedUrlResponse, { description: "Generate a pre-signed URL to upload a file" }),
     __param(0, (0, type_graphql_1.Arg)("filename")),
@@ -263,6 +262,7 @@ __decorate([
     __metadata("design:paramtypes", [MediaItem_1.MediaItem]),
     __metadata("design:returntype", Number)
 ], MediaItemResolver.prototype, "fileSize", null);
-exports.MediaItemResolver = MediaItemResolver = __decorate([
+MediaItemResolver = __decorate([
     (0, type_graphql_1.Resolver)(MediaItem_1.MediaItem)
 ], MediaItemResolver);
+exports.MediaItemResolver = MediaItemResolver;

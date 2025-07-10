@@ -20,7 +20,6 @@ const GPXTrack_1 = require("../../entities/GPXTrack");
 const BucketListItem_1 = require("../../entities/BucketListItem");
 let DeletedIds = class DeletedIds {
 };
-exports.DeletedIds = DeletedIds;
 __decorate([
     (0, type_graphql_1.Field)(() => [type_graphql_1.ID]),
     __metadata("design:type", Array)
@@ -49,12 +48,12 @@ __decorate([
     (0, type_graphql_1.Field)(() => [type_graphql_1.ID]),
     __metadata("design:type", Array)
 ], DeletedIds.prototype, "bucketListItems", void 0);
-exports.DeletedIds = DeletedIds = __decorate([
+DeletedIds = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], DeletedIds);
+exports.DeletedIds = DeletedIds;
 let SyncResponse = class SyncResponse {
 };
-exports.SyncResponse = SyncResponse;
 __decorate([
     (0, type_graphql_1.Field)(() => [Trip_1.Trip]),
     __metadata("design:type", Array)
@@ -91,6 +90,7 @@ __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", Date)
 ], SyncResponse.prototype, "serverTimestamp", void 0);
-exports.SyncResponse = SyncResponse = __decorate([
+SyncResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], SyncResponse);
+exports.SyncResponse = SyncResponse;

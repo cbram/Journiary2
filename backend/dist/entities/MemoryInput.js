@@ -14,7 +14,6 @@ const type_graphql_1 = require("type-graphql");
 const LocationInput_1 = require("./LocationInput");
 let MemoryInput = class MemoryInput {
 };
-exports.MemoryInput = MemoryInput;
 __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", String)
@@ -51,6 +50,7 @@ __decorate([
     (0, type_graphql_1.Field)(() => [type_graphql_1.ID], { nullable: true, description: "A list of Tag IDs to associate with this memory" }),
     __metadata("design:type", Array)
 ], MemoryInput.prototype, "tagIds", void 0);
-exports.MemoryInput = MemoryInput = __decorate([
+MemoryInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "New memory data" })
 ], MemoryInput);
+exports.MemoryInput = MemoryInput;

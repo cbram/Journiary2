@@ -17,12 +17,12 @@ var SyncOperationType;
     SyncOperationType["CREATE"] = "CREATE";
     SyncOperationType["UPDATE"] = "UPDATE";
     SyncOperationType["DELETE"] = "DELETE";
-})(SyncOperationType || (exports.SyncOperationType = SyncOperationType = {}));
+})(SyncOperationType = exports.SyncOperationType || (exports.SyncOperationType = {}));
 var SyncResultStatus;
 (function (SyncResultStatus) {
     SyncResultStatus["SUCCESS"] = "success";
     SyncResultStatus["FAILED"] = "failed";
-})(SyncResultStatus || (exports.SyncResultStatus = SyncResultStatus = {}));
+})(SyncResultStatus = exports.SyncResultStatus || (exports.SyncResultStatus = {}));
 (0, type_graphql_1.registerEnumType)(SyncOperationType, {
     name: "SyncOperationType",
     description: "Typ der Synchronisations-Operation"
@@ -34,7 +34,6 @@ var SyncResultStatus;
 // Input-Typen für GraphQL
 let SyncOperation = class SyncOperation {
 };
-exports.SyncOperation = SyncOperation;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     __metadata("design:type", String)
@@ -59,12 +58,12 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", Date)
 ], SyncOperation.prototype, "timestamp", void 0);
-exports.SyncOperation = SyncOperation = __decorate([
+SyncOperation = __decorate([
     (0, type_graphql_1.InputType)()
 ], SyncOperation);
+exports.SyncOperation = SyncOperation;
 let BatchSyncOptions = class BatchSyncOptions {
 };
-exports.BatchSyncOptions = BatchSyncOptions;
 __decorate([
     (0, type_graphql_1.Field)(() => Number, { nullable: true, defaultValue: 100 }),
     __metadata("design:type", Number)
@@ -81,13 +80,13 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true, defaultValue: false }),
     __metadata("design:type", Boolean)
 ], BatchSyncOptions.prototype, "skipValidation", void 0);
-exports.BatchSyncOptions = BatchSyncOptions = __decorate([
+BatchSyncOptions = __decorate([
     (0, type_graphql_1.InputType)()
 ], BatchSyncOptions);
+exports.BatchSyncOptions = BatchSyncOptions;
 // Output-Typen für GraphQL
 let SyncResult = class SyncResult {
 };
-exports.SyncResult = SyncResult;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     __metadata("design:type", String)
@@ -112,12 +111,12 @@ __decorate([
     (0, type_graphql_1.Field)({ nullable: true }),
     __metadata("design:type", String)
 ], SyncResult.prototype, "entityType", void 0);
-exports.SyncResult = SyncResult = __decorate([
+SyncResult = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], SyncResult);
+exports.SyncResult = SyncResult;
 let FailedOperation = class FailedOperation {
 };
-exports.FailedOperation = FailedOperation;
 __decorate([
     (0, type_graphql_1.Field)(() => type_graphql_1.ID),
     __metadata("design:type", String)
@@ -134,12 +133,12 @@ __decorate([
     (0, type_graphql_1.Field)(() => SyncOperationType),
     __metadata("design:type", String)
 ], FailedOperation.prototype, "operationType", void 0);
-exports.FailedOperation = FailedOperation = __decorate([
+FailedOperation = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], FailedOperation);
+exports.FailedOperation = FailedOperation;
 let BatchSyncResponse = class BatchSyncResponse {
 };
-exports.BatchSyncResponse = BatchSyncResponse;
 __decorate([
     (0, type_graphql_1.Field)(() => [SyncResult]),
     __metadata("design:type", Array)
@@ -168,6 +167,7 @@ __decorate([
     (0, type_graphql_1.Field)(() => String, { nullable: true }),
     __metadata("design:type", String)
 ], BatchSyncResponse.prototype, "performanceMetrics", void 0);
-exports.BatchSyncResponse = BatchSyncResponse = __decorate([
+BatchSyncResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], BatchSyncResponse);
+exports.BatchSyncResponse = BatchSyncResponse;

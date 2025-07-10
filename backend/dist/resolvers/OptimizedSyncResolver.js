@@ -232,7 +232,6 @@ let OptimizedSyncResolver = class OptimizedSyncResolver {
         }
     }
 };
-exports.OptimizedSyncResolver = OptimizedSyncResolver;
 __decorate([
     (0, type_graphql_1.Authorized)(),
     (0, type_graphql_1.Mutation)(() => BatchSyncTypes_1.BatchSyncResponse, {
@@ -267,7 +266,8 @@ __decorate([
     __metadata("design:paramtypes", [Object, String, Number]),
     __metadata("design:returntype", Promise)
 ], OptimizedSyncResolver.prototype, "getBatchPerformanceStats", null);
-exports.OptimizedSyncResolver = OptimizedSyncResolver = __decorate([
+OptimizedSyncResolver = __decorate([
     (0, type_graphql_1.Resolver)(),
     __metadata("design:paramtypes", [])
 ], OptimizedSyncResolver);
+exports.OptimizedSyncResolver = OptimizedSyncResolver;

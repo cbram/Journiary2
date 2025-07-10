@@ -96,7 +96,6 @@ let TagResolver = class TagResolver {
         return tag.category?.id;
     }
 };
-exports.TagResolver = TagResolver;
 __decorate([
     (0, type_graphql_1.Query)(() => [Tag_1.Tag]),
     __metadata("design:type", Function),
@@ -135,6 +134,7 @@ __decorate([
     __metadata("design:paramtypes", [Tag_1.Tag]),
     __metadata("design:returntype", Object)
 ], TagResolver.prototype, "categoryId", null);
-exports.TagResolver = TagResolver = __decorate([
+TagResolver = __decorate([
     (0, type_graphql_1.Resolver)(Tag_1.Tag)
 ], TagResolver);
+exports.TagResolver = TagResolver;

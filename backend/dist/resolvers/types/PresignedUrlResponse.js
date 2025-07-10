@@ -13,7 +13,6 @@ exports.PresignedUrlResponse = void 0;
 const type_graphql_1 = require("type-graphql");
 let PresignedUrlResponse = class PresignedUrlResponse {
 };
-exports.PresignedUrlResponse = PresignedUrlResponse;
 __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", String)
@@ -30,6 +29,7 @@ __decorate([
     (0, type_graphql_1.Field)({ name: "objectKey" }),
     __metadata("design:type", String)
 ], PresignedUrlResponse.prototype, "objectName", void 0);
-exports.PresignedUrlResponse = PresignedUrlResponse = __decorate([
+PresignedUrlResponse = __decorate([
     (0, type_graphql_1.ObjectType)()
 ], PresignedUrlResponse);
+exports.PresignedUrlResponse = PresignedUrlResponse;
