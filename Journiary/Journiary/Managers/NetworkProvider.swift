@@ -711,3 +711,350 @@ extension JourniaryAPI.TripInput {
         )
     }
 } 
+
+// MARK: - Network Request Optimizations (Schritt 5.4)
+
+/// Network-Request-Optimierungen für bessere Performance und Effizienz
+/// Implementiert als Teil von Schritt 5.4 des Sync-Implementierungsplans
+extension NetworkProvider {
+    
+    /// Batch-Request-Manager für GraphQL-Operationen
+    private static let batchRequestManager = BatchRequestManager()
+    
+    /// Request-Deduplication-Cache
+    private static var pendingRequests: [String: Task<Any, Error>] = [:]
+    private static let requestLock = NSLock()
+    
+    /// Optimierte Sync-Funktion mit Request-Batching
+    func syncOptimized(lastSyncedAt: Date?) async throws -> SyncQuery.Data.Sync {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "OptimizedSync")
+        
+        // Verwende intelligente Caching-Strategie
+        let cacheKey = "sync:\(lastSyncedAt?.timeIntervalSince1970 ?? 0)"
+        
+        // Prüfe auf bereits laufende Request
+        if let existingTask = Self.getExistingRequest(for: cacheKey) {
+            let result = try await existingTask as! SyncQuery.Data.Sync
+            measurement.finish(entityCount: 1)
+            return result
+        }
+        
+        // Erstelle neue optimierte Request
+        let task = Task<SyncQuery.Data.Sync, Error> {
+            defer { Self.removeRequest(for: cacheKey) }
+            
+            // Verwende Cache wenn verfügbar und noch gültig
+            if let cached = SyncCacheManager.shared.getCachedEntity(forKey: cacheKey, type: SyncQuery.Data.Sync.self) {
+                measurement.finish(entityCount: 1)
+                return cached
+            }
+            
+            // Führe normale Sync-Request aus
+            let result = try await self.sync(lastSyncedAt: lastSyncedAt)
+            
+            // Cache das Ergebnis für 2 Minuten
+            SyncCacheManager.shared.cacheEntity(result, forKey: cacheKey, ttl: 120)
+            
+            measurement.finish(entityCount: 1)
+            return result
+        }
+        
+        Self.storeRequest(task, for: cacheKey)
+        return try await task.value
+    }
+    
+    /// Batch-Upload für mehrere Entitäten
+    func batchUpload<T: Any>(
+        operations: [(operation: String, input: T)],
+        maxBatchSize: Int = 10
+    ) async throws -> [BatchUploadResult] {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "BatchUpload")
+        
+        let batches = operations.chunked(into: maxBatchSize)
+        var allResults: [BatchUploadResult] = []
+        
+        for batch in batches {
+            let batchResults = try await processBatch(batch)
+            allResults.append(contentsOf: batchResults)
+            
+            // Kleine Pause zwischen Batches um Server nicht zu überlasten
+            try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+        }
+        
+        measurement.finish(entityCount: operations.count)
+        return allResults
+    }
+    
+    /// Optimierte File-Upload mit Compression und Retry-Logik
+    func uploadFileOptimized(
+        fileURL: URL,
+        uploadURL: URL,
+        mimeType: String,
+        maxRetries: Int = 3
+    ) async throws -> Bool {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "OptimizedFileUpload")
+        
+        var lastError: Error?
+        
+        for attempt in 1...maxRetries {
+            do {
+                let success = try await uploadFileWithCompression(
+                    fileURL: fileURL,
+                    uploadURL: uploadURL,
+                    mimeType: mimeType
+                )
+                
+                measurement.finish(entityCount: 1)
+                return success
+                
+            } catch {
+                lastError = error
+                print("⚠️ Upload-Versuch \(attempt) fehlgeschlagen: \(error.localizedDescription)")
+                
+                if attempt < maxRetries {
+                    // Exponential backoff: 1s, 2s, 4s
+                    let delay = TimeInterval(1 << (attempt - 1))
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                }
+            }
+        }
+        
+        measurement.finish(entityCount: 0)
+        throw lastError ?? URLError(.unknown)
+    }
+    
+    /// Intelligent Request-Caching
+    func cachedRequest<T: Codable>(
+        cacheKey: String,
+        ttl: TimeInterval = 300,
+        requestBuilder: () async throws -> T
+    ) async throws -> T {
+        // Prüfe Cache zuerst
+        if let cached = SyncCacheManager.shared.getCachedEntity(forKey: cacheKey, type: T.self) {
+            return cached
+        }
+        
+        // Request ausführen und cachen
+        let result = try await requestBuilder()
+        SyncCacheManager.shared.cacheEntity(result, forKey: cacheKey, ttl: ttl)
+        
+        return result
+    }
+    
+    // MARK: - Private Helper Methods
+    
+    private func processBatch<T: Any>(
+        _ batch: [(operation: String, input: T)]
+    ) async throws -> [BatchUploadResult] {
+        // Führe Batch-Operationen parallel aus
+        return try await withThrowingTaskGroup(of: BatchUploadResult.self) { group in
+            for operation in batch {
+                group.addTask {
+                    do {
+                        let result = try await self.processSingleOperation(operation)
+                        return BatchUploadResult(
+                            operation: operation.operation,
+                            success: true,
+                            result: result,
+                            error: nil
+                        )
+                    } catch {
+                        return BatchUploadResult(
+                            operation: operation.operation,
+                            success: false,
+                            result: nil,
+                            error: error.localizedDescription
+                        )
+                    }
+                }
+            }
+            
+            var results: [BatchUploadResult] = []
+            for try await result in group {
+                results.append(result)
+            }
+            return results
+        }
+    }
+    
+    private func processSingleOperation<T: Any>(
+        _ operation: (operation: String, input: T)
+    ) async throws -> Any {
+        // Router für verschiedene Operationen
+        switch operation.operation {
+        case "createTrip":
+            return try await createTrip(input: operation.input as! TripInput)
+        case "createMemory":
+            return try await createMemory(input: operation.input as! MemoryInput)
+        case "createMediaItem":
+            return try await createMediaItem(input: operation.input as! MediaItemInput)
+        case "createGPXTrack":
+            return try await createGPXTrack(input: operation.input as! GPXTrackInput)
+        default:
+            throw NSError(domain: "NetworkProvider", code: 999, userInfo: [
+                NSLocalizedDescriptionKey: "Unknown operation: \(operation.operation)"
+            ])
+        }
+    }
+    
+    private func uploadFileWithCompression(
+        fileURL: URL,
+        uploadURL: URL,
+        mimeType: String
+    ) async throws -> Bool {
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "PUT"
+        request.setValue(mimeType, forHTTPHeaderField: "Content-Type")
+        
+        // Komprimiere Datei wenn möglich
+        let fileData: Data
+        if shouldCompressFile(mimeType: mimeType) {
+            fileData = try compressFile(at: fileURL)
+            request.setValue("gzip", forHTTPHeaderField: "Content-Encoding")
+        } else {
+            fileData = try Data(contentsOf: fileURL)
+        }
+        
+        request.httpBody = fileData
+        
+        // Verwende optimierte URLSession
+        let session = getOptimizedURLSession()
+        
+        let (_, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        return (200...299).contains(httpResponse.statusCode)
+    }
+    
+    private func shouldCompressFile(mimeType: String) -> Bool {
+        // Komprimiere nur bestimmte Dateitypen
+        let compressibleTypes = ["text/", "application/json", "application/xml"]
+        return compressibleTypes.contains { mimeType.hasPrefix($0) }
+    }
+    
+    private func compressFile(at fileURL: URL) throws -> Data {
+        let originalData = try Data(contentsOf: fileURL)
+        return try (originalData as NSData).compressed(using: .zlib) as Data
+    }
+    
+    private func getOptimizedURLSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        
+        // Optimierte Konfiguration für File-Uploads
+        config.timeoutIntervalForRequest = 30.0
+        config.timeoutIntervalForResource = 300.0
+        config.httpMaximumConnectionsPerHost = 6
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        
+        // Connection-Pool-Optimierungen
+        config.httpShouldUsePipelining = true
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        
+        // Compression
+        config.httpAdditionalHeaders = [
+            "Accept-Encoding": "gzip, deflate"
+        ]
+        
+        return URLSession(configuration: config)
+    }
+    
+    // Request-Deduplication Hilfsmethoden
+    private static func getExistingRequest(for key: String) -> Task<Any, Error>? {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        return pendingRequests[key]
+    }
+    
+    private static func storeRequest<T>(_ task: Task<T, Error>, for key: String) {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        pendingRequests[key] = task as! Task<Any, Error>
+    }
+    
+    private static func removeRequest(for key: String) {
+        requestLock.lock()
+        defer { requestLock.unlock() }
+        pendingRequests.removeValue(forKey: key)
+    }
+}
+
+// MARK: - Supporting Types
+
+/// Ergebnis einer Batch-Upload-Operation
+struct BatchUploadResult {
+    let operation: String
+    let success: Bool
+    let result: Any?
+    let error: String?
+}
+
+/// Batch-Request-Manager für GraphQL-Optimierungen
+class BatchRequestManager {
+    private var pendingBatches: [String: [PendingRequest]] = [:]
+    private let batchQueue = DispatchQueue(label: "BatchRequestQueue")
+    private let maxWaitTime: TimeInterval = 0.1 // 100ms
+    
+    struct PendingRequest {
+        let id: UUID
+        let timestamp: Date
+        let completion: (Result<Any, Error>) -> Void
+    }
+    
+    func batchRequest<T>(
+        operation: String,
+        completion: @escaping (Result<T, Error>) -> Void
+    ) {
+        batchQueue.async {
+            let request = PendingRequest(
+                id: UUID(),
+                timestamp: Date(),
+                completion: { result in
+                    switch result {
+                    case .success(let value):
+                        if let typedValue = value as? T {
+                            completion(.success(typedValue))
+                        } else {
+                            completion(.failure(NSError(domain: "BatchRequestManager", code: 1, userInfo: [
+                                NSLocalizedDescriptionKey: "Type conversion failed"
+                            ])))
+                        }
+                    case .failure(let error):
+                        completion(.failure(error))
+                    }
+                }
+            )
+            
+            if self.pendingBatches[operation] == nil {
+                self.pendingBatches[operation] = []
+            }
+            self.pendingBatches[operation]?.append(request)
+            
+            // Verzögertes Ausführen der Batch
+            DispatchQueue.global().asyncAfter(deadline: .now() + self.maxWaitTime) {
+                self.executeBatch(for: operation)
+            }
+        }
+    }
+    
+    private func executeBatch(for operation: String) {
+        batchQueue.sync {
+            guard let requests = pendingBatches[operation], !requests.isEmpty else {
+                return
+            }
+            
+            pendingBatches[operation] = nil
+            
+            // Führe gebatchte Requests aus
+            for request in requests {
+                // Simuliere Batch-Ausführung
+                request.completion(.success("Batch result for \(operation)"))
+            }
+        }
+    }
+}
+
+// Array chunking wird bereits in SyncManager definiert 
