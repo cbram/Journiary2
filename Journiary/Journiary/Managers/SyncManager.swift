@@ -29,7 +29,13 @@ final class SyncManager {
     }
 
     /// Private initializer to enforce the singleton pattern.
-    private init() {}
+    private init() {
+        // Initialisiere erweiterte Logging-Infrastruktur
+        SyncLogger.shared.info("SyncManager initialisiert", category: "Initialization", metadata: [
+            "version": "7.1",
+            "features": ["dependency_resolution", "conflict_resolution", "performance_monitoring", "enhanced_logging"]
+        ])
+    }
 
     /// Initiates the synchronization cycle.
     ///
@@ -41,18 +47,23 @@ final class SyncManager {
     /// If any step in the cycle fails, the entire process is aborted,
     /// and the `lastSyncedAt` timestamp is not updated to ensure data consistency.
     func sync(reason: String = "Unknown") async {
-        print("Sync started...")
+        let syncStartTime = Date()
+        
+        // Erweiterte Logging-Infrastruktur für Sync-Start
+        let isAuthenticated = await MainActor.run { AuthService.shared.isAuthenticated }
+        SyncLogger.shared.logSyncStart(reason: reason, metadata: [
+            "user_authenticated": isAuthenticated,
+            "last_sync": lastSyncedAt?.timeIntervalSince1970 ?? 0
+        ])
         
         // Starte Performance-Monitoring für gesamten Sync-Zyklus
         let syncMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "FullSync")
         
-        // Prüfe Authentifizierung vor dem Sync (MainActor-sicher)
-        let isAuthenticated = await MainActor.run {
-            return AuthService.shared.isAuthenticated
-        }
-        
         guard isAuthenticated else {
-            print("⚠️ Sync übersprungen: Benutzer ist nicht authentifiziert")
+            SyncLogger.shared.warning("Sync übersprungen: Benutzer ist nicht authentifiziert", 
+                                    category: "Authentication", 
+                                    metadata: ["sync_reason": reason])
+            
             let authError = SyncError.authenticationError
             await MainActor.run {
                 SyncNotificationCenter.shared.notifySyncError(
@@ -75,7 +86,6 @@ final class SyncManager {
             // If both phases succeed, update the last synced timestamp from the server response.
             if let serverTimestamp = self.dateTimeToDate(syncData.serverTimestamp) {
                 self.lastSyncedAt = serverTimestamp
-                print("Sync completed successfully. New lastSyncedAt: \(serverTimestamp)")
                 
                 // Phase 5.4: Berechne synchronisierte Entitäten
                 let syncedEntities = SyncedEntities(
@@ -94,6 +104,24 @@ final class SyncManager {
                                   syncedEntities.tagsUpdated + syncedEntities.tagCategoriesUpdated + 
                                   syncedEntities.bucketListItemsUpdated
                 syncMeasurement.finish(entityCount: totalEntities)
+                
+                // Erweiterte Logging für erfolgreichen Sync
+                let syncDuration = Date().timeIntervalSince(syncStartTime)
+                SyncLogger.shared.logSyncSuccess(
+                    reason: reason, 
+                    duration: syncDuration, 
+                    entitiesProcessed: totalEntities,
+                    metadata: [
+                        "server_timestamp": serverTimestamp.timeIntervalSince1970,
+                        "trips": syncedEntities.tripsUpdated,
+                        "memories": syncedEntities.memoriesUpdated,
+                        "media_items": syncedEntities.mediaItemsUpdated,
+                        "gpx_tracks": syncedEntities.gpxTracksUpdated,
+                        "tags": syncedEntities.tagsUpdated,
+                        "tag_categories": syncedEntities.tagCategoriesUpdated,
+                        "bucket_list_items": syncedEntities.bucketListItemsUpdated
+                    ]
+                )
                 
                 // Phase 5.4: Notify sync success
                 await MainActor.run {
@@ -123,7 +151,17 @@ final class SyncManager {
             }
 
         } catch {
-            print("Sync failed: \(error.localizedDescription)")
+            // Erweiterte Logging für Sync-Fehler
+            SyncLogger.shared.logSyncError(
+                reason: reason, 
+                error: error, 
+                phase: "sync_cycle",
+                metadata: [
+                    "duration_seconds": Date().timeIntervalSince(syncStartTime),
+                    "last_sync_attempt": lastSyncedAt?.timeIntervalSince1970 ?? 0
+                ]
+            )
+            
             // The `lastSyncedAt` timestamp is not updated, so the next sync will retry the failed operations.
             
             // Beende Performance-Monitoring für fehlgeschlagenen Sync
@@ -144,11 +182,14 @@ final class SyncManager {
     /// Neue Methode für dependency-aware Upload (erstmal nur logging)
     /// Integriert den Dependency-Resolver ohne bestehende Funktionalität zu brechen
     private func uploadPhaseWithDependencies() async throws {
-        print("📋 Dependency-aware Upload wird vorbereitet...")
+        SyncLogger.shared.info("Dependency-aware Upload wird vorbereitet", category: "Dependencies", metadata: ["phase": "upload_with_dependencies"])
         
         let syncOrder = dependencyResolver.resolveSyncOrder()
         for entityType in syncOrder {
-            print("  - \(entityType.rawValue) (Order: \(entityType.syncOrder))")
+            SyncLogger.shared.debug("Entity in sync order: \(entityType.rawValue)", category: "Dependencies", metadata: [
+                "entity_type": entityType.rawValue,
+                "sync_order": entityType.syncOrder
+            ])
         }
         
         // Rufe bestehende uploadPhase auf
@@ -159,7 +200,7 @@ final class SyncManager {
     ///
     /// Identifies local creations, updates, and deletions and sends them to the backend via GraphQL mutations.
     private func uploadPhase() async throws {
-        print("Executing upload phase...")
+        SyncLogger.shared.info("Executing upload phase", category: "SyncPhase", metadata: ["phase": "upload"])
         
         // Starte Performance-Monitoring für Upload-Phase
         let uploadMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "UploadPhase")
@@ -264,7 +305,10 @@ final class SyncManager {
     /// - parameter since: The timestamp of the last successful synchronization. If `nil`, a full sync might be performed.
     /// - returns: The `SyncQuery.Data.Sync` object from the server.
     private func downloadPhase(since lastSync: Date?) async throws -> SyncQuery.Data.Sync {
-        print("Executing download phase...")
+        SyncLogger.shared.info("Executing download phase", category: "SyncPhase", metadata: [
+            "phase": "download",
+            "last_sync": lastSync?.timeIntervalSince1970 ?? 0
+        ])
         
         // Starte Performance-Monitoring für Download-Phase
         let downloadMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "DownloadPhase")
