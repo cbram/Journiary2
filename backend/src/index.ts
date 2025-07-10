@@ -21,6 +21,7 @@ import { UserResolver } from "./resolvers/UserResolver";
 import { AdminResolver } from "./resolvers/AdminResolver";
 import { User } from "./entities/User";
 import { SyncResolver } from "./resolvers/SyncResolver";
+import { OptimizedSyncResolver } from "./resolvers/OptimizedSyncResolver";
 import { authChecker } from "./utils/auth";
 
 export interface MyContext {
@@ -61,7 +62,8 @@ async function startServer() {
                 GPXResolver,
                 UserResolver,
                 AdminResolver,
-                SyncResolver
+                SyncResolver,
+                OptimizedSyncResolver
             ],
             validate: false,
             authChecker,
