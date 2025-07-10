@@ -1,329 +1,333 @@
-import { Resolver, Mutation, Arg, Ctx, Authorized, Query } from "type-graphql";
-import { AuthenticationError } from "apollo-server-express";
-import { AppDataSource } from "../utils/database";
-import { MyContext } from "..";
-import { 
-    SyncOperation, 
-    BatchSyncOptions, 
-    BatchSyncResponse, 
-    SyncResult, 
-    FailedOperation,
-    SyncResultStatus 
-} from "./types/BatchSyncTypes";
-import { BatchProcessor } from "../utils/BatchProcessor";
-import { PerformanceMeasurement, MetricsCollector, performanceMonitor } from "../utils/PerformanceMonitoring";
-import { EntityManager } from "typeorm";
+import { Resolver, Query, Arg, Ctx, Int } from 'type-graphql';
+import { Service } from 'typedi';
+import * as DataLoader from 'dataloader';
+import { Repository, In, getConnection, getRepository } from 'typeorm';
+import { Trip } from '../entities/Trip';
+import { Memory } from '../entities/Memory';
+import { MediaItem } from '../entities/MediaItem';
+import { GPXTrack } from '../entities/GPXTrack';
+import { Tag } from '../entities/Tag';
 
-@Resolver()
+// Temporäre Cache-Implementierung (bis RedisCacheManager verfügbar ist)
+class SimpleCacheManager {
+    private cache = new Map<string, { data: any; expiry: number }>();
+    
+    async smartCache<T>(
+        key: string,
+        fetchFunction: () => Promise<T>,
+        ttl: number = 300
+    ): Promise<T> {
+        const cached = this.cache.get(key);
+        if (cached && Date.now() < cached.expiry) {
+            return cached.data;
+        }
+        
+        const data = await fetchFunction();
+        this.cache.set(key, {
+            data,
+            expiry: Date.now() + ttl * 1000
+        });
+        
+        return data;
+    }
+    
+    async invalidateCache(pattern: string): Promise<void> {
+        for (const key of this.cache.keys()) {
+            if (key.includes(pattern.replace('*', ''))) {
+                this.cache.delete(key);
+            }
+        }
+    }
+}
+
+class OptimizedSyncResponse {
+    trips: Trip[];
+    memories: Memory[];
+    mediaItems: MediaItem[];
+    gpxTracks: GPXTrack[];
+    tags: Tag[];
+    timestamp: Date;
+    totalCount: number;
+
+    constructor(data: any) {
+        this.trips = data.trips || [];
+        this.memories = data.memories || [];
+        this.mediaItems = data.mediaItems || [];
+        this.gpxTracks = data.gpxTracks || [];
+        this.tags = data.tags || [];
+        this.timestamp = data.timestamp || new Date();
+        this.totalCount = data.totalCount || 0;
+    }
+}
+
+interface Context {
+    user: { id: string };
+}
+
+@Service()
+@Resolver(() => Trip)
 export class OptimizedSyncResolver {
-    private readonly batchProcessor: BatchProcessor;
-    
+    private cacheManager: SimpleCacheManager;
+    private tripRepository: Repository<Trip>;
+    private memoryRepository: Repository<Memory>;
+    private mediaItemRepository: Repository<MediaItem>;
+    private gpxTrackRepository: Repository<GPXTrack>;
+    private tagRepository: Repository<Tag>;
+
     constructor() {
-        this.batchProcessor = new BatchProcessor();
+        this.cacheManager = new SimpleCacheManager();
+        this.tripRepository = getRepository(Trip);
+        this.memoryRepository = getRepository(Memory);
+        this.mediaItemRepository = getRepository(MediaItem);
+        this.gpxTrackRepository = getRepository(GPXTrack);
+        this.tagRepository = getRepository(Tag);
     }
-    
-    @Authorized()
-    @Mutation(() => BatchSyncResponse, { 
-        description: "Erweiterte Batch-Synchronisation mit Performance-Optimierungen" 
-    })
-    async batchSync(
-        @Arg("operations", () => [SyncOperation]) operations: SyncOperation[],
-        @Ctx() { userId }: MyContext,
-        @Arg("options", () => BatchSyncOptions, { nullable: true }) options?: BatchSyncOptions
-    ): Promise<BatchSyncResponse> {
-        if (!userId) {
-            throw new AuthenticationError("Benutzer muss angemeldet sein für Batch-Sync.");
-        }
+
+    @Query(() => OptimizedSyncResponse)
+    async optimizedSync(
+        @Arg('userId') userId: string,
+        @Arg('lastSync', { nullable: true }) lastSync?: Date,
+        @Arg('limit', { defaultValue: 1000 }) limit: number = 1000,
+        @Ctx() context?: Context
+    ): Promise<OptimizedSyncResponse> {
+        const syncTimestamp = new Date();
+        const cacheKey = `sync:${userId}:${lastSync?.getTime() || 0}:${limit}`;
         
-        const startTime = Date.now();
-        const measurement = performanceMonitor.startMeasurement(
-            "BatchSync", 
-            options?.batchSize, 
-            options?.maxConcurrency
+        return await this.cacheManager.smartCache(
+            cacheKey,
+            async () => {
+                const results = await this.performOptimizedSync(userId, lastSync, limit);
+                return new OptimizedSyncResponse({
+                    ...results,
+                    timestamp: syncTimestamp,
+                    totalCount: results.trips.length + results.memories.length + 
+                               results.mediaItems.length + results.gpxTracks.length + results.tags.length
+                });
+            },
+            60 // 1 Minute Cache
         );
-        
-        console.log(`🚀 Batch-Sync gestartet: ${operations.length} Operationen für User ${userId}`);
-        
-        try {
-            // Validiere Operationen
-            if (!options?.skipValidation) {
-                this.validateOperations(operations);
-            }
-            
-            // Parallelisiere Batch-Operationen
-            const batchSize = options?.batchSize || 100;
-            const batches = this.chunkOperations(operations, batchSize);
-            
-            console.log(`📊 Aufgeteilt in ${batches.length} Batches à ${batchSize} Operationen`);
-            
-            // Verarbeite Batches parallel mit Error-Handling
-            const results = await Promise.allSettled(
-                batches.map((batch, index) => 
-                    this.processBatch(batch, userId, index, options?.timeout)
-                )
-            );
-            
-            // Sammle Ergebnisse
-            const successful: SyncResult[] = [];
-            const failed: FailedOperation[] = [];
-            
-            results.forEach((result, batchIndex) => {
-                if (result.status === 'fulfilled') {
-                    successful.push(...result.value.successful);
-                    failed.push(...result.value.failed);
-                } else {
-                    // Behandle Batch-Level-Fehler
-                    const batchOps = batches[batchIndex];
-                    batchOps.forEach(op => {
-                        failed.push({
-                            id: op.id,
-                            error: `Batch-Fehler: ${result.reason.message}`,
-                            entityType: op.entityType,
-                            operationType: op.type
-                        });
-                    });
-                }
-            });
-            
-            const duration = Date.now() - startTime;
-            const successRate = operations.length > 0 ? successful.length / operations.length : 0;
-            
-            // Performance-Metriken sammeln
-            const performanceMetrics = this.generatePerformanceMetrics(
-                operations.length,
-                duration,
-                successful.length,
-                failed.length,
-                options
-            );
-            
-            measurement.finish(operations.length);
-            
-            console.log(`✅ Batch-Sync abgeschlossen: ${successful.length}/${operations.length} erfolgreich in ${duration}ms`);
-            
-            return {
-                successful,
-                failed,
-                processed: operations.length,
-                duration,
-                timestamp: new Date(),
-                successRate,
-                performanceMetrics: JSON.stringify(performanceMetrics)
-            };
-            
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            measurement.finish(operations.length, error as Error);
-            
-            console.error(`❌ Batch-Sync fehlgeschlagen nach ${duration}ms:`, error);
-            
-            // Erstelle Fehler-Response
-            const failed: FailedOperation[] = operations.map(op => ({
-                id: op.id,
-                error: `Globaler Batch-Fehler: ${(error as Error).message}`,
-                entityType: op.entityType,
-                operationType: op.type
-            }));
-            
-            return {
-                successful: [],
-                failed,
-                processed: operations.length,
-                duration,
-                timestamp: new Date(),
-                successRate: 0,
-                performanceMetrics: JSON.stringify({ error: (error as Error).message })
-            };
-        }
     }
-    
-    @Authorized()
-    @Query(() => String, { 
-        description: "Exportiert Performance-Metriken als JSON" 
-    })
-    async exportPerformanceMetrics(@Ctx() { userId }: MyContext): Promise<string> {
-        if (!userId) {
-            throw new AuthenticationError("Benutzer muss angemeldet sein.");
-        }
+
+    @Query(() => [Trip])
+    async tripsOptimized(
+        @Arg('userId') userId: string,
+        @Arg('limit', { defaultValue: 50 }) limit: number = 50,
+        @Arg('offset', { defaultValue: 0 }) offset: number = 0
+    ): Promise<Trip[]> {
+        const cacheKey = `trips:${userId}:${limit}:${offset}`;
         
-        return performanceMonitor.exportMetrics();
+        return await this.cacheManager.smartCache(
+            cacheKey,
+            async () => {
+                const queryBuilder = this.tripRepository.createQueryBuilder('trip')
+                    .where('trip.userId = :userId', { userId })
+                    .orderBy('trip.createdAt', 'DESC')
+                    .limit(limit)
+                    .offset(offset);
+                
+                return await queryBuilder.getMany();
+            },
+            300 // 5 Minuten Cache
+        );
     }
-    
-    @Authorized()
-    @Query(() => String, { 
-        description: "Gibt aktuelle Batch-Performance-Statistiken zurück" 
-    })
-    async getBatchPerformanceStats(
-        @Ctx() { userId }: MyContext,
-        @Arg("operation", { nullable: true }) operation?: string,
-        @Arg("lastMinutes", { nullable: true, defaultValue: 60 }) lastMinutes?: number
-    ): Promise<string> {
-        if (!userId) {
-            throw new AuthenticationError("Benutzer muss angemeldet sein.");
-        }
-        
-        const metrics = performanceMonitor.getMetrics(operation, lastMinutes);
-        return JSON.stringify(metrics, null, 2);
-    }
-    
-    /**
-     * Verarbeitet einen einzelnen Batch von Operationen
-     */
-    private async processBatch(
-        operations: SyncOperation[],
+
+    private async performOptimizedSync(
         userId: string,
-        batchIndex: number,
-        timeout?: number
-    ): Promise<{ successful: SyncResult[]; failed: FailedOperation[] }> {
-        console.log(`🔄 Verarbeite Batch ${batchIndex + 1} mit ${operations.length} Operationen`);
+        lastSync?: Date,
+        limit: number = 1000
+    ): Promise<{
+        trips: Trip[];
+        memories: Memory[];
+        mediaItems: MediaItem[];
+        gpxTracks: GPXTrack[];
+        tags: Tag[];
+    }> {
+        const connection = getConnection();
         
-        const batchMeasurement = performanceMonitor.startMeasurement(
-            `BatchProcess-${batchIndex}`,
-            operations.length
-        );
+        // Verwende optimierte Raw-Query für bessere Performance
+        const entities = await this.buildOptimizedSyncQuery(userId, lastSync, limit);
         
-        try {
-            // Verwende Transaktion für atomare Batch-Verarbeitung
-            const result = await this.batchProcessor.processInTransaction(
-                operations,
-                async (ops, entityManager) => {
-                    return await this.processOperationsInBatch(ops, entityManager, userId);
-                }
-            );
-            
-            batchMeasurement.finish(operations.length);
-            console.log(`✅ Batch ${batchIndex + 1} erfolgreich verarbeitet`);
-            
-            return result;
-            
-        } catch (error) {
-            batchMeasurement.finish(operations.length, error as Error);
-            console.error(`❌ Batch ${batchIndex + 1} fehlgeschlagen:`, error);
-            
-            // Alle Operationen in diesem Batch als fehlgeschlagen markieren
-            const failed: FailedOperation[] = operations.map(op => ({
-                id: op.id,
-                error: `Batch-Transaktion fehlgeschlagen: ${(error as Error).message}`,
-                entityType: op.entityType,
-                operationType: op.type
-            }));
-            
-            return { successful: [], failed };
-        }
-    }
-    
-    /**
-     * Verarbeitet Operationen innerhalb eines Batches mit Dependency-Auflösung
-     */
-    private async processOperationsInBatch(
-        operations: SyncOperation[],
-        entityManager: EntityManager,
-        userId: string
-    ): Promise<{ successful: SyncResult[]; failed: FailedOperation[] }> {
-        // Verwende BatchProcessor für dependency-aware Verarbeitung
-        const results = await this.batchProcessor.processOperationsWithDependencies(
-            operations,
-            entityManager
-        );
+        // Separiere Entities nach Typ
+        const trips: Trip[] = [];
+        const memories: Memory[] = [];
+        const mediaItems: MediaItem[] = [];
+        const gpxTracks: GPXTrack[] = [];
+        const tags: Tag[] = [];
         
-        const successful: SyncResult[] = [];
-        const failed: FailedOperation[] = [];
+        // Lade komplette Entities basierend auf IDs
+        const tripIds = entities.filter(e => e.entity_type === 'trip').map(e => e.id);
+        const memoryIds = entities.filter(e => e.entity_type === 'memory').map(e => e.id);
+        const mediaItemIds = entities.filter(e => e.entity_type === 'media_item').map(e => e.id);
+        const gpxTrackIds = entities.filter(e => e.entity_type === 'gpx_track').map(e => e.id);
+        const tagIds = entities.filter(e => e.entity_type === 'tag').map(e => e.id);
         
-        results.forEach(({ operation, result, error }) => {
-            const processingTime = Date.now(); // Vereinfacht, könnte genauer gemessen werden
-            
-            if (error) {
-                failed.push({
-                    id: operation.id,
-                    error: error.message,
-                    entityType: operation.entityType,
-                    operationType: operation.type
-                });
-            } else {
-                successful.push({
-                    id: operation.id,
-                    status: SyncResultStatus.SUCCESS,
-                    data: JSON.stringify(result),
-                    processingTime,
-                    entityType: operation.entityType
-                });
-            }
-        });
-        
-        return { successful, failed };
-    }
-    
-    /**
-     * Validiert die eingehenden Operationen
-     */
-    private validateOperations(operations: SyncOperation[]): void {
-        if (!operations || operations.length === 0) {
-            throw new Error("Keine Operationen zur Verarbeitung erhalten");
-        }
-        
-        if (operations.length > 10000) {
-            throw new Error("Zu viele Operationen in einem Batch (Maximum: 10000)");
-        }
-        
-        // Validiere jede Operation
-        operations.forEach((op, index) => {
-            if (!op.id || !op.type || !op.entityType || !op.data) {
-                throw new Error(`Operation ${index} ist unvollständig: ID, Type, EntityType und Data sind erforderlich`);
-            }
-            
-            try {
-                JSON.parse(op.data);
-            } catch (error) {
-                throw new Error(`Operation ${index} hat ungültiges JSON in data-Feld`);
-            }
-        });
-        
-        console.log(`✅ ${operations.length} Operationen erfolgreich validiert`);
-    }
-    
-    /**
-     * Teilt Operationen in Chunks auf
-     */
-    private chunkOperations(operations: SyncOperation[], chunkSize: number): SyncOperation[][] {
-        return this.batchProcessor.chunkArray(operations, chunkSize);
-    }
-    
-    /**
-     * Generiert Performance-Metriken für die Response
-     */
-    private generatePerformanceMetrics(
-        totalOperations: number,
-        duration: number,
-        successCount: number,
-        failCount: number,
-        options?: BatchSyncOptions
-    ): any {
-        const throughput = totalOperations > 0 ? totalOperations / (duration / 1000) : 0;
-        const successRate = totalOperations > 0 ? successCount / totalOperations : 0;
+        // Parallel-Laden für bessere Performance
+        const [loadedTrips, loadedMemories, loadedMediaItems, loadedTracks, loadedTags] = await Promise.all([
+            tripIds.length > 0 ? this.tripRepository.findByIds(tripIds) : Promise.resolve([]),
+            memoryIds.length > 0 ? this.memoryRepository.findByIds(memoryIds) : Promise.resolve([]),
+            mediaItemIds.length > 0 ? this.mediaItemRepository.findByIds(mediaItemIds) : Promise.resolve([]),
+            gpxTrackIds.length > 0 ? this.gpxTrackRepository.findByIds(gpxTrackIds) : Promise.resolve([]),
+            tagIds.length > 0 ? this.tagRepository.findByIds(tagIds) : Promise.resolve([])
+        ]);
         
         return {
-            totalOperations,
-            duration,
-            throughput: parseFloat(throughput.toFixed(2)),
-            successRate: parseFloat(successRate.toFixed(4)),
-            successCount,
-            failCount,
-            batchSize: options?.batchSize || 100,
-            maxConcurrency: options?.maxConcurrency || 10,
-            timestamp: new Date().toISOString(),
-            memoryUsage: this.getCurrentMemoryUsage()
+            trips: loadedTrips,
+            memories: loadedMemories,
+            mediaItems: loadedMediaItems,
+            gpxTracks: loadedTracks,
+            tags: loadedTags
         };
     }
-    
-    /**
-     * Gibt aktuellen Speicherverbrauch zurück
-     */
-    private getCurrentMemoryUsage(): number {
-        try {
-            const memoryUsage = process.memoryUsage();
-            return memoryUsage.heapUsed;
-        } catch (error) {
-            return 0;
+
+    private async buildOptimizedSyncQuery(
+        userId: string,
+        lastSync?: Date,
+        limit: number = 1000
+    ): Promise<any[]> {
+        const connection = getConnection();
+        const params: any[] = [userId];
+        
+        // Baue WHERE-Bedingungen
+        const syncCondition = lastSync ? 
+            `AND updated_at > $${params.length + 1}` : '';
+        if (lastSync) params.push(lastSync);
+        
+        // Optimierte Union-Query für PostgreSQL
+        const query = `
+            SELECT 
+                'trip' as entity_type,
+                id,
+                created_at,
+                updated_at
+            FROM trips 
+            WHERE user_id = $1 
+            ${syncCondition}
+            
+            UNION ALL
+            
+            SELECT 
+                'memory' as entity_type,
+                m.id,
+                m.created_at,
+                m.updated_at
+            FROM memories m
+            JOIN trips t ON m.trip_id = t.id
+            WHERE t.user_id = $1 
+            ${syncCondition.replace('updated_at', 'm.updated_at')}
+            
+            UNION ALL
+            
+            SELECT 
+                'media_item' as entity_type,
+                mi.id,
+                mi.created_at,
+                mi.updated_at
+            FROM media_items mi
+            JOIN memories m ON mi.memory_id = m.id
+            JOIN trips t ON m.trip_id = t.id
+            WHERE t.user_id = $1 
+            ${syncCondition.replace('updated_at', 'mi.updated_at')}
+            
+            UNION ALL
+            
+            SELECT 
+                'gpx_track' as entity_type,
+                gt.id,
+                gt.created_at,
+                gt.updated_at
+            FROM gpx_tracks gt
+            JOIN memories m ON gt.memory_id = m.id
+            JOIN trips t ON m.trip_id = t.id
+            WHERE t.user_id = $1 
+            ${syncCondition.replace('updated_at', 'gt.updated_at')}
+            
+            UNION ALL
+            
+            SELECT 
+                'tag' as entity_type,
+                tag.id,
+                tag.created_at,
+                tag.updated_at
+            FROM tags tag
+            WHERE tag.user_id = $1 
+            ${syncCondition.replace('updated_at', 'tag.updated_at')}
+            
+            ORDER BY updated_at DESC
+            LIMIT $${params.length + 1}
+        `;
+        
+        params.push(limit);
+        
+        return await connection.query(query, params);
+    }
+
+    private async invalidateRelatedCaches(userId: string): Promise<void> {
+        const cacheKeys = [
+            `trips:${userId}:*`,
+            `sync:${userId}:*`,
+            `user:${userId}:*`
+        ];
+        
+        for (const pattern of cacheKeys) {
+            await this.cacheManager.invalidateCache(pattern);
         }
     }
+}
+
+// Query-Komplexitäts-Analyzer für Performance-Monitoring
+export class QueryComplexityAnalyzer {
+    static analyzeComplexity(query: string): QueryComplexity {
+        const complexity = {
+            score: 0,
+            factors: [] as string[],
+            recommendations: [] as string[]
+        };
+        
+        // Analysiere JOINs
+        const joinMatches = query.match(/JOIN/gi) || [];
+        if (joinMatches.length > 0) {
+            complexity.score += joinMatches.length * 2;
+            complexity.factors.push(`${joinMatches.length} JOIN operations`);
+        }
+        
+        // Analysiere UNIONs
+        const unionMatches = query.match(/UNION/gi) || [];
+        if (unionMatches.length > 0) {
+            complexity.score += unionMatches.length * 1.5;
+            complexity.factors.push(`${unionMatches.length} UNION operations`);
+        }
+        
+        // Analysiere Subqueries
+        const subqueryMatches = query.match(/\(SELECT/gi) || [];
+        if (subqueryMatches.length > 0) {
+            complexity.score += subqueryMatches.length * 3;
+            complexity.factors.push(`${subqueryMatches.length} subqueries`);
+        }
+        
+        // Analysiere ORDER BY
+        if (query.includes('ORDER BY')) {
+            complexity.score += 1;
+            complexity.factors.push('ORDER BY clause');
+        }
+        
+        // Generiere Empfehlungen
+        if (complexity.score > 10) {
+            complexity.recommendations.push('Consider using DataLoader for related data');
+            complexity.recommendations.push('Add database indexes for frequently queried columns');
+            complexity.recommendations.push('Implement query result caching');
+        }
+        
+        if (complexity.score > 15) {
+            complexity.recommendations.push('Query is highly complex - consider optimization');
+            complexity.recommendations.push('Break down into simpler queries where possible');
+        }
+        
+        return complexity;
+    }
+}
+
+interface QueryComplexity {
+    score: number;
+    factors: string[];
+    recommendations: string[];
 } 
