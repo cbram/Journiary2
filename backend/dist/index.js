@@ -26,6 +26,7 @@ const UserResolver_1 = require("./resolvers/UserResolver");
 const AdminResolver_1 = require("./resolvers/AdminResolver");
 const SyncResolver_1 = require("./resolvers/SyncResolver");
 const OptimizedSyncResolver_1 = require("./resolvers/OptimizedSyncResolver");
+const ConflictAwareSyncResolver_1 = require("./resolvers/ConflictAwareSyncResolver");
 const auth_1 = require("./utils/auth");
 async function startServer() {
     try {
@@ -55,7 +56,8 @@ async function startServer() {
                 UserResolver_1.UserResolver,
                 AdminResolver_1.AdminResolver,
                 SyncResolver_1.SyncResolver,
-                OptimizedSyncResolver_1.OptimizedSyncResolver
+                OptimizedSyncResolver_1.OptimizedSyncResolver,
+                ConflictAwareSyncResolver_1.ConflictAwareSyncResolver
             ],
             validate: false,
             authChecker: auth_1.authChecker,

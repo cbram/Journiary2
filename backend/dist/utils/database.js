@@ -16,6 +16,7 @@ const TrackMetadata_1 = require("../entities/TrackMetadata");
 const User_1 = require("../entities/User");
 const TripMembership_1 = require("../entities/TripMembership");
 const DeletionLog_1 = require("../entities/DeletionLog");
+const ConflictTypes_1 = require("../types/ConflictTypes");
 const databaseUrl = process.env.DATABASE_URL;
 // Development-Modus: Verwende SQLite wenn keine DATABASE_URL gesetzt ist
 const isLocalDevelopment = !databaseUrl;
@@ -44,7 +45,9 @@ exports.AppDataSource = new typeorm_1.DataSource(isLocalDevelopment ? {
         TrackMetadata_1.TrackMetadata,
         User_1.User,
         TripMembership_1.TripMembership,
-        DeletionLog_1.DeletionLog
+        DeletionLog_1.DeletionLog,
+        ConflictTypes_1.ConflictLog,
+        ConflictTypes_1.DeviceRegistry
     ],
     subscribers: [],
     migrations: [],
@@ -67,7 +70,9 @@ exports.AppDataSource = new typeorm_1.DataSource(isLocalDevelopment ? {
         TrackMetadata_1.TrackMetadata,
         User_1.User,
         TripMembership_1.TripMembership,
-        DeletionLog_1.DeletionLog
+        DeletionLog_1.DeletionLog,
+        ConflictTypes_1.ConflictLog,
+        ConflictTypes_1.DeviceRegistry
     ],
     subscribers: [],
     migrations: [],

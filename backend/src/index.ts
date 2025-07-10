@@ -22,6 +22,8 @@ import { AdminResolver } from "./resolvers/AdminResolver";
 import { User } from "./entities/User";
 import { SyncResolver } from "./resolvers/SyncResolver";
 import { OptimizedSyncResolver } from "./resolvers/OptimizedSyncResolver";
+import { ConflictAwareSyncResolver } from "./resolvers/ConflictAwareSyncResolver";
+import { ConflictLog, DeviceRegistry } from "./types/ConflictTypes";
 import { authChecker } from "./utils/auth";
 
 export interface MyContext {
@@ -63,7 +65,8 @@ async function startServer() {
                 UserResolver,
                 AdminResolver,
                 SyncResolver,
-                OptimizedSyncResolver
+                OptimizedSyncResolver,
+                ConflictAwareSyncResolver
             ],
             validate: false,
             authChecker,
