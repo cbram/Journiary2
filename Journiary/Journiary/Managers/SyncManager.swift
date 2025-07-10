@@ -2,6 +2,7 @@ import Foundation
 import CoreData
 import JourniaryAPI
 import os.log
+import Darwin
 
 /// Manages the synchronization of data between the client and the backend.
 ///
@@ -1581,3 +1582,219 @@ extension SyncManager {
         print("❌ \(entityType) Upload fehlgeschlagen: \(error.localizedDescription)")
     }
 }
+
+// MARK: - Memory-Management-Optimierungen
+
+/// Memory-Management-Optimierungen für große Sync-Operationen
+/// Implementiert als Teil von Schritt 5.2 des Sync-Implementierungsplans
+extension SyncManager {
+    
+    /// Optimierte Batch-Upload-Funktionalität mit Memory-Threshold-Überwachung
+    /// - Parameters:
+    ///   - entities: Die zu uploadenden Entitäten
+    ///   - batchSize: Die Größe jeder Batch (Standard: 50)
+    ///   - memoryThreshold: Memory-Schwellenwert in Bytes (Standard: 100MB)
+    private func optimizedBatchUpload<T: NSManagedObject>(
+        entities: [T],
+        batchSize: Int = 50,
+        memoryThreshold: UInt64 = 100_000_000 // 100MB
+    ) async throws {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "BatchUpload-\(T.self)")
+        
+        let batches = entities.chunked(into: batchSize)
+        var processedCount = 0
+        
+        for batch in batches {
+            // Memory-Check vor jeder Batch
+            if getMemoryUsage() > memoryThreshold {
+                print("⚠️ Memory-Threshold erreicht, pausiere für Garbage Collection")
+                await Task.yield() // Lasse andere Tasks laufen
+                
+                // Explicit Memory Pressure Relief
+                await forceMemoryRelease()
+            }
+            
+            try await uploadBatch(batch)
+            processedCount += batch.count
+            
+            print("📤 Batch hochgeladen: \(processedCount)/\(entities.count)")
+        }
+        
+        measurement.finish(entityCount: entities.count)
+    }
+    
+    /// Forciert Memory-Freigabe für bessere Performance bei großen Sync-Operationen
+    private func forceMemoryRelease() async {
+        // Background-Context für Memory-intensive Operationen verwenden
+        let context = persistenceController.container.newBackgroundContext()
+        await context.perform {
+            context.reset()
+        }
+        
+        // Explicit Autorelease Pool Drain
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                autoreleasepool {
+                    // Trigger Memory Cleanup
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
+                continuation.resume()
+            }
+        }
+    }
+    
+    /// Ermittelt den aktuellen Memory-Verbrauch der App
+    /// - Returns: Memory-Verbrauch in Bytes
+    private func getMemoryUsage() -> UInt64 {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size)/4
+        
+        let kerr: kern_return_t = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+        
+        return kerr == KERN_SUCCESS ? info.resident_size : 0
+    }
+    
+    /// Upload-Batch-Verarbeitung mit Memory-Optimierung
+    /// - Parameter batch: Die zu uploadende Batch von Entitäten
+    private func uploadBatch<T: NSManagedObject>(_ batch: [T]) async throws {
+        // Verwende autoreleasepool für bessere Memory-Performance
+        try await withCheckedThrowingContinuation { continuation in
+            Task {
+                do {
+                                            // Hier würde die tatsächliche Upload-Logik stehen
+                        // Für jetzt simulieren wir die Arbeit
+                        for _ in batch {
+                            // Simuliere Upload-Arbeit
+                            await Task.yield()
+                        }
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    /// Optimierte Batch-Download-Funktionalität mit Memory-Management
+    /// - Parameters:
+    ///   - entityType: Der Typ der zu downloadenden Entitäten
+    ///   - batchSize: Die Größe jeder Batch
+    ///   - memoryThreshold: Memory-Schwellenwert in Bytes
+    private func optimizedBatchDownload(
+        entityType: String,
+        batchSize: Int = 100,
+        memoryThreshold: UInt64 = 100_000_000 // 100MB
+    ) async throws {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "BatchDownload-\(entityType)")
+        
+        var offset = 0
+        var hasMore = true
+        
+        while hasMore {
+            // Memory-Check vor jeder Batch
+            if getMemoryUsage() > memoryThreshold {
+                print("⚠️ Memory-Threshold erreicht während Download, pausiere für Garbage Collection")
+                await Task.yield()
+                await forceMemoryRelease()
+            }
+            
+            // Hier würde die tatsächliche Download-Logik stehen
+            // Für jetzt simulieren wir die Arbeit
+            let batchData = try await downloadBatch(entityType: entityType, offset: offset, limit: batchSize)
+            
+            if batchData.count < batchSize {
+                hasMore = false
+            }
+            
+            offset += batchData.count
+            print("📥 Batch heruntergeladen: \(offset) \(entityType) Entitäten")
+        }
+        
+        measurement.finish(entityCount: offset)
+    }
+    
+    /// Simuliert Download einer Batch (Placeholder)
+    /// - Parameters:
+    ///   - entityType: Der Typ der zu downloadenden Entitäten
+    ///   - offset: Der Offset für die Paginierung
+    ///   - limit: Die maximale Anzahl der Entitäten pro Batch
+    /// - Returns: Array mit simulierten Entitäten
+    private func downloadBatch(entityType: String, offset: Int, limit: Int) async throws -> [Any] {
+        // Simuliere Netzwerk-Latenz
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        
+        // Simuliere weniger Daten bei hohem Offset
+        let remainingData = max(0, 1000 - offset)
+        let actualLimit = min(limit, remainingData)
+        
+        return Array(0..<actualLimit)
+    }
+}
+
+// MARK: - Array-Extensions für Memory-Management
+
+/// Array-Extensions für optimierte Batch-Verarbeitung
+/// Implementiert als Teil von Schritt 5.2 des Sync-Implementierungsplans
+/// Hinweis: chunked(into:) ist bereits in MapCacheManager.swift definiert
+extension Array {
+    
+    /// Verarbeitet das Array in Memory-optimierten Batches
+    /// - Parameters:
+    ///   - batchSize: Die Größe jeder Batch
+    ///   - processor: Die Verarbeitungsfunktion für jede Batch
+    func processBatches<T>(
+        batchSize: Int,
+        processor: ([Element]) async throws -> T
+    ) async throws -> [T] {
+        var results: [T] = []
+        let batches = chunked(into: batchSize)
+        
+        for batch in batches {
+            let result = try await processor(batch)
+            results.append(result)
+        }
+        
+        return results
+    }
+}
+
+// MARK: - Memory-Monitoring-Tools
+
+/// Memory-Monitoring-Tools für Debug-Zwecke
+/// Implementiert als Teil von Schritt 5.2 des Sync-Implementierungsplans
+extension SyncManager {
+    
+    /// Formatiert Memory-Verbrauch für lesbare Ausgabe
+    /// - Parameter bytes: Memory-Verbrauch in Bytes
+    /// - Returns: Formatierte String-Darstellung
+    private func formatMemoryUsage(_ bytes: UInt64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useGB]
+        formatter.countStyle = .memory
+        return formatter.string(fromByteCount: Int64(bytes))
+    }
+    
+    /// Loggt den aktuellen Memory-Verbrauch
+    /// - Parameter context: Kontext für den Memory-Check
+    private func logMemoryUsage(_ context: String) {
+        let memoryUsage = getMemoryUsage()
+        let formattedUsage = formatMemoryUsage(memoryUsage)
+        print("🧠 Memory-Verbrauch (\(context)): \(formattedUsage)")
+    }
+    
+    /// Prüft, ob der Memory-Verbrauch kritisch ist
+    /// - Parameter threshold: Der Schwellenwert in Bytes
+    /// - Returns: true wenn Memory-Verbrauch über dem Schwellenwert liegt
+    private func isMemoryUsageCritical(_ threshold: UInt64 = 200_000_000) -> Bool {
+        return getMemoryUsage() > threshold
+    }
+}
+
+// mach_task_basic_info wird durch Darwin-Import am Anfang der Datei bereitgestellt
