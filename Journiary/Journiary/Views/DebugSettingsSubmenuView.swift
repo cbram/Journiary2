@@ -57,8 +57,25 @@ struct DebugSettingsSubmenuView: View {
                 }
             }
             
-            // Sync Performance Monitoring
-            Section("Performance Monitoring") {
+            // Sync Performance & Debug Monitoring
+            Section("Sync Debugging & Performance") {
+                NavigationLink(destination: SyncDebugDashboard()) {
+                    HStack {
+                        Image(systemName: "externaldrive.badge.checkmark")
+                            .font(.title3)
+                            .foregroundColor(.purple)
+                            .frame(width: 24)
+                        Text("Sync Debug Dashboard")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+                
                 NavigationLink(destination: SyncPerformanceView()) {
                     HStack {
                         Image(systemName: "chart.bar.fill")
