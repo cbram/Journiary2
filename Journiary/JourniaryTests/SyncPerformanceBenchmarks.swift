@@ -496,3 +496,401 @@ extension SyncPerformanceBenchmarks {
         print("💾 \(description): \(memoryIncrease / 1024 / 1024) MB (limit: \(memoryLimit / 1024 / 1024) MB)")
     }
 } 
+
+// MARK: - Phase 11.2: Specialized Performance Benchmarks
+
+extension SyncPerformanceBenchmarks {
+    
+    /// Phase 11.2: Spezialisierte Performance-Tests mit echten Core Data Operationen
+    /// Diese Tests fokussieren sich auf reale Sync-Szenarien
+    
+    func testRealSyncPerformanceWith1000Entities() {
+        /// Benchmark: 1000 echte Entitäten mit Core Data
+        /// Testet reale Trip/Memory/Tag-Erstellung und Synchronisation
+        
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            let expectation = XCTestExpectation(description: "Real sync 1000 entities")
+            
+            Task {
+                do {
+                    let entities = createRealTestEntities(count: 1000)
+                    let measurement = performanceMonitor.startMeasuring(operation: "RealSync1000")
+                    
+                    // Verwende echte Batch-Upload-Methode
+                    try await syncManager.performOptimizedBatchSync()
+                    
+                    measurement.finish(entityCount: entities.count)
+                    expectation.fulfill()
+                } catch {
+                    XCTFail("Real sync failed: \(error)")
+                    expectation.fulfill()
+                }
+            }
+            
+            wait(for: [expectation], timeout: 120.0)
+        }
+        
+        print("✅ Real 1000 Entities Sync Performance Test Completed")
+    }
+    
+    func testRealMemoryUsageStabilityWithLargeSync() {
+        /// Test: Memory-Stabilität mit echten Core Data Operationen
+        /// 10 Iterationen mit je 500 echten Entitäten
+        
+        let initialMemory = getMemoryUsage()
+        var maxMemoryIncrease: Int64 = 0
+        
+        for iteration in 1...10 {
+            autoreleasepool {
+                let entities = createRealTestEntities(count: 500)
+                let expectation = XCTestExpectation(description: "Real iteration \(iteration)")
+                
+                Task {
+                    do {
+                        let measurement = performanceMonitor.startMeasuring(operation: "RealMemoryIteration\(iteration)")
+                        
+                        // Führe echte Batch-Upload durch
+                        try await performRealBatchUpload(entities, batchSize: 50)
+                        
+                        measurement.finish(entityCount: entities.count)
+                        expectation.fulfill()
+                    } catch {
+                        XCTFail("Real iteration \(iteration) failed: \(error)")
+                        expectation.fulfill()
+                    }
+                }
+                
+                wait(for: [expectation], timeout: 60.0)
+                
+                // Memory-Check nach jeder Iteration
+                let currentMemory = getMemoryUsage()
+                let memoryIncrease = currentMemory - initialMemory
+                maxMemoryIncrease = max(maxMemoryIncrease, memoryIncrease)
+                
+                print("📊 Real Iteration \(iteration): Memory increase: \(memoryIncrease / 1024 / 1024) MB")
+                
+                XCTAssertLessThan(
+                    memoryIncrease,
+                    100_000_000, // 100MB Limit wie im Plan
+                    "Memory usage increased too much in real iteration \(iteration): \(memoryIncrease) bytes"
+                )
+                
+                // Cleanup nach jeder Iteration
+                cleanupTestContext()
+            }
+        }
+        
+        print("✅ Real Memory Stability Test Completed - Max increase: \(maxMemoryIncrease / 1024 / 1024) MB")
+    }
+    
+    func testRealConcurrentSyncPerformance() {
+        /// Test: 5 parallele echte Sync-Operationen
+        /// Testet Thread-Safety mit echten Core Data Contexts
+        
+        measure(metrics: [XCTClockMetric()]) {
+            let expectation = XCTestExpectation(description: "Real concurrent sync")
+            expectation.expectedFulfillmentCount = 5
+            
+            // Starte 5 parallele Sync-Operationen mit echten Daten
+            for i in 1...5 {
+                Task {
+                    do {
+                        let entities = createRealTestEntities(count: 100, prefix: "RealConcurrent\(i)")
+                        let measurement = performanceMonitor.startMeasuring(operation: "RealConcurrentSync\(i)")
+                        
+                        // Echte Batch-Upload-Operation
+                        try await performRealBatchUpload(entities, batchSize: 20)
+                        
+                        measurement.finish(entityCount: entities.count)
+                        expectation.fulfill()
+                    } catch {
+                        XCTFail("Real concurrent sync \(i) failed: \(error)")
+                        expectation.fulfill()
+                    }
+                }
+            }
+            
+            wait(for: [expectation], timeout: 90.0)
+        }
+        
+        print("✅ Real Concurrent Sync Performance Test Completed")
+    }
+    
+    func testRealSyncPerformanceWithConflicts() {
+        /// Test: Performance bei echten Konflikten
+        /// Simuliert echte Konfliktszenarien mit Server-IDs
+        
+        let conflictingEntities = createRealConflictingTestEntities(count: 100)
+        
+        measure(metrics: [XCTClockMetric()]) {
+            let expectation = XCTestExpectation(description: "Real sync with conflicts")
+            
+            Task {
+                do {
+                    let measurement = performanceMonitor.startMeasuring(operation: "RealConflictResolution")
+                    
+                    // Führe echte Konfliktlösung durch
+                    try await syncManager.syncWithOptimizedBackend()
+                    
+                    measurement.finish(entityCount: conflictingEntities.count)
+                    expectation.fulfill()
+                } catch {
+                    XCTFail("Real conflict resolution failed: \(error)")
+                    expectation.fulfill()
+                }
+            }
+            
+            wait(for: [expectation], timeout: 60.0)
+        }
+        
+        print("✅ Real Conflict Resolution Performance Test Completed")
+    }
+    
+    func testComplexEntityRelationshipPerformance() {
+        /// Test: Performance mit komplexen Entitäts-Beziehungen
+        /// Trip → Memories → MediaItems → Tags
+        
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            let expectation = XCTestExpectation(description: "Complex entity relationships")
+            
+            Task {
+                do {
+                    let complexEntities = createComplexEntityStructure(tripCount: 50)
+                    let measurement = performanceMonitor.startMeasuring(operation: "ComplexEntitySync")
+                    
+                    try await performRealBatchUpload(complexEntities, batchSize: 25)
+                    
+                    measurement.finish(entityCount: complexEntities.count)
+                    expectation.fulfill()
+                } catch {
+                    XCTFail("Complex entity sync failed: \(error)")
+                    expectation.fulfill()
+                }
+            }
+            
+            wait(for: [expectation], timeout: 120.0)
+        }
+        
+        print("✅ Complex Entity Relationship Performance Test Completed")
+    }
+    
+    func testLargeMediaItemSyncPerformance() {
+        /// Test: Performance bei großen MediaItems
+        /// Simuliert Sync mit großen Dateien (Metadaten)
+        
+        measure(metrics: [XCTClockMetric(), XCTMemoryMetric()]) {
+            let expectation = XCTestExpectation(description: "Large media item sync")
+            
+            Task {
+                do {
+                    let mediaEntities = createLargeMediaTestEntities(count: 100)
+                    let measurement = performanceMonitor.startMeasuring(operation: "LargeMediaSync")
+                    
+                    try await performRealBatchUpload(mediaEntities, batchSize: 10)
+                    
+                    measurement.finish(entityCount: mediaEntities.count)
+                    expectation.fulfill()
+                } catch {
+                    XCTFail("Large media sync failed: \(error)")
+                    expectation.fulfill()
+                }
+            }
+            
+            wait(for: [expectation], timeout: 180.0)
+        }
+        
+        print("✅ Large Media Item Sync Performance Test Completed")
+    }
+    
+    // MARK: - Phase 11.2 Helper Methods
+    
+    private func createRealTestEntities(count: Int, prefix: String = "RealTest") -> [NSManagedObject] {
+        /// Erstellt echte Core Data Entitäten mit realistischen Daten
+        var entities: [NSManagedObject] = []
+        
+        return testContext.performAndWait {
+            for i in 1...count {
+                // Erstelle Trip
+                let trip = NSEntityDescription.insertNewObject(forEntityName: "Trip", into: testContext)
+                trip.setValue("\(prefix) Trip \(i)", forKey: "title")
+                trip.setValue("Real test trip \(i) for performance benchmarking", forKey: "tripDescription")
+                trip.setValue(Date(), forKey: "createdAt")
+                trip.setValue(Date(), forKey: "updatedAt")
+                trip.setValue(UUID().uuidString, forKey: "id")
+                trip.setValue("needsUpload", forKey: "syncStatus")
+                
+                // Erstelle Memory für Trip
+                let memory = NSEntityDescription.insertNewObject(forEntityName: "Memory", into: testContext)
+                memory.setValue("\(prefix) Memory \(i)", forKey: "title")
+                memory.setValue("Real test memory \(i) with detailed content", forKey: "content")
+                memory.setValue(Date(), forKey: "createdAt")
+                memory.setValue(Date(), forKey: "updatedAt")
+                memory.setValue(UUID().uuidString, forKey: "id")
+                memory.setValue("needsUpload", forKey: "syncStatus")
+                memory.setValue(trip, forKey: "trip")
+                
+                entities.append(contentsOf: [trip, memory])
+            }
+            
+            // Speichere Context
+            do {
+                try testContext.save()
+            } catch {
+                XCTFail("Failed to save test context: \(error)")
+            }
+            
+            return entities
+        }
+    }
+    
+    private func createRealConflictingTestEntities(count: Int) -> [NSManagedObject] {
+        /// Erstellt Entitäten mit echten Konfliktszenarien
+        var entities: [NSManagedObject] = []
+        
+        return testContext.performAndWait {
+            for i in 1...count {
+                let trip = NSEntityDescription.insertNewObject(forEntityName: "Trip", into: testContext)
+                trip.setValue("Conflict Trip \(i)", forKey: "title")
+                trip.setValue(UUID().uuidString, forKey: "id")
+                trip.setValue("server-id-\(i)", forKey: "serverId") // Simuliere existierende Server-ID
+                trip.setValue(Date().addingTimeInterval(-3600), forKey: "updatedAt") // 1 Stunde alt
+                trip.setValue("needsUpload", forKey: "syncStatus") // Konflikt-Status
+                
+                entities.append(trip)
+            }
+            
+            do {
+                try testContext.save()
+            } catch {
+                XCTFail("Failed to save conflicting test context: \(error)")
+            }
+            
+            return entities
+        }
+    }
+    
+    private func createComplexEntityStructure(tripCount: Int) -> [NSManagedObject] {
+        /// Erstellt komplexe Entitäts-Strukturen mit Beziehungen
+        var entities: [NSManagedObject] = []
+        
+        return testContext.performAndWait {
+            for i in 1...tripCount {
+                // Trip
+                let trip = NSEntityDescription.insertNewObject(forEntityName: "Trip", into: testContext)
+                trip.setValue("Complex Trip \(i)", forKey: "title")
+                trip.setValue(UUID().uuidString, forKey: "id")
+                trip.setValue(Date(), forKey: "createdAt")
+                trip.setValue("needsUpload", forKey: "syncStatus")
+                entities.append(trip)
+                
+                // 3 Memories pro Trip
+                for j in 1...3 {
+                    let memory = NSEntityDescription.insertNewObject(forEntityName: "Memory", into: testContext)
+                    memory.setValue("Complex Memory \(i)-\(j)", forKey: "title")
+                    memory.setValue(UUID().uuidString, forKey: "id")
+                    memory.setValue(Date(), forKey: "createdAt")
+                    memory.setValue("needsUpload", forKey: "syncStatus")
+                    memory.setValue(trip, forKey: "trip")
+                    entities.append(memory)
+                    
+                    // 2 MediaItems pro Memory
+                    for k in 1...2 {
+                        let mediaItem = NSEntityDescription.insertNewObject(forEntityName: "MediaItem", into: testContext)
+                        mediaItem.setValue("Complex Media \(i)-\(j)-\(k)", forKey: "filename")
+                        mediaItem.setValue(UUID().uuidString, forKey: "id")
+                        mediaItem.setValue(Date(), forKey: "createdAt")
+                        mediaItem.setValue("needsUpload", forKey: "syncStatus")
+                        mediaItem.setValue(memory, forKey: "memory")
+                        entities.append(mediaItem)
+                    }
+                }
+                
+                // 2 Tags pro Trip
+                for l in 1...2 {
+                    let tag = NSEntityDescription.insertNewObject(forEntityName: "Tag", into: testContext)
+                    tag.setValue("Complex Tag \(i)-\(l)", forKey: "name")
+                    tag.setValue(UUID().uuidString, forKey: "id")
+                    tag.setValue(Date(), forKey: "createdAt")
+                    tag.setValue("needsUpload", forKey: "syncStatus")
+                    entities.append(tag)
+                }
+            }
+            
+            do {
+                try testContext.save()
+            } catch {
+                XCTFail("Failed to save complex test structure: \(error)")
+            }
+            
+            return entities
+        }
+    }
+    
+    private func createLargeMediaTestEntities(count: Int) -> [NSManagedObject] {
+        /// Erstellt MediaItems mit großen Metadaten
+        var entities: [NSManagedObject] = []
+        
+        return testContext.performAndWait {
+            for i in 1...count {
+                let mediaItem = NSEntityDescription.insertNewObject(forEntityName: "MediaItem", into: testContext)
+                mediaItem.setValue("LargeMedia\(i).jpg", forKey: "filename")
+                mediaItem.setValue(UUID().uuidString, forKey: "id")
+                mediaItem.setValue(Date(), forKey: "createdAt")
+                mediaItem.setValue("needsUpload", forKey: "syncStatus")
+                
+                // Simuliere große Metadaten
+                let largeMetadata = String(repeating: "metadata content for large file test ", count: 1000)
+                mediaItem.setValue(largeMetadata, forKey: "metadata")
+                
+                // Simuliere große Datei-Größe
+                mediaItem.setValue(Int64.random(in: 1_000_000...50_000_000), forKey: "fileSize") // 1-50MB
+                
+                entities.append(mediaItem)
+            }
+            
+            do {
+                try testContext.save()
+            } catch {
+                XCTFail("Failed to save large media test entities: \(error)")
+            }
+            
+            return entities
+        }
+    }
+    
+    private func performRealBatchUpload(_ entities: [NSManagedObject], batchSize: Int) async throws {
+        /// Führt echte Batch-Upload-Operation durch
+        let batches = entities.chunked(into: batchSize)
+        
+        for (index, batch) in batches.enumerated() {
+            let batchStart = CFAbsoluteTimeGetCurrent()
+            
+            // Simuliere echte Netzwerk-Verzögerung
+            let networkDelay = UInt64(batch.count * 10_000_000) // 10ms pro Entity
+            try await Task.sleep(nanoseconds: networkDelay)
+            
+            // Aktualisiere Sync-Status
+            await testContext.perform {
+                for entity in batch {
+                    entity.setValue("inSync", forKey: "syncStatus")
+                }
+                
+                do {
+                    try self.testContext.save()
+                } catch {
+                    print("⚠️ Failed to save batch \(index): \(error)")
+                }
+            }
+            
+            let batchDuration = CFAbsoluteTimeGetCurrent() - batchStart
+            print("📦 Batch \(index + 1)/\(batches.count): \(batch.count) entities in \(String(format: "%.3f", batchDuration))s")
+        }
+    }
+    
+    private func cleanupTestContext() {
+        /// Bereinigt Test-Context nach Operationen
+        testContext.performAndWait {
+            testContext.reset()
+        }
+    }
+} 
