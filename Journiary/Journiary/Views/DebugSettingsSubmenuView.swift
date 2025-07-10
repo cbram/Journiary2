@@ -3,6 +3,7 @@ import SwiftUI
 struct DebugSettingsSubmenuView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var showingGPSDebugView: Bool
+    @State private var showingSyncPerformanceView = false
 
     var body: some View {
         List {
@@ -53,6 +54,26 @@ struct DebugSettingsSubmenuView: View {
                         }
                         .padding(.vertical, 8)
                     }
+                }
+            }
+            
+            // Sync Performance Monitoring
+            Section("Performance Monitoring") {
+                NavigationLink(destination: SyncPerformanceView()) {
+                    HStack {
+                        Image(systemName: "chart.bar.fill")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+                        Text("Sync Performance")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
                 }
             }
         }

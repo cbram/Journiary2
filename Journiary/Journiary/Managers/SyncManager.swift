@@ -41,6 +41,9 @@ final class SyncManager {
     func sync(reason: String = "Unknown") async {
         print("Sync started...")
         
+        // Starte Performance-Monitoring für gesamten Sync-Zyklus
+        let syncMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "FullSync")
+        
         // Prüfe Authentifizierung vor dem Sync (MainActor-sicher)
         let isAuthenticated = await MainActor.run {
             return AuthService.shared.isAuthenticated
@@ -83,6 +86,13 @@ final class SyncManager {
                     bucketListItemsUpdated: syncData.bucketListItems.count
                 )
                 
+                // Beende Performance-Monitoring für erfolgreichen Sync
+                let totalEntities = syncedEntities.tripsUpdated + syncedEntities.memoriesUpdated + 
+                                  syncedEntities.mediaItemsUpdated + syncedEntities.gpxTracksUpdated + 
+                                  syncedEntities.tagsUpdated + syncedEntities.tagCategoriesUpdated + 
+                                  syncedEntities.bucketListItemsUpdated
+                syncMeasurement.finish(entityCount: totalEntities)
+                
                 // Phase 5.4: Notify sync success
                 await MainActor.run {
                     SyncNotificationCenter.shared.notifySyncSuccess(
@@ -98,6 +108,10 @@ final class SyncManager {
             } else {
                 print("Sync completed, but server timestamp was invalid.")
                 let invalidTimestampError = SyncError.invalidServerTimestamp
+                
+                // Beende Performance-Monitoring für fehlgeschlagenen Sync
+                syncMeasurement.finish(entityCount: 0)
+                
                 await MainActor.run {
                     SyncNotificationCenter.shared.notifySyncError(
                         reason: reason,
@@ -109,6 +123,9 @@ final class SyncManager {
         } catch {
             print("Sync failed: \(error.localizedDescription)")
             // The `lastSyncedAt` timestamp is not updated, so the next sync will retry the failed operations.
+            
+            // Beende Performance-Monitoring für fehlgeschlagenen Sync
+            syncMeasurement.finish(entityCount: 0)
             
             // Phase 5.4: Notify sync error
             await MainActor.run {
@@ -141,6 +158,9 @@ final class SyncManager {
     /// Identifies local creations, updates, and deletions and sends them to the backend via GraphQL mutations.
     private func uploadPhase() async throws {
         print("Executing upload phase...")
+        
+        // Starte Performance-Monitoring für Upload-Phase
+        let uploadMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "UploadPhase")
         
         let context = persistenceController.container.newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
@@ -220,6 +240,20 @@ final class SyncManager {
                 try context.save()
             }
         }
+        
+        // Beende Performance-Monitoring für Upload-Phase
+        // Zähle die Anzahl der lokal geänderten Entities
+        let uploadedEntities = try await context.perform {
+            var count = 0
+            let entityNames = ["Trip", "Memory", "MediaItem", "GPXTrack", "Tag", "TagCategory", "BucketListItem"]
+            for entityName in entityNames {
+                let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: entityName)
+                fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", "uploaded")
+                count += try context.count(for: fetchRequest)
+            }
+            return count
+        }
+        uploadMeasurement.finish(entityCount: uploadedEntities)
     }
 
     /// **Phase 2: Download**
@@ -229,6 +263,9 @@ final class SyncManager {
     /// - returns: The `SyncQuery.Data.Sync` object from the server.
     private func downloadPhase(since lastSync: Date?) async throws -> SyncQuery.Data.Sync {
         print("Executing download phase...")
+        
+        // Starte Performance-Monitoring für Download-Phase
+        let downloadMeasurement = PerformanceMonitor.shared.startMeasuring(operation: "DownloadPhase")
         
         // 1. Call the `sync` query with the `lastSyncedAt` timestamp.
         let syncData = try await networkProvider.sync(lastSyncedAt: lastSync)
@@ -320,6 +357,13 @@ final class SyncManager {
                 try context.save()
             }
         }
+        
+        // Beende Performance-Monitoring für Download-Phase
+        let downloadedEntities = syncData.trips.count + syncData.memories.count + 
+                                syncData.mediaItems.count + syncData.gpxTracks.count + 
+                                syncData.tags.count + syncData.tagCategories.count + 
+                                syncData.bucketListItems.count
+        downloadMeasurement.finish(entityCount: downloadedEntities)
         
         // The new timestamp from the server is stored by the calling `sync()` method upon full success.
         print("Download phase completed.")
