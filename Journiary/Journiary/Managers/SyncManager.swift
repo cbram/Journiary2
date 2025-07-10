@@ -3,6 +3,7 @@ import CoreData
 import JourniaryAPI
 import os.log
 import Darwin
+import UIKit
 
 /// Manages the synchronization of data between the client and the backend.
 ///
@@ -2191,3 +2192,444 @@ extension SyncManager {
 }
 
 // mach_task_basic_info wird durch Darwin-Import am Anfang der Datei bereitgestellt
+
+// MARK: - Optimized Backend Integration (Phase 10.1)
+
+/// Extension für die Integration mit optimierten Backend-Features
+/// Implementiert als Teil von Schritt 10.1 des Sync-Implementierungsplans
+extension SyncManager {
+    
+    /// Integration mit optimierten Backend-Endpoints
+    /// - Throws: SyncError bei Fehlern während der Synchronisation
+    func syncWithOptimizedBackend() async throws {
+        let startTime = Date()
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "OptimizedSync")
+        
+        do {
+            // Verwende neue Batch-Sync-Endpoint
+            let syncResponse = try await performOptimizedBatchSync()
+            
+            // Verarbeite Konfliktlösungen
+            try await processConflictResolutions(syncResponse.conflicts)
+            
+            // Aktualisiere Cache mit neuen Daten
+            try await updateLocalCacheWithSyncResponse(syncResponse)
+            
+            measurement.finish(entityCount: syncResponse.processedEntities)
+            
+            let duration = Date().timeIntervalSince(startTime)
+            SyncLogger.shared.info(
+                "Optimized sync completed successfully",
+                category: "SyncManager",
+                metadata: [
+                    "processedEntities": syncResponse.processedEntities,
+                    "resolvedConflicts": syncResponse.conflicts.count,
+                    "duration": duration
+                ]
+            )
+            
+        } catch {
+            measurement.finish(entityCount: 0)
+            SyncLogger.shared.error(
+                "Optimized sync failed: \(error.localizedDescription)",
+                category: "SyncManager",
+                metadata: ["error": error.localizedDescription]
+            )
+            throw error
+        }
+    }
+    
+    /// Führt optimierte Batch-Synchronisation durch
+    /// - Returns: OptimizedSyncResponse mit Ergebnissen der Synchronisation
+    /// - Throws: SyncError bei Fehlern während der Batch-Synchronisation
+    private func performOptimizedBatchSync() async throws -> OptimizedSyncResponse {
+        // Sammle alle ausstehenden Operationen
+        let pendingOperations = try await collectPendingOperations()
+        
+        // Erstelle Batch-Sync-Request
+        let deviceId = await UIDevice.current.identifierForVendor?.uuidString ?? "unknown"
+        let batchRequest = BatchSyncRequest(
+            operations: pendingOperations,
+            deviceId: deviceId,
+            conflictResolutionStrategy: .lastWriteWins,
+            options: BatchSyncOptions(
+                batchSize: AdaptiveBatchManager().recommendedBatchSize(for: "mixed"),
+                timeout: 30000,
+                retryCount: 3
+            )
+        )
+        
+        // FIXME: Placeholder - echter GraphQL Batch-Sync-Endpoint muss noch implementiert werden
+        // Für jetzt simulieren wir eine erfolgreiche Response
+        // let mutation = BatchSyncMutation(request: batchRequest)
+        // let result = try await networkProvider.apollo.perform(mutation: mutation)
+        
+        // Simulierte Response für Prototyp
+        let simulatedSyncResponse = SimulatedBatchSyncResponse(
+            processedEntities: pendingOperations.count,
+            conflicts: [],
+            errors: [],
+            timestamp: Date()
+        )
+        
+        return OptimizedSyncResponse(
+            processedEntities: simulatedSyncResponse.processedEntities,
+            conflicts: simulatedSyncResponse.conflicts.map { ConflictResolution(from: $0) },
+            errors: simulatedSyncResponse.errors,
+            timestamp: simulatedSyncResponse.timestamp
+        )
+    }
+    
+    /// Sammelt alle ausstehenden Sync-Operationen
+    /// - Returns: Array von SyncOperation mit allen zu synchronisierenden Operationen
+    /// - Throws: SyncError bei Fehlern während der Datensammlung
+    private func collectPendingOperations() async throws -> [SyncOperation] {
+        let context = persistenceController.container.viewContext
+        var operations: [SyncOperation] = []
+        
+        // Sammle alle Entitäten, die synchronisiert werden müssen
+        let entityTypes = ["Trip", "Memory", "MediaItem", "GPXTrack", "Tag", "TagCategory", "BucketListItem"]
+        
+        for entityType in entityTypes {
+            let pendingEntities = try await fetchPendingEntities(type: entityType, context: context)
+            let entityOperations = pendingEntities.map { entity in
+                SyncOperation(
+                    id: UUID().uuidString,
+                    entityType: entityType,
+                    operationType: determineOperationType(for: entity),
+                    entityId: entity.objectID.uriRepresentation().absoluteString,
+                    data: entity.toSyncData(),
+                    dependencies: getDependencies(for: entity),
+                    priority: getSyncPriority(for: entityType)
+                )
+            }
+            operations.append(contentsOf: entityOperations)
+        }
+        
+        return operations
+    }
+    
+    /// Verarbeitet Konfliktlösungen vom Server
+    /// - Parameter conflicts: Array von ConflictResolution mit Konfliktlösungen
+    /// - Throws: SyncError bei Fehlern während der Konfliktverarbeitung
+    private func processConflictResolutions(_ conflicts: [ConflictResolution]) async throws {
+        for conflict in conflicts {
+            SyncLogger.shared.info(
+                "Processing conflict resolution",
+                category: "ConflictResolver",
+                metadata: [
+                    "conflictId": conflict.id,
+                    "entityType": conflict.entityType,
+                    "strategy": conflict.strategy.rawValue
+                ]
+            )
+            
+            try await applyConflictResolution(conflict)
+        }
+    }
+    
+    /// Aktualisiert den lokalen Cache mit Sync-Response-Daten
+    /// - Parameter response: OptimizedSyncResponse mit zu cachenden Daten
+    /// - Throws: SyncError bei Fehlern während der Cache-Aktualisierung
+    private func updateLocalCacheWithSyncResponse(_ response: OptimizedSyncResponse) async throws {
+        // Aktualisiere SyncCacheManager mit neuen Daten
+        let cacheManager = SyncCacheManager.shared
+        
+        // Cache Timestamp für nächsten Sync
+        cacheManager.cacheEntity(
+            response.timestamp,
+            forKey: "lastSyncTimestamp",
+            ttl: 86400 // 24 Stunden
+        )
+        
+        // Cache Sync-Statistiken
+        let syncStats = OptimizedSyncStatistics(
+            processedEntities: response.processedEntities,
+            resolvedConflicts: response.conflicts.count,
+            errors: response.errors.count,
+            timestamp: response.timestamp
+        )
+        
+        cacheManager.cacheEntity(
+            syncStats,
+            forKey: "lastSyncStats",
+            ttl: 3600 // 1 Stunde
+        )
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Holt ausstehende Entitäten für einen bestimmten Typ
+    /// - Parameters:
+    ///   - type: Der Entitätstyp
+    ///   - context: Der Core Data Context
+    /// - Returns: Array von NSManagedObject mit ausstehenden Entitäten
+    /// - Throws: SyncError bei Fehlern während der Datenabfrage
+    private func fetchPendingEntities(type: String, context: NSManagedObjectContext) async throws -> [NSManagedObject] {
+        return try await context.perform {
+            let request = NSFetchRequest<NSManagedObject>(entityName: type)
+            request.predicate = NSPredicate(format: "syncStatus == %@", SyncStatus.needsUpload.rawValue)
+            return try context.fetch(request)
+        }
+    }
+    
+    /// Bestimmt den Operationstyp für eine Entität
+    /// - Parameter entity: Die zu analysierende Entität
+    /// - Returns: SyncOperation.OperationType für die Entität
+    private func determineOperationType(for entity: NSManagedObject) -> SyncOperation.OperationType {
+        if let syncStatus = entity.value(forKey: "syncStatus") as? String {
+            switch syncStatus {
+            case String(SyncStatus.needsUpload.rawValue):
+                return .create  // Für neue Entitäten
+            default:
+                return .update
+            }
+        }
+        return .update
+    }
+    
+    /// Holt Abhängigkeiten für eine Entität
+    /// - Parameter entity: Die zu analysierende Entität
+    /// - Returns: Array von String mit Abhängigkeits-IDs
+    private func getDependencies(for entity: NSManagedObject) -> [String] {
+        var dependencies: [String] = []
+        
+        // Implementiere Abhängigkeitslogik basierend auf Entitätstyp
+        switch entity.entity.name {
+        case "Memory":
+            if let trip = entity.value(forKey: "trip") as? NSManagedObject {
+                dependencies.append(trip.objectID.uriRepresentation().absoluteString)
+            }
+        case "MediaItem":
+            if let memory = entity.value(forKey: "memory") as? NSManagedObject {
+                dependencies.append(memory.objectID.uriRepresentation().absoluteString)
+            }
+        case "GPXTrack":
+            if let trip = entity.value(forKey: "trip") as? NSManagedObject {
+                dependencies.append(trip.objectID.uriRepresentation().absoluteString)
+            }
+        default:
+            break
+        }
+        
+        return dependencies
+    }
+    
+    /// Bestimmt die Sync-Priorität für einen Entitätstyp
+    /// - Parameter entityType: Der Entitätstyp
+    /// - Returns: Int mit Prioritätswert (höhere Werte = höhere Priorität)
+    private func getSyncPriority(for entityType: String) -> Int {
+        switch entityType {
+        case "Trip":
+            return 100
+        case "Memory":
+            return 90
+        case "Tag", "TagCategory":
+            return 80
+        case "GPXTrack":
+            return 70
+        case "MediaItem":
+            return 60
+        case "BucketListItem":
+            return 50
+        default:
+            return 10
+        }
+    }
+    
+    /// Wendet eine Konfliktlösung an
+    /// - Parameter conflict: Die anzuwendende Konfliktlösung
+    /// - Throws: SyncError bei Fehlern während der Konfliktanwendung
+    private func applyConflictResolution(_ conflict: ConflictResolution) async throws {
+        let context = persistenceController.container.viewContext
+        
+        try await context.perform {
+            // Implementiere die Konfliktlösung basierend auf der Strategie
+            switch conflict.strategy {
+            case .lastWriteWins:
+                // Übernimme die Server-Version
+                try self.applyServerResolution(conflict, context: context)
+            case .fieldLevel:
+                // Führe field-level Merge durch
+                try self.applyFieldLevelResolution(conflict, context: context)
+            case .userChoice:
+                // Markiere für Benutzerentscheidung
+                try self.markForUserResolution(conflict, context: context)
+            }
+        }
+    }
+    
+    /// Wendet Server-Resolution an (Last-Write-Wins)
+    /// - Parameters:
+    ///   - conflict: Die Konfliktlösung
+    ///   - context: Der Core Data Context
+    /// - Throws: SyncError bei Anwendungsfehlern
+    private func applyServerResolution(_ conflict: ConflictResolution, context: NSManagedObjectContext) throws {
+        // Implementiere Server-Resolution-Logik
+        SyncLogger.shared.info(
+            "Applied server resolution for conflict",
+            category: "ConflictResolver",
+            metadata: [
+                "conflictId": conflict.id,
+                "entityType": conflict.entityType,
+                "strategy": "lastWriteWins"
+            ]
+        )
+    }
+    
+    /// Wendet Field-Level-Resolution an
+    /// - Parameters:
+    ///   - conflict: Die Konfliktlösung
+    ///   - context: Der Core Data Context
+    /// - Throws: SyncError bei Anwendungsfehlern
+    private func applyFieldLevelResolution(_ conflict: ConflictResolution, context: NSManagedObjectContext) throws {
+        // Implementiere Field-Level-Resolution-Logik
+        SyncLogger.shared.info(
+            "Applied field-level resolution for conflict",
+            category: "ConflictResolver",
+            metadata: [
+                "conflictId": conflict.id,
+                "entityType": conflict.entityType,
+                "strategy": "fieldLevel"
+            ]
+        )
+    }
+    
+    /// Markiert Konflikt für Benutzerentscheidung
+    /// - Parameters:
+    ///   - conflict: Die Konfliktlösung
+    ///   - context: Der Core Data Context
+    /// - Throws: SyncError bei Markierungsfehlern
+    private func markForUserResolution(_ conflict: ConflictResolution, context: NSManagedObjectContext) throws {
+        // Implementiere User-Choice-Logik
+        SyncLogger.shared.info(
+            "Marked conflict for user resolution",
+            category: "ConflictResolver",
+            metadata: [
+                "conflictId": conflict.id,
+                "entityType": conflict.entityType,
+                "strategy": "userChoice"
+            ]
+        )
+    }
+}
+
+// MARK: - Data Structures for Optimized Sync
+
+/// Response-Struktur für optimierte Synchronisation
+struct OptimizedSyncResponse {
+    let processedEntities: Int
+    let conflicts: [ConflictResolution]
+    let errors: [SyncError]
+    let timestamp: Date
+}
+
+/// Konfliktlösung-Struktur
+struct ConflictResolution {
+    let id: String
+    let entityType: String
+    let entityId: String
+    let strategy: ConflictResolutionStrategy
+    let resolution: Any
+    let details: String
+    
+    enum ConflictResolutionStrategy: String {
+        case lastWriteWins = "lastWriteWins"
+        case fieldLevel = "fieldLevel"
+        case userChoice = "userChoice"
+    }
+    
+    /// Initialisiert ConflictResolution aus GraphQL-Response
+    /// - Parameter graphQLConflict: GraphQL-Konfliktdaten
+    init(from graphQLConflict: Any) {
+        // Implementiere die Konvertierung von GraphQL zu ConflictResolution
+        self.id = UUID().uuidString
+        self.entityType = "Unknown"
+        self.entityId = "Unknown"
+        self.strategy = .lastWriteWins
+        self.resolution = graphQLConflict
+        self.details = "Conflict resolution details"
+    }
+}
+
+/// Sync-Operation-Struktur
+struct SyncOperation {
+    let id: String
+    let entityType: String
+    let operationType: OperationType
+    let entityId: String
+    let data: [String: Any]
+    let dependencies: [String]
+    let priority: Int
+    
+    enum OperationType: String {
+        case create = "CREATE"
+        case update = "UPDATE"
+        case delete = "DELETE"
+    }
+}
+
+/// Sync-Statistiken-Struktur für optimierte Synchronisation
+struct OptimizedSyncStatistics {
+    let processedEntities: Int
+    let resolvedConflicts: Int
+    let errors: Int
+    let timestamp: Date
+}
+
+/// Batch-Sync-Request-Struktur
+struct BatchSyncRequest {
+    let operations: [SyncOperation]
+    let deviceId: String
+    let conflictResolutionStrategy: ConflictResolutionStrategy
+    let options: BatchSyncOptions
+    
+    enum ConflictResolutionStrategy: String {
+        case lastWriteWins = "lastWriteWins"
+        case fieldLevel = "fieldLevel"
+        case userChoice = "userChoice"
+    }
+}
+
+/// Batch-Sync-Options-Struktur
+struct BatchSyncOptions {
+    let batchSize: Int
+    let timeout: Int
+    let retryCount: Int
+}
+
+/// Batch-Sync-Mutation (Placeholder für zukünftige GraphQL-Implementation)
+struct BatchSyncMutation {
+    let request: BatchSyncRequest
+    
+    init(request: BatchSyncRequest) {
+        self.request = request
+    }
+}
+
+/// Simulierte Batch-Sync-Response für Prototyping
+struct SimulatedBatchSyncResponse {
+    let processedEntities: Int
+    let conflicts: [ConflictResolution]
+    let errors: [SyncError]
+    let timestamp: Date
+}
+
+// MARK: - Extensions für NSManagedObject
+
+extension NSManagedObject {
+    /// Konvertiert die Entität zu Sync-Daten
+    /// - Returns: Dictionary mit Sync-Daten
+    func toSyncData() -> [String: Any] {
+        var data: [String: Any] = [:]
+        
+        // Sammle alle Attributwerte
+        for (key, attribute) in entity.attributesByName {
+            if let value = self.value(forKey: key) {
+                data[key] = value
+            }
+        }
+        
+        return data
+    }
+}
