@@ -16,6 +16,7 @@ final class SyncManager {
     private let persistenceController = PersistenceController.shared
     private let networkProvider = NetworkProvider.shared
     private let dependencyResolver = SyncDependencyResolver()
+    private let conflictResolver = ConflictResolver()
     private var lastSyncedAt: Date? {
         get {
             // Retrieve the last sync date from UserDefaults
@@ -319,7 +320,7 @@ final class SyncManager {
         // Process memories if they exist
         let memories = syncData.memories
         if !memories.isEmpty {
-            try await upsertMemories(memories, context: context)
+            try await upsertMemoriesWithConflictResolution(memories, context: context)
         }
         
         // Process media items if they exist
@@ -1890,6 +1891,226 @@ extension Array {
         }
         
         return results
+    }
+}
+
+// MARK: - Conflict Resolution Integration
+
+/// Conflict Resolution Integration für erweiterte Synchronisation
+/// Implementiert als Teil von Schritt 6.3 des Sync-Implementierungsplans
+extension SyncManager {
+    
+    /// Synchronisiert eine Entität mit Conflict Resolution
+    /// - Parameters:
+    ///   - localEntity: Die lokale Entität
+    ///   - remoteData: Die Remote-Daten
+    ///   - context: Der Core Data Context
+    /// - Returns: Die aufgelöste Entität
+    func syncEntityWithConflictResolution<T: NSManagedObject>(
+        localEntity: T,
+        remoteData: [String: Any],
+        context: NSManagedObjectContext
+    ) async throws -> T {
+        
+        // Erstelle temporäres Remote-Entity zum Vergleich
+        let tempRemoteEntity = try createTempEntity(from: remoteData, type: T.self, context: context)
+        
+        // Erkennung von Konflikten
+        let conflictDetection = conflictResolver.detectConflict(
+            localEntity: localEntity,
+            remoteEntity: tempRemoteEntity
+        )
+        
+        if conflictDetection.hasConflict {
+            print("⚠️ Konflikt erkannt: \(conflictDetection.conflictType) - Felder: \(conflictDetection.conflictedFields.joined(separator: ", ")) - EntityType: \(String(describing: T.self))")
+            
+            // Löse Konflikt mit erweiterter Detection
+            let resolution = try await conflictResolver.resolveConflictWithDetection(
+                localEntity: localEntity,
+                remoteEntity: tempRemoteEntity,
+                strategy: .lastWriteWins
+            )
+            
+            print("✅ Konflikt gelöst mit Strategie: \(resolution.strategy) - EntityType: \(String(describing: T.self)) - Details: \(resolution.conflictDetails)")
+            
+            return resolution.resolvedEntity as! T
+        } else {
+            // Kein Konflikt - normale Synchronisation
+            updateLocalEntity(localEntity, with: remoteData)
+            
+            print("🔄 Keine Konflikte erkannt - normale Synchronisation - EntityType: \(String(describing: T.self))")
+            
+            return localEntity
+        }
+    }
+    
+    /// Erstellt eine temporäre Entität aus Remote-Daten für Vergleichszwecke
+    /// - Parameters:
+    ///   - data: Die Remote-Daten
+    ///   - type: Der Typ der Entität
+    ///   - context: Der Core Data Context
+    /// - Returns: Die temporäre Entität
+    private func createTempEntity<T: NSManagedObject>(
+        from data: [String: Any],
+        type: T.Type,
+        context: NSManagedObjectContext
+    ) throws -> T {
+        let entityName = String(describing: type)
+        
+        guard let entity = NSEntityDescription.entity(forEntityName: entityName, in: context) else {
+            throw SyncError.dataError("Entity description not found for \(entityName)")
+        }
+        
+        let tempEntity = T(entity: entity, insertInto: nil) // Nicht in Context einfügen
+        updateLocalEntity(tempEntity, with: data)
+        
+        return tempEntity
+    }
+    
+    /// Aktualisiert eine lokale Entität mit Remote-Daten
+    /// - Parameters:
+    ///   - entity: Die zu aktualisierende Entität
+    ///   - data: Die neuen Daten
+    private func updateLocalEntity<T: NSManagedObject>(_ entity: T, with data: [String: Any]) {
+        for (key, value) in data {
+            if entity.entity.attributesByName.keys.contains(key) {
+                // Konvertiere Werte entsprechend des Attribut-Typs
+                let convertedValue = convertValue(value, forKey: key, in: entity)
+                entity.setValue(convertedValue, forKey: key)
+            }
+        }
+    }
+    
+    /// Konvertiert einen Wert entsprechend des Attribut-Typs
+    /// - Parameters:
+    ///   - value: Der zu konvertierende Wert
+    ///   - key: Der Schlüssel des Attributes
+    ///   - entity: Die Entität für Typ-Informationen
+    /// - Returns: Der konvertierte Wert
+    private func convertValue(_ value: Any, forKey key: String, in entity: NSManagedObject) -> Any? {
+        guard let attribute = entity.entity.attributesByName[key] else {
+            return value
+        }
+        
+        switch attribute.attributeType {
+        case .dateAttributeType:
+            if let dateString = value as? String {
+                return dateTimeToDate(dateString)
+            }
+            return value
+        case .booleanAttributeType:
+            if let boolValue = value as? Bool {
+                return boolValue
+            } else if let intValue = value as? Int {
+                return intValue != 0
+            }
+            return value
+        case .integer16AttributeType, .integer32AttributeType, .integer64AttributeType:
+            if let stringValue = value as? String, let intValue = Int(stringValue) {
+                return intValue
+            }
+            return value
+        case .doubleAttributeType, .floatAttributeType:
+            if let stringValue = value as? String, let doubleValue = Double(stringValue) {
+                return doubleValue
+            }
+            return value
+        default:
+            return value
+        }
+    }
+    
+    /// Erweiterte Upsert-Methode mit Conflict Resolution
+    /// - Parameters:
+    ///   - remoteData: Die Remote-Daten
+    ///   - localEntity: Die lokale Entität (kann nil sein)
+    ///   - context: Der Core Data Context
+    /// - Returns: Die aufgelöste Entität
+    private func upsertWithConflictResolution<T: NSManagedObject>(
+        remoteData: [String: Any],
+        localEntity: T?,
+        context: NSManagedObjectContext
+    ) async throws -> T {
+        
+        if let localEntity = localEntity {
+            // Entität existiert bereits - prüfe auf Konflikte
+            let resolvedEntity = try await syncEntityWithConflictResolution(
+                localEntity: localEntity,
+                remoteData: remoteData,
+                context: context
+            )
+            
+            // Setze Sync-Status
+            resolvedEntity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+            
+            return resolvedEntity
+        } else {
+            // Neue Entität - erstelle ohne Konflikt-Prüfung
+            let entityName = String(describing: T.self)
+            guard let entity = NSEntityDescription.entity(forEntityName: entityName, in: context) else {
+                throw SyncError.dataError("Entity description not found for \(entityName)")
+            }
+            
+            let newEntity = T(entity: entity, insertInto: context)
+            updateLocalEntity(newEntity, with: remoteData)
+            
+            // Setze Sync-Status für neue Entität
+            newEntity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+            
+            print("📥 Neue Entität erstellt: \(entityName) - ServerId: \(remoteData["id"] as? String ?? "unknown")")
+            
+            return newEntity
+        }
+    }
+    
+    /// Erweiterte Memory-Upsert-Methode mit Conflict Resolution
+    /// - Parameters:
+    ///   - memories: Die Remote-Memories
+    ///   - context: Der Core Data Context
+    private func upsertMemoriesWithConflictResolution(
+        _ memories: [SyncQuery.Data.Sync.Memory],
+        context: NSManagedObjectContext
+    ) async throws {
+        for remoteMemory in memories {
+            let fetchRequest = Memory.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "serverId == %@", remoteMemory.id)
+            fetchRequest.fetchLimit = 1
+            
+            let localMemory = try await context.perform {
+                return try context.fetch(fetchRequest).first
+            }
+            
+            // Bereite Remote-Daten vor
+            let remoteData: [String: Any] = [
+                "serverId": remoteMemory.id,
+                "title": remoteMemory.title ?? "",
+                "text": remoteMemory.text ?? "",
+                "timestamp": self.dateTimeToDate(remoteMemory.timestamp) ?? Date(),
+                "latitude": remoteMemory.latitude ?? 0.0,
+                "longitude": remoteMemory.longitude ?? 0.0,
+                "locationName": remoteMemory.locationName ?? "",
+                "createdAt": self.dateTimeToDate(remoteMemory.createdAt) ?? Date(),
+                "updatedAt": self.dateTimeToDate(remoteMemory.updatedAt) ?? Date()
+            ]
+            
+            let resolvedMemory = try await self.upsertWithConflictResolution(
+                remoteData: remoteData,
+                localEntity: localMemory,
+                context: context
+            )
+            
+            // Handle Trip relationship
+            let tripId = remoteMemory.tripId
+            let tripFetchRequest = Trip.fetchRequest()
+            tripFetchRequest.predicate = NSPredicate(format: "serverId == %@", tripId)
+            tripFetchRequest.fetchLimit = 1
+            
+            try await context.perform {
+                if let trip = try context.fetch(tripFetchRequest).first {
+                    resolvedMemory.trip = trip
+                }
+            }
+        }
     }
 }
 

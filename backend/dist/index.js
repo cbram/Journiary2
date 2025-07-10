@@ -25,6 +25,8 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const UserResolver_1 = require("./resolvers/UserResolver");
 const AdminResolver_1 = require("./resolvers/AdminResolver");
 const SyncResolver_1 = require("./resolvers/SyncResolver");
+const OptimizedSyncResolver_1 = require("./resolvers/OptimizedSyncResolver");
+const auth_1 = require("./utils/auth");
 async function startServer() {
     try {
         await database_1.AppDataSource.initialize();
@@ -52,9 +54,11 @@ async function startServer() {
                 GPXResolver_1.GPXResolver,
                 UserResolver_1.UserResolver,
                 AdminResolver_1.AdminResolver,
-                SyncResolver_1.SyncResolver
+                SyncResolver_1.SyncResolver,
+                OptimizedSyncResolver_1.OptimizedSyncResolver
             ],
             validate: false,
+            authChecker: auth_1.authChecker,
         }),
         context: ({ req, res }) => {
             const context = { req, res };
@@ -65,8 +69,13 @@ async function startServer() {
                 console.log('🔍 Full token:', token);
                 if (token) {
                     try {
-                        console.log('🔐 Attempting to verify token with secret: "your-super-secret-key"');
-                        const decoded = jsonwebtoken_1.default.verify(token, "your-super-secret-key");
+                        const jwtSecret = process.env.JWT_SECRET;
+                        if (!jwtSecret) {
+                            console.log('❌ JWT_SECRET nicht in Umgebungsvariablen definiert');
+                            throw new Error('JWT_SECRET nicht konfiguriert');
+                        }
+                        console.log('🔐 Attempting to verify token with environment JWT_SECRET');
+                        const decoded = jsonwebtoken_1.default.verify(token, jwtSecret);
                         console.log('✅ JWT verified successfully, userId:', decoded.userId);
                         context.userId = decoded.userId;
                     }
