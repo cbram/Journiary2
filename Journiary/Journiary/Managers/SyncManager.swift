@@ -1166,6 +1166,31 @@ public enum SyncStatus: Int16 {
     case needsUpload = 1
 }
 
+/// Erweiterte Sync-Status-Enum mit detaillierteren Zuständen
+/// Implementiert als Teil von Schritt 1.1 des Sync-Implementierungsplans
+@objc
+public enum DetailedSyncStatus: Int16, CaseIterable {
+    case inSync = 0
+    case needsUpload = 1
+    case needsDownload = 2
+    case uploading = 3
+    case downloading = 4
+    case syncError = 5
+    case filesPending = 6
+    
+    var displayName: String {
+        switch self {
+        case .inSync: return "Synchronisiert"
+        case .needsUpload: return "Upload ausstehend"
+        case .needsDownload: return "Download ausstehend"
+        case .uploading: return "Wird hochgeladen..."
+        case .downloading: return "Wird heruntergeladen..."
+        case .syncError: return "Sync-Fehler"
+        case .filesPending: return "Dateien ausstehend"
+        }
+    }
+}
+
 
 // MARK: - CoreData Entity Conformance to Synchronizable
 
@@ -1388,11 +1413,17 @@ extension SyncManager {
 // MARK: - Sync Error Types
 
 /// Errors that can occur during synchronization
+/// Erweitert als Teil von Schritt 1.2 des Sync-Implementierungsplans
 enum SyncError: Error, LocalizedError {
     case invalidServerTimestamp
     case networkError(Error)
     case dataError(String)
     case authenticationError
+    case dependencyNotMet(entity: String, dependency: String)
+    case consistencyValidationFailed([String])
+    case transactionFailed(Error)
+    case maxRetriesExceeded
+    case noUploadUrlGenerated
     
     var errorDescription: String? {
         switch self {
@@ -1404,6 +1435,16 @@ enum SyncError: Error, LocalizedError {
             return "Datenfehler: \(message)"
         case .authenticationError:
             return "Authentifizierungsfehler"
+        case .dependencyNotMet(let entity, let dependency):
+            return "Abhängigkeit fehlt: \(entity) benötigt \(dependency)"
+        case .consistencyValidationFailed(let issues):
+            return "Konsistenzfehler: \(issues.joined(separator: ", "))"
+        case .transactionFailed(let error):
+            return "Transaktionsfehler: \(error.localizedDescription)"
+        case .maxRetriesExceeded:
+            return "Maximale Wiederholungsversuche erreicht"
+        case .noUploadUrlGenerated:
+            return "Keine Upload-URL generiert"
         }
     }
 }
