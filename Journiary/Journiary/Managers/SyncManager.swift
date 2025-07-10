@@ -14,6 +14,7 @@ final class SyncManager {
 
     private let persistenceController = PersistenceController.shared
     private let networkProvider = NetworkProvider.shared
+    private let dependencyResolver = SyncDependencyResolver()
     private var lastSyncedAt: Date? {
         get {
             // Retrieve the last sync date from UserDefaults
@@ -117,6 +118,22 @@ final class SyncManager {
                 )
             }
         }
+    }
+
+    /// **Phase 1: Upload with Dependencies (Experimental)**
+    ///
+    /// Neue Methode für dependency-aware Upload (erstmal nur logging)
+    /// Integriert den Dependency-Resolver ohne bestehende Funktionalität zu brechen
+    private func uploadPhaseWithDependencies() async throws {
+        print("📋 Dependency-aware Upload wird vorbereitet...")
+        
+        let syncOrder = dependencyResolver.resolveSyncOrder()
+        for entityType in syncOrder {
+            print("  - \(entityType.rawValue) (Order: \(entityType.syncOrder))")
+        }
+        
+        // Rufe bestehende uploadPhase auf
+        try await uploadPhase()
     }
 
     /// **Phase 1: Upload**
