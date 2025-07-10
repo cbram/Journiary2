@@ -278,6 +278,9 @@ struct SyncStatusBanner_Previews: PreviewProvider {
             // Inline Status
             InlineSyncStatus()
                 .environmentObject(createSyncingManager())
+            
+            // Enhanced Banner
+            EnhancedSyncStatusBanner()
         }
         .previewLayout(.sizeThatFits)
     }
@@ -299,4 +302,324 @@ struct SyncStatusBanner_Previews: PreviewProvider {
         manager.lastSyncAttempt = Date().addingTimeInterval(-2000) // 33 Minuten alt
         return manager
     }
-} 
+}
+
+// MARK: - Enhanced Sync Status Banner (Step 10.2)
+
+/// Erweiterte Sync-Status-Banner-Implementierung gemäß Schritt 10.2
+struct EnhancedSyncStatusBanner: View {
+    @StateObject private var viewModel = SyncStatusViewModel()
+    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
+    @State private var showDetails = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Haupt-Status-Banner
+            HStack {
+                statusIcon
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.statusText)
+                        .font(.headline)
+                        .foregroundColor(statusColor)
+                    
+                    if let detailText = viewModel.detailText {
+                        Text(detailText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Spacer()
+                
+                if viewModel.isActive {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Button(action: { showDetails.toggle() }) {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            .background(backgroundColor)
+            .animation(.easeInOut(duration: 0.3), value: viewModel.syncStatus)
+            
+            // Erweiterte Details (ausklappbar)
+            if showDetails {
+                SyncDetailView(viewModel: viewModel)
+                    .transition(.opacity.combined(with: .slide))
+            }
+        }
+        .cornerRadius(12)
+        .shadow(radius: 2)
+        .onAppear {
+            viewModel.startMonitoring(with: syncTriggerManager)
+        }
+        .onDisappear {
+            viewModel.stopMonitoring()
+        }
+    }
+    
+    private var statusIcon: some View {
+        Group {
+            switch viewModel.syncStatus {
+            case .idle:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+            case .syncing:
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .foregroundColor(.blue)
+            case .error:
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.red)
+            case .conflict:
+                Image(systemName: "questionmark.circle.fill")
+                    .foregroundColor(.orange)
+            }
+        }
+        .font(.title2)
+    }
+    
+    private var statusColor: Color {
+        switch viewModel.syncStatus {
+        case .idle: return .green
+        case .syncing: return .blue
+        case .error: return .red
+        case .conflict: return .orange
+        }
+    }
+    
+    private var backgroundColor: Color {
+        switch viewModel.syncStatus {
+        case .idle: return Color.green.opacity(0.1)
+        case .syncing: return Color.blue.opacity(0.1)
+        case .error: return Color.red.opacity(0.1)
+        case .conflict: return Color.orange.opacity(0.1)
+        }
+    }
+}
+
+struct SyncDetailView: View {
+    @ObservedObject var viewModel: SyncStatusViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Divider()
+            
+            // Sync-Statistiken
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Letzte Synchronisation")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text(viewModel.lastSyncTime)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing) {
+                    Text("Ausstehende Elemente")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("\(viewModel.pendingCount)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+            }
+            
+            // Fortschrittsbalken für verschiedene Entity-Typen
+            ForEach(viewModel.entityProgress, id: \.entityType) { progress in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(progress.entityType)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text("\(progress.synced)/\(progress.total)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    ProgressView(value: progress.percentage)
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .scaleEffect(y: 0.5)
+                }
+            }
+            
+            // Aktions-Buttons
+            HStack {
+                if viewModel.canRetry {
+                    Button("Wiederholen") {
+                        viewModel.retrySync()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                
+                Spacer()
+                
+                Button("Sync-Debug") {
+                    viewModel.showDebugView = true
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+            }
+        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .sheet(isPresented: $viewModel.showDebugView) {
+            SyncDebugDashboard()
+        }
+    }
+}
+
+// MARK: - Enhanced Sync Status ViewModel
+
+class SyncStatusViewModel: ObservableObject {
+    @Published var syncStatus: SyncStatus = .idle
+    @Published var statusText: String = "Synchronisiert"
+    @Published var detailText: String?
+    @Published var pendingCount: Int = 0
+    @Published var lastSyncTime: String = "Nie"
+    @Published var entityProgress: [EntityProgress] = []
+    @Published var isActive: Bool = false
+    @Published var canRetry: Bool = false
+    @Published var showDebugView: Bool = false
+    
+    private var syncManager = SyncManager.shared
+    private var cancellables = Set<AnyCancellable>()
+    
+    // SyncTriggerManager wird über Dependency Injection bereitgestellt
+    weak var syncTriggerManager: SyncTriggerManager?
+    
+    enum SyncStatus {
+        case idle
+        case syncing
+        case error
+        case conflict
+    }
+    
+    struct EntityProgress {
+        let entityType: String
+        let synced: Int
+        let total: Int
+        
+        var percentage: Double {
+            total > 0 ? Double(synced) / Double(total) : 0.0
+        }
+    }
+    
+    @MainActor
+    func startMonitoring(with triggerManager: SyncTriggerManager) {
+        self.syncTriggerManager = triggerManager
+        
+        // Überwache Sync-Status-Änderungen über SyncTriggerManager
+        triggerManager.$isSyncing
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isSyncing in
+                self?.updateSyncingStatus(isSyncing)
+            }
+            .store(in: &cancellables)
+        
+        // Überwache Sync-Fehler
+        triggerManager.$lastSyncError
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] error in
+                self?.updateErrorStatus(error)
+            }
+            .store(in: &cancellables)
+        
+        // Timer für regelmäßige Updates
+        Timer.publish(every: 30, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    self?.loadInitialData()
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Initiale Daten laden
+        loadInitialData()
+    }
+    
+    func stopMonitoring() {
+        cancellables.removeAll()
+    }
+    
+    @MainActor
+    private func updateSyncingStatus(_ isSyncing: Bool) {
+        if isSyncing {
+            syncStatus = .syncing
+            statusText = "Synchronisiert..."
+            detailText = "Daten werden abgeglichen"
+            isActive = true
+            canRetry = false
+        } else {
+            // Zurück zu Idle wenn kein Fehler vorliegt
+            if syncTriggerManager?.lastSyncError == nil {
+                syncStatus = .idle
+                statusText = "Synchronisiert"
+                detailText = nil
+                isActive = false
+                canRetry = false
+            }
+        }
+    }
+    
+    @MainActor
+    private func updateErrorStatus(_ error: String?) {
+        if let error = error, syncTriggerManager?.isSyncing == false {
+            syncStatus = .error
+            statusText = "Sync-Fehler"
+            detailText = error
+            isActive = false
+            canRetry = true
+        }
+    }
+    
+    @MainActor
+    private func loadInitialData() {
+        // Lade Sync-Statistiken aus Core Data
+        // Simuliere Statistiken - in echter Implementation würde dies aus Core Data kommen
+        self.pendingCount = self.calculatePendingEntities()
+        self.lastSyncTime = self.formatLastSyncTime(syncTriggerManager?.lastSyncAttempt)
+        self.entityProgress = self.generateEntityProgress()
+    }
+    
+    private func calculatePendingEntities() -> Int {
+        // Simulierte Berechnung - in echter Implementation Core Data Query
+        return Int.random(in: 0...25)
+    }
+    
+    private func generateEntityProgress() -> [EntityProgress] {
+        // Simulierte Entity-Progress - in echter Implementation aus Core Data
+        return [
+            EntityProgress(entityType: "Memories", synced: 45, total: 50),
+            EntityProgress(entityType: "Photos", synced: 128, total: 135),
+            EntityProgress(entityType: "Tracks", synced: 12, total: 15),
+            EntityProgress(entityType: "Tags", synced: 23, total: 23)
+        ]
+    }
+    
+    private func formatLastSyncTime(_ date: Date?) -> String {
+        guard let date = date else { return "Nie" }
+        
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    func retrySync() {
+        Task {
+            await syncTriggerManager?.triggerManualSync()
+        }
+    }
+}
+
+import Combine 
