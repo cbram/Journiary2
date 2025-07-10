@@ -1,6 +1,7 @@
 import Foundation
 import CoreData
 import JourniaryAPI
+import os.log
 
 /// Manages the synchronization of data between the client and the backend.
 ///
@@ -1446,5 +1447,76 @@ enum SyncError: Error, LocalizedError {
         case .noUploadUrlGenerated:
             return "Keine Upload-URL generiert"
         }
+    }
+}
+
+// MARK: - Sync Logging Extension
+
+/// Erweiterte Logging-Funktionen für den SyncManager
+/// Implementiert als Teil von Schritt 1.4 des Sync-Implementierungsplans
+extension SyncManager {
+    
+    /// Logger für Synchronisations-Events
+    private static let logger = Logger(subsystem: "com.journiary.sync", category: "SyncManager")
+    
+    /// Protokolliert den Start eines Synchronisations-Zyklus
+    /// - Parameter reason: Der Grund für den Sync-Start
+    private func logSyncStart(reason: String) {
+        Self.logger.info("🔄 Sync gestartet: \(reason)")
+        print("🔄 Sync gestartet: \(reason)")
+    }
+    
+    /// Protokolliert den erfolgreichen Abschluss eines Synchronisations-Zyklus
+    /// - Parameter reason: Der Grund für den Sync
+    /// - Parameter duration: Die Dauer des Sync-Vorgangs in Sekunden
+    private func logSyncSuccess(reason: String, duration: TimeInterval) {
+        Self.logger.info("✅ Sync erfolgreich: \(reason) (\(duration)s)")
+        print("✅ Sync erfolgreich: \(reason) (\(duration)s)")
+    }
+    
+    /// Protokolliert einen Fehler während der Synchronisation
+    /// - Parameter reason: Der Grund für den Sync-Versuch
+    /// - Parameter error: Der aufgetretene Fehler
+    private func logSyncError(reason: String, error: Error) {
+        Self.logger.error("❌ Sync fehlgeschlagen: \(reason) - \(error.localizedDescription)")
+        print("❌ Sync fehlgeschlagen: \(reason) - \(error.localizedDescription)")
+    }
+    
+    /// Protokolliert den Start einer Upload-Phase
+    /// - Parameter entityCount: Anzahl der zu synchronisierenden Entitäten
+    private func logUploadStart(entityCount: Int) {
+        Self.logger.info("📤 Upload-Phase gestartet: \(entityCount) Entitäten")
+        print("📤 Upload-Phase gestartet: \(entityCount) Entitäten")
+    }
+    
+    /// Protokolliert den Start einer Download-Phase
+    /// - Parameter since: Zeitpunkt der letzten Synchronisation
+    private func logDownloadStart(since: Date?) {
+        let sinceString = since?.formatted() ?? "Erstmalig"
+        Self.logger.info("📥 Download-Phase gestartet: Seit \(sinceString)")
+        print("📥 Download-Phase gestartet: Seit \(sinceString)")
+    }
+    
+    /// Protokolliert den Start einer Datei-Synchronisation
+    /// - Parameter fileCount: Anzahl der zu synchronisierenden Dateien
+    private func logFileSyncStart(fileCount: Int) {
+        Self.logger.info("📁 Datei-Synchronisation gestartet: \(fileCount) Dateien")
+        print("📁 Datei-Synchronisation gestartet: \(fileCount) Dateien")
+    }
+    
+    /// Protokolliert Entity-spezifische Upload-Erfolge
+    /// - Parameter entityType: Der Typ der synchronisierten Entität
+    /// - Parameter count: Anzahl der synchronisierten Entitäten
+    private func logEntityUploadSuccess(entityType: String, count: Int) {
+        Self.logger.info("✅ \(entityType) synchronisiert: \(count) Entitäten")
+        print("✅ \(entityType) synchronisiert: \(count) Entitäten")
+    }
+    
+    /// Protokolliert Entity-spezifische Upload-Fehler
+    /// - Parameter entityType: Der Typ der fehlgeschlagenen Entität
+    /// - Parameter error: Der aufgetretene Fehler
+    private func logEntityUploadError(entityType: String, error: Error) {
+        Self.logger.error("❌ \(entityType) Upload fehlgeschlagen: \(error.localizedDescription)")
+        print("❌ \(entityType) Upload fehlgeschlagen: \(error.localizedDescription)")
     }
 }

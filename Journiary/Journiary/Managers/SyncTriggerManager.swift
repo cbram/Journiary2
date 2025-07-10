@@ -55,9 +55,13 @@ final class SyncTriggerManager: ObservableObject {
     }
     
     deinit {
-        Task { @MainActor in
-            cleanup()
-        }
+        // Direkte Cleanup-Operationen ohne Task
+        periodicSyncTimer?.invalidate()
+        periodicSyncTimer = nil
+        networkMonitor?.cancel()
+        networkMonitor = nil
+        monitorQueue = nil
+        logger.info("SyncTriggerManager bereinigt")
     }
     
     // MARK: - Public Methods
@@ -190,31 +194,18 @@ final class SyncTriggerManager: ObservableObject {
         lastSyncAttempt = Date()
         lastSyncError = nil
         
-        do {
-            // Führe Synchronisation durch
-            await syncManager.sync(reason: reason)
-            
-            logger.info("\(reason)-Synchronisation erfolgreich abgeschlossen")
-            
-            // Phase 5.3: Toast für Sync-Erfolg (nur bei manuellen Syncs)
-            if reason == "Manuell" {
-                toastManager?.showSyncCompleted()
-            }
-            
-            // Update UI
-            isSyncing = false
-            
-        } catch {
-            let errorMessage = error.localizedDescription
-            logger.error("\(reason)-Synchronisation fehlgeschlagen: \(errorMessage)")
-            
-            // Phase 5.3: Toast für Sync-Fehler
-            toastManager?.showSyncFailed(error: errorMessage)
-            
-            // Update UI
-            lastSyncError = errorMessage
-            isSyncing = false
+        // Führe Synchronisation durch
+        await syncManager.sync(reason: reason)
+        
+        logger.info("\(reason)-Synchronisation erfolgreich abgeschlossen")
+        
+        // Phase 5.3: Toast für Sync-Erfolg (nur bei manuellen Syncs)
+        if reason == "Manuell" {
+            toastManager?.showSyncCompleted()
         }
+        
+        // Update UI
+        isSyncing = false
     }
     
     /// Richtet Netzwerküberwachung ein

@@ -122,7 +122,7 @@ class AuthService: ObservableObject {
     // MARK: - Private Helpers
     
     private func checkAuthentication() {
-        if let token = getToken() {
+        if getToken() != nil {
             // TODO: Künftig sollte hier auch die Token-Gültigkeit geprüft werden
             // Beispiel: Einfache Test-Anfrage an das Backend senden
             self.isAuthenticated = true
