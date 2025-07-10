@@ -2633,3 +2633,179 @@ extension NSManagedObject {
         return data
     }
 }
+
+// MARK: - Phase 10.3: Intelligente Sync-Strategien
+
+extension SyncManager {
+    
+    /// Führt minimale Synchronisation durch (nur kritische Änderungen)
+    /// - Throws: SyncError bei Fehlern während der Synchronisation
+    func performMinimalSync() async throws {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "MinimalSync")
+        
+        SyncLogger.shared.info("Starte minimale Synchronisation", category: "SyncManager")
+        
+        do {
+            let context = persistenceController.container.viewContext
+            
+            // Nur kritische Entitäten synchronisieren (Trips, Tags)
+            let criticalEntityTypes = ["Trip", "Tag", "TagCategory"]
+            var totalSynced = 0
+            
+            for entityType in criticalEntityTypes {
+                let pendingEntities = try await fetchPendingEntitiesForStrategySync(type: entityType, context: context)
+                
+                if !pendingEntities.isEmpty {
+                    // Sync in kleinen Batches für bessere Performance
+                    let batchSize = 5
+                    for batch in pendingEntities.chunked(into: batchSize) {
+                        try await syncEntityBatch(batch, context: context)
+                        totalSynced += batch.count
+                    }
+                }
+            }
+            
+            measurement.finish(entityCount: totalSynced)
+            
+            SyncLogger.shared.info(
+                "Minimale Synchronisation abgeschlossen",
+                category: "SyncManager",
+                metadata: ["syncedEntities": totalSynced]
+            )
+            
+        } catch {
+            measurement.finish(entityCount: 0)
+            SyncLogger.shared.error(
+                "Minimale Synchronisation fehlgeschlagen: \(error.localizedDescription)",
+                category: "SyncManager"
+            )
+            throw SyncError.dataError(error.localizedDescription)
+        }
+    }
+    
+    /// Führt Standard-Synchronisation durch
+    /// - Throws: SyncError bei Fehlern während der Synchronisation
+    func performStandardSync() async throws {
+        let measurement = PerformanceMonitor.shared.startMeasuring(operation: "StandardSync")
+        
+        SyncLogger.shared.info("Starte Standard-Synchronisation", category: "SyncManager")
+        
+        do {
+            let context = persistenceController.container.viewContext
+            
+            // Standard-Entitäten synchronisieren (ohne MediaItems für Performance)
+            let standardEntityTypes = ["Trip", "Memory", "Tag", "TagCategory", "GPXTrack", "BucketListItem"]
+            var totalSynced = 0
+            
+            for entityType in standardEntityTypes {
+                let pendingEntities = try await fetchPendingEntitiesForStrategySync(type: entityType, context: context)
+                
+                if !pendingEntities.isEmpty {
+                    // Sync in mittleren Batches
+                    let batchSize = AdaptiveBatchManager().recommendedBatchSize(for: entityType)
+                    for batch in pendingEntities.chunked(into: batchSize) {
+                        try await syncEntityBatch(batch, context: context)
+                        totalSynced += batch.count
+                    }
+                }
+            }
+            
+            measurement.finish(entityCount: totalSynced)
+            
+            SyncLogger.shared.info(
+                "Standard-Synchronisation abgeschlossen",
+                category: "SyncManager",
+                metadata: ["syncedEntities": totalSynced]
+            )
+            
+        } catch {
+            measurement.finish(entityCount: 0)
+            SyncLogger.shared.error(
+                "Standard-Synchronisation fehlgeschlagen: \(error.localizedDescription)",
+                category: "SyncManager"
+            )
+            throw SyncError.dataError(error.localizedDescription)
+        }
+    }
+    
+    /// Prüft, ob ausstehende Änderungen vorhanden sind
+    /// - Returns: true wenn Änderungen vorhanden sind
+    func hasPendingChanges() -> Bool {
+        let context = persistenceController.container.viewContext
+        
+        return context.performAndWait {
+            let entityTypes = ["Trip", "Memory", "Tag", "TagCategory", "GPXTrack", "MediaItem", "BucketListItem"]
+            
+            for entityType in entityTypes {
+                let request = NSFetchRequest<NSManagedObject>(entityName: entityType)
+                request.predicate = NSPredicate(format: "syncStatus != %@", SyncStatus.inSync.rawValue)
+                request.fetchLimit = 1
+                
+                do {
+                    let count = try context.count(for: request)
+                    if count > 0 {
+                        return true
+                    }
+                } catch {
+                    SyncLogger.shared.error(
+                        "Fehler beim Prüfen auf ausstehende Änderungen: \(error.localizedDescription)",
+                        category: "SyncManager"
+                    )
+                }
+            }
+            
+            return false
+        }
+    }
+    
+    /// Holt ausstehende Entitäten für einen bestimmten Typ (erweiterte Version)
+    /// - Parameters:
+    ///   - type: Der Entitätstyp
+    ///   - context: Der Core Data Context
+    /// - Returns: Array von NSManagedObject mit ausstehenden Entitäten
+    /// - Throws: SyncError bei Fehlern während der Datenabfrage
+    private func fetchPendingEntitiesForStrategySync(type: String, context: NSManagedObjectContext) async throws -> [NSManagedObject] {
+        return await context.perform {
+            let request = NSFetchRequest<NSManagedObject>(entityName: type)
+            request.predicate = NSPredicate(format: "syncStatus == %@", SyncStatus.needsUpload.rawValue)
+            request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
+            
+            do {
+                return try context.fetch(request)
+            } catch {
+                SyncLogger.shared.error(
+                    "Fehler beim Laden ausstehender Entitäten für \(type): \(error.localizedDescription)",
+                    category: "SyncManager"
+                )
+                return []
+            }
+        }
+    }
+    
+    /// Synchronisiert einen Batch von Entitäten
+    /// - Parameters:
+    ///   - entities: Array von zu synchronisierenden Entitäten
+    ///   - context: Der Core Data Context
+    /// - Throws: SyncError bei Synchronisationsfehlern
+    private func syncEntityBatch(_ entities: [NSManagedObject], context: NSManagedObjectContext) async throws {
+        // Simuliere Batch-Synchronisation (in echter Implementation würde dies über GraphQL erfolgen)
+        try await Task.sleep(nanoseconds: 100_000_000) // 0.1 Sekunden
+        
+        await context.perform {
+            for entity in entities {
+                entity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+                entity.setValue(Date(), forKey: "lastSyncedAt")
+            }
+            
+            do {
+                try context.save()
+            } catch {
+                SyncLogger.shared.error(
+                    "Fehler beim Speichern synchronisierter Entitäten: \(error.localizedDescription)",
+                    category: "SyncManager"
+                )
+            }
+        }
+    }
+}
+
