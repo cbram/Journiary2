@@ -16,6 +16,7 @@ exports.MediaItemResolver = void 0;
 const type_graphql_1 = require("type-graphql");
 const MediaItem_1 = require("../entities/MediaItem");
 const MediaItemInput_1 = require("../entities/MediaItemInput");
+const UpdateMediaItemInput_1 = require("../entities/UpdateMediaItemInput");
 const database_1 = require("../utils/database");
 const minio_1 = require("../utils/minio");
 const Memory_1 = require("../entities/Memory");
@@ -113,6 +114,24 @@ let MediaItemResolver = class MediaItemResolver {
         });
         return await mediaItemRepository.save(mediaItem);
     }
+    async updateMediaItem(id, input, { userId }) {
+        if (!userId)
+            throw new apollo_server_express_1.AuthenticationError("You must be logged in.");
+        const mediaItem = await database_1.AppDataSource.getRepository(MediaItem_1.MediaItem).findOne({
+            where: { id },
+            relations: ["memory", "memory.trip"]
+        });
+        if (!mediaItem) {
+            throw new apollo_server_express_1.UserInputError(`Media item with ID ${id} not found.`);
+        }
+        const hasAccess = await (0, auth_1.checkTripAccess)(userId, mediaItem.memory.trip.id, TripMembership_1.TripRole.EDITOR);
+        if (!hasAccess) {
+            throw new apollo_server_express_1.AuthenticationError("You don't have permission to update this media item.");
+        }
+        // Update the media item with the provided fields
+        Object.assign(mediaItem, input);
+        return await database_1.AppDataSource.getRepository(MediaItem_1.MediaItem).save(mediaItem);
+    }
     async deleteMediaItem(id, { userId }) {
         if (!userId)
             throw new apollo_server_express_1.AuthenticationError("You must be logged in.");
@@ -207,6 +226,15 @@ __decorate([
     __metadata("design:paramtypes", [MediaItemInput_1.MediaItemInput, Object]),
     __metadata("design:returntype", Promise)
 ], MediaItemResolver.prototype, "createMediaItem", null);
+__decorate([
+    (0, type_graphql_1.Mutation)(() => MediaItem_1.MediaItem, { description: "Update a media item" }),
+    __param(0, (0, type_graphql_1.Arg)("id", () => String)),
+    __param(1, (0, type_graphql_1.Arg)("input")),
+    __param(2, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, UpdateMediaItemInput_1.UpdateMediaItemInput, Object]),
+    __metadata("design:returntype", Promise)
+], MediaItemResolver.prototype, "updateMediaItem", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Boolean, { description: "Delete a media item" }),
     __param(0, (0, type_graphql_1.Arg)("id", () => String)),

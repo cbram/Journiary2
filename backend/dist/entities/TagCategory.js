@@ -64,7 +64,7 @@ __decorate([
 ], TagCategory.prototype, "createdAt", void 0);
 __decorate([
     (0, type_graphql_1.Field)(),
-    (0, typeorm_1.Column)({ type: "timestamp", default: () => "CURRENT_TIMESTAMP", onUpdate: "CURRENT_TIMESTAMP" }),
+    (0, typeorm_1.Column)({ type: "timestamp", default: () => "CURRENT_TIMESTAMP" }),
     __metadata("design:type", Date)
 ], TagCategory.prototype, "updatedAt", void 0);
 __decorate([

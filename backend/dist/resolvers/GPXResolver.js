@@ -25,6 +25,7 @@ const RoutePoint_1 = require("../entities/RoutePoint");
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const GpxParser = require("gpxparser");
 const GPXTrackInput_1 = require("../entities/GPXTrackInput");
+const UpdateGPXTrackInput_1 = require("../entities/UpdateGPXTrackInput");
 const PresignedUrlResponse_1 = require("./types/PresignedUrlResponse");
 const minio_2 = require("../utils/minio");
 const Memory_1 = require("../entities/Memory");
@@ -155,6 +156,40 @@ let GPXResolver = class GPXResolver {
         }
         // Use the entity manager to save the track and all its cascaded segments and points
         return await database_1.AppDataSource.manager.save(newGpxTrack);
+    }
+    async updateGpxTrack(id, input, { userId }) {
+        if (!userId)
+            throw new apollo_server_express_1.AuthenticationError("You must be logged in.");
+        const gpxTrack = await database_1.AppDataSource.getRepository(GPXTrack_1.GPXTrack).findOne({
+            where: { id },
+            relations: ["trip", "memory"]
+        });
+        if (!gpxTrack) {
+            throw new apollo_server_express_1.UserInputError(`GPX track with ID ${id} not found.`);
+        }
+        const hasAccess = await (0, auth_1.checkTripAccess)(userId, gpxTrack.trip.id, TripMembership_1.TripRole.EDITOR);
+        if (!hasAccess) {
+            throw new apollo_server_express_1.AuthenticationError("You don't have permission to update this GPX track.");
+        }
+        // Handle memory association if provided
+        if (input.memoryId !== undefined) {
+            if (input.memoryId) {
+                const memory = await database_1.AppDataSource.getRepository(Memory_1.Memory).findOne({
+                    where: { id: input.memoryId, trip: { id: gpxTrack.trip.id } }
+                });
+                if (!memory) {
+                    throw new apollo_server_express_1.UserInputError(`Memory with ID ${input.memoryId} not found in this trip.`);
+                }
+                gpxTrack.memory = memory;
+            }
+            else {
+                gpxTrack.memory = undefined;
+            }
+        }
+        // Update the GPX track with the provided fields (excluding memoryId which we handled above)
+        const { memoryId, ...updateFields } = input;
+        Object.assign(gpxTrack, updateFields);
+        return await database_1.AppDataSource.getRepository(GPXTrack_1.GPXTrack).save(gpxTrack);
     }
     async deleteGpxTrack(id, { userId }) {
         if (!userId) {
@@ -300,6 +335,15 @@ __decorate([
     __metadata("design:paramtypes", [GPXTrackInput_1.GPXTrackInput, Object]),
     __metadata("design:returntype", Promise)
 ], GPXResolver.prototype, "createGpxTrack", null);
+__decorate([
+    (0, type_graphql_1.Mutation)(() => GPXTrack_1.GPXTrack, { description: "Update a GPX track" }),
+    __param(0, (0, type_graphql_1.Arg)("id", () => type_graphql_1.ID)),
+    __param(1, (0, type_graphql_1.Arg)("input")),
+    __param(2, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, UpdateGPXTrackInput_1.UpdateGPXTrackInput, Object]),
+    __metadata("design:returntype", Promise)
+], GPXResolver.prototype, "updateGpxTrack", null);
 __decorate([
     (0, type_graphql_1.Mutation)(() => Boolean, { description: "Deletes a GPX track and its associated data." }),
     __param(0, (0, type_graphql_1.Arg)("id", () => type_graphql_1.ID)),

@@ -27,6 +27,104 @@ const DeletionLog_1 = require("../entities/DeletionLog");
 const typeorm_1 = require("typeorm");
 const TripMembership_1 = require("../entities/TripMembership");
 const apollo_server_express_1 = require("apollo-server-express");
+const minio_1 = require("../utils/minio");
+let UploadRequest = class UploadRequest {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => type_graphql_1.ID),
+    __metadata("design:type", String)
+], UploadRequest.prototype, "entityId", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], UploadRequest.prototype, "entityType", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], UploadRequest.prototype, "objectName", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], UploadRequest.prototype, "mimeType", void 0);
+UploadRequest = __decorate([
+    (0, type_graphql_1.InputType)()
+], UploadRequest);
+let FileDownloadUrl = class FileDownloadUrl {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => type_graphql_1.ID),
+    __metadata("design:type", String)
+], FileDownloadUrl.prototype, "entityId", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], FileDownloadUrl.prototype, "entityType", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], FileDownloadUrl.prototype, "objectName", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], FileDownloadUrl.prototype, "downloadUrl", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => Number),
+    __metadata("design:type", Number)
+], FileDownloadUrl.prototype, "expiresIn", void 0);
+FileDownloadUrl = __decorate([
+    (0, type_graphql_1.ObjectType)()
+], FileDownloadUrl);
+let FileSyncResponse = class FileSyncResponse {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => [FileDownloadUrl]),
+    __metadata("design:type", Array)
+], FileSyncResponse.prototype, "downloadUrls", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => Date),
+    __metadata("design:type", Date)
+], FileSyncResponse.prototype, "generatedAt", void 0);
+FileSyncResponse = __decorate([
+    (0, type_graphql_1.ObjectType)()
+], FileSyncResponse);
+let BulkUploadUrl = class BulkUploadUrl {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => type_graphql_1.ID),
+    __metadata("design:type", String)
+], BulkUploadUrl.prototype, "entityId", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], BulkUploadUrl.prototype, "entityType", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], BulkUploadUrl.prototype, "objectName", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(),
+    __metadata("design:type", String)
+], BulkUploadUrl.prototype, "uploadUrl", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => Number),
+    __metadata("design:type", Number)
+], BulkUploadUrl.prototype, "expiresIn", void 0);
+BulkUploadUrl = __decorate([
+    (0, type_graphql_1.ObjectType)()
+], BulkUploadUrl);
+let BulkUploadResponse = class BulkUploadResponse {
+};
+__decorate([
+    (0, type_graphql_1.Field)(() => [BulkUploadUrl]),
+    __metadata("design:type", Array)
+], BulkUploadResponse.prototype, "uploadUrls", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => Date),
+    __metadata("design:type", Date)
+], BulkUploadResponse.prototype, "generatedAt", void 0);
+BulkUploadResponse = __decorate([
+    (0, type_graphql_1.ObjectType)()
+], BulkUploadResponse);
 let SyncResolver = class SyncResolver {
     async sync(lastSyncedAt, { userId }) {
         if (!userId) {
@@ -90,6 +188,177 @@ let SyncResolver = class SyncResolver {
             serverTimestamp: now,
         };
     }
+    async generateBatchDownloadUrls({ userId }, mediaItemIds, gpxTrackIds, expiresIn) {
+        if (!userId) {
+            throw new apollo_server_express_1.AuthenticationError("You must be logged in to generate download URLs.");
+        }
+        const downloadUrls = [];
+        const now = new Date();
+        const urlExpiresIn = expiresIn || 3600;
+        // Process MediaItems
+        if (mediaItemIds && mediaItemIds.length > 0) {
+            const mediaItems = await database_1.AppDataSource.getRepository(MediaItem_1.MediaItem).find({
+                where: { id: (0, typeorm_1.In)(mediaItemIds) },
+                relations: ["memory", "memory.trip"]
+            });
+            for (const mediaItem of mediaItems) {
+                // Check access permissions
+                const memberships = await database_1.AppDataSource.getRepository(TripMembership_1.TripMembership).find({
+                    where: { user: { id: userId }, trip: { id: mediaItem.memory.trip.id } }
+                });
+                if (memberships.length === 0)
+                    continue;
+                // Generate download URL for main file
+                if (mediaItem.objectName) {
+                    try {
+                        const downloadUrl = await (0, minio_1.generatePresignedGetUrl)(mediaItem.objectName, urlExpiresIn);
+                        downloadUrls.push({
+                            entityId: mediaItem.id,
+                            entityType: 'MediaItem',
+                            objectName: mediaItem.objectName,
+                            downloadUrl,
+                            expiresIn: urlExpiresIn
+                        });
+                    }
+                    catch (error) {
+                        console.error(`Failed to generate download URL for MediaItem ${mediaItem.id}:`, error);
+                    }
+                }
+                // Generate download URL for thumbnail
+                if (mediaItem.thumbnailObjectName) {
+                    try {
+                        const downloadUrl = await (0, minio_1.generatePresignedGetUrl)(mediaItem.thumbnailObjectName, urlExpiresIn);
+                        downloadUrls.push({
+                            entityId: mediaItem.id,
+                            entityType: 'MediaItemThumbnail',
+                            objectName: mediaItem.thumbnailObjectName,
+                            downloadUrl,
+                            expiresIn: urlExpiresIn
+                        });
+                    }
+                    catch (error) {
+                        console.error(`Failed to generate thumbnail download URL for MediaItem ${mediaItem.id}:`, error);
+                    }
+                }
+            }
+        }
+        // Process GPXTracks
+        if (gpxTrackIds && gpxTrackIds.length > 0) {
+            const gpxTracks = await database_1.AppDataSource.getRepository(GPXTrack_1.GPXTrack).find({
+                where: { id: (0, typeorm_1.In)(gpxTrackIds) },
+                relations: ["trip"]
+            });
+            for (const gpxTrack of gpxTracks) {
+                // Check access permissions
+                const memberships = await database_1.AppDataSource.getRepository(TripMembership_1.TripMembership).find({
+                    where: { user: { id: userId }, trip: { id: gpxTrack.trip.id } }
+                });
+                if (memberships.length === 0)
+                    continue;
+                // Generate download URL for GPX file
+                if (gpxTrack.gpxFileObjectName) {
+                    try {
+                        const downloadUrl = await (0, minio_1.generatePresignedGetUrl)(gpxTrack.gpxFileObjectName, urlExpiresIn);
+                        downloadUrls.push({
+                            entityId: gpxTrack.id,
+                            entityType: 'GPXTrack',
+                            objectName: gpxTrack.gpxFileObjectName,
+                            downloadUrl,
+                            expiresIn: urlExpiresIn
+                        });
+                    }
+                    catch (error) {
+                        console.error(`Failed to generate download URL for GPXTrack ${gpxTrack.id}:`, error);
+                    }
+                }
+            }
+        }
+        return {
+            downloadUrls,
+            generatedAt: now
+        };
+    }
+    async generateBatchUploadUrls(uploadRequests, { userId }, expiresIn) {
+        if (!userId) {
+            throw new apollo_server_express_1.AuthenticationError("You must be logged in to generate upload URLs.");
+        }
+        const uploadUrls = [];
+        const now = new Date();
+        const urlExpiresIn = expiresIn || 3600;
+        for (const request of uploadRequests) {
+            try {
+                const uploadUrl = await (0, minio_1.generatePresignedPutUrl)(request.objectName, request.mimeType, urlExpiresIn);
+                uploadUrls.push({
+                    entityId: request.entityId,
+                    entityType: request.entityType,
+                    objectName: request.objectName,
+                    uploadUrl,
+                    expiresIn: urlExpiresIn
+                });
+            }
+            catch (error) {
+                console.error(`Failed to generate upload URL for ${request.entityType} ${request.entityId}:`, error);
+            }
+        }
+        return {
+            uploadUrls,
+            generatedAt: now
+        };
+    }
+    async markFileUploadComplete(entityId, entityType, objectName, { userId }) {
+        if (!userId) {
+            throw new apollo_server_express_1.AuthenticationError("You must be logged in to mark uploads complete.");
+        }
+        try {
+            switch (entityType) {
+                case 'MediaItem':
+                    const mediaItem = await database_1.AppDataSource.getRepository(MediaItem_1.MediaItem).findOne({
+                        where: { id: entityId },
+                        relations: ["memory", "memory.trip"]
+                    });
+                    if (!mediaItem)
+                        throw new Error("MediaItem not found");
+                    // Check permissions
+                    const memberships = await database_1.AppDataSource.getRepository(TripMembership_1.TripMembership).find({
+                        where: { user: { id: userId }, trip: { id: mediaItem.memory.trip.id } }
+                    });
+                    if (memberships.length === 0)
+                        throw new Error("Access denied");
+                    // Update objectName if needed
+                    if (mediaItem.objectName !== objectName) {
+                        mediaItem.objectName = objectName;
+                        await database_1.AppDataSource.getRepository(MediaItem_1.MediaItem).save(mediaItem);
+                    }
+                    break;
+                case 'GPXTrack':
+                    const gpxTrack = await database_1.AppDataSource.getRepository(GPXTrack_1.GPXTrack).findOne({
+                        where: { id: entityId },
+                        relations: ["trip"]
+                    });
+                    if (!gpxTrack)
+                        throw new Error("GPXTrack not found");
+                    // Check permissions
+                    const gpxMemberships = await database_1.AppDataSource.getRepository(TripMembership_1.TripMembership).find({
+                        where: { user: { id: userId }, trip: { id: gpxTrack.trip.id } }
+                    });
+                    if (gpxMemberships.length === 0)
+                        throw new Error("Access denied");
+                    // Update objectName if needed
+                    if (gpxTrack.gpxFileObjectName !== objectName) {
+                        gpxTrack.gpxFileObjectName = objectName;
+                        await database_1.AppDataSource.getRepository(GPXTrack_1.GPXTrack).save(gpxTrack);
+                    }
+                    break;
+                default:
+                    throw new Error(`Unsupported entity type: ${entityType}`);
+            }
+            return true;
+        }
+        catch (error) {
+            console.error(`Failed to mark upload complete for ${entityType} ${entityId}:`, error);
+            return false;
+        }
+    }
 };
 exports.SyncResolver = SyncResolver;
 __decorate([
@@ -101,6 +370,38 @@ __decorate([
     __metadata("design:paramtypes", [Date, Object]),
     __metadata("design:returntype", Promise)
 ], SyncResolver.prototype, "sync", null);
+__decorate([
+    (0, type_graphql_1.Authorized)(),
+    (0, type_graphql_1.Query)(() => FileSyncResponse, { description: "Generate batch download URLs for media files and GPX tracks" }),
+    __param(0, (0, type_graphql_1.Ctx)()),
+    __param(1, (0, type_graphql_1.Arg)("mediaItemIds", () => [type_graphql_1.ID], { nullable: true })),
+    __param(2, (0, type_graphql_1.Arg)("gpxTrackIds", () => [type_graphql_1.ID], { nullable: true })),
+    __param(3, (0, type_graphql_1.Arg)("expiresIn", () => Number, { nullable: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Array, Array, Number]),
+    __metadata("design:returntype", Promise)
+], SyncResolver.prototype, "generateBatchDownloadUrls", null);
+__decorate([
+    (0, type_graphql_1.Authorized)(),
+    (0, type_graphql_1.Mutation)(() => BulkUploadResponse, { description: "Generate batch upload URLs for media files and GPX tracks" }),
+    __param(0, (0, type_graphql_1.Arg)("uploadRequests", () => [UploadRequest])),
+    __param(1, (0, type_graphql_1.Ctx)()),
+    __param(2, (0, type_graphql_1.Arg)("expiresIn", () => Number, { nullable: true })),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Array, Object, Number]),
+    __metadata("design:returntype", Promise)
+], SyncResolver.prototype, "generateBatchUploadUrls", null);
+__decorate([
+    (0, type_graphql_1.Authorized)(),
+    (0, type_graphql_1.Mutation)(() => Boolean, { description: "Mark file upload as completed and update entity" }),
+    __param(0, (0, type_graphql_1.Arg)("entityId", () => type_graphql_1.ID)),
+    __param(1, (0, type_graphql_1.Arg)("entityType")),
+    __param(2, (0, type_graphql_1.Arg)("objectName")),
+    __param(3, (0, type_graphql_1.Ctx)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], SyncResolver.prototype, "markFileUploadComplete", null);
 exports.SyncResolver = SyncResolver = __decorate([
     (0, type_graphql_1.Resolver)()
 ], SyncResolver);

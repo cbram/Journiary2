@@ -34,6 +34,10 @@ __decorate([
     (0, type_graphql_1.Field)(),
     __metadata("design:type", Date)
 ], RoutePointInput.prototype, "timestamp", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => type_graphql_1.ID, { description: "The ID of the trip this route point belongs to" }),
+    __metadata("design:type", String)
+], RoutePointInput.prototype, "tripId", void 0);
 exports.RoutePointInput = RoutePointInput = __decorate([
     (0, type_graphql_1.InputType)({ description: "Input data to create a new RoutePoint" })
 ], RoutePointInput);

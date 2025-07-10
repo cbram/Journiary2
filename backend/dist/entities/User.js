@@ -21,7 +21,7 @@ const TagCategory_1 = require("./TagCategory");
 const RoutePoint_1 = require("./RoutePoint");
 const GPXTrack_1 = require("./GPXTrack");
 const TripMembership_1 = require("./TripMembership");
-let User = class User {
+let User = class User extends typeorm_1.BaseEntity {
     // Computed Fields
     get displayName() {
         if (this.firstName && this.lastName) {
@@ -131,6 +131,11 @@ __decorate([
     (0, typeorm_1.UpdateDateColumn)(),
     __metadata("design:type", Date)
 ], User.prototype, "updatedAt", void 0);
+__decorate([
+    (0, type_graphql_1.Field)(() => [String]),
+    (0, typeorm_1.Column)("simple-array", { default: "" }),
+    __metadata("design:type", Array)
+], User.prototype, "roles", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => Trip_1.Trip, trip => trip.owner),
     __metadata("design:type", Array)
