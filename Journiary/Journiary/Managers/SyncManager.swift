@@ -38,6 +38,9 @@ final class SyncManager {
         ])
     }
 
+    /// Mutex zur Verhinderung paralleler Sync-Operationen
+    private let syncActor = SyncActor()
+    
     /// Initiates the synchronization cycle.
     ///
     /// The process consists of three main phases:
@@ -48,6 +51,14 @@ final class SyncManager {
     /// If any step in the cycle fails, the entire process is aborted,
     /// and the `lastSyncedAt` timestamp is not updated to ensure data consistency.
     func sync(reason: String = "Unknown") async {
+        // Verwende Actor für Thread-sichere Synchronisation
+        await syncActor.performSync {
+            await self.internalSync(reason: reason)
+        }
+    }
+    
+    /// Interne Sync-Implementierung ohne Race Conditions
+    private func internalSync(reason: String) async {
         let syncStartTime = Date()
         
         // Erweiterte Logging-Infrastruktur für Sync-Start
@@ -443,7 +454,7 @@ final class SyncManager {
                 memoryToUpdate.locationName = remoteMemory.locationName
                 memoryToUpdate.createdAt = self.dateTimeToDate(remoteMemory.createdAt) ?? Date()
                 memoryToUpdate.updatedAt = self.dateTimeToDate(remoteMemory.updatedAt) ?? Date()
-                memoryToUpdate.syncStatus = .inSync
+                memoryToUpdate.syncStatusEnum = .inSync
                 
                 // Handle Trip relationship
                 let tripId = remoteMemory.tripId
@@ -576,7 +587,7 @@ final class SyncManager {
                 tripToUpdate.gpsTrackingEnabled = remoteTrip.gpsTrackingEnabled
                 tripToUpdate.createdAt = self.dateTimeToDate(remoteTrip.createdAt) ?? Date()
                 tripToUpdate.updatedAt = self.dateTimeToDate(remoteTrip.updatedAt) ?? Date()
-                tripToUpdate.syncStatus = .inSync
+                tripToUpdate.syncStatusEnum = .inSync
             }
         }
     }
@@ -624,8 +635,8 @@ final class SyncManager {
     ) async throws where T: NSManagedObject, T: Synchronizable {
         
         let objectsToUpload = try await context.perform { () -> [T] in
-            // We use the underlying Int16 value for the predicate
-            fetchRequest.predicate = NSPredicate(format: "syncStatusValue == %d", SyncStatus.needsUpload.rawValue)
+            // We use the String value for the predicate
+            fetchRequest.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
             return try context.fetch(fetchRequest)
         }
 
@@ -649,7 +660,7 @@ final class SyncManager {
                         let managedObject = try context.existingObject(with: objectID) as! T
                         managedObject.serverId = result.id
                         managedObject.updatedAt = self.dateTimeToDate(result.updatedAt)
-                        managedObject.syncStatus = .inSync
+                        managedObject.syncStatusEnum = .inSync
                     } catch {
                         print("Failed to update local object after successful upload: \(error)")
                     }
@@ -1253,7 +1264,7 @@ final class SyncManager {
 protocol Synchronizable: AnyObject {
     var serverId: String? { get set }
     var updatedAt: Date? { get set }
-    var syncStatus: SyncStatus { get set }
+    var syncStatusEnum: SyncStatus { get set }
     
     func toGraphQLInput() -> Any
 }
@@ -1305,14 +1316,16 @@ public enum DetailedSyncStatus: Int16, CaseIterable {
 
 extension Trip: Synchronizable {
 
-    // The raw value of the enum is stored in a Core Data attribute named 'syncStatusValue'.
-    // This computed property provides a convenient way to work with the `SyncStatus` enum.
-    var syncStatus: SyncStatus {
+    // Bridge between CoreData String and SyncStatus enum
+    var syncStatusEnum: SyncStatus {
         get {
-            return SyncStatus(rawValue: self.syncStatusValue) ?? .inSync
+            if let statusString = self.syncStatus, let statusValue = Int16(statusString) {
+                return SyncStatus(rawValue: statusValue) ?? .inSync
+            }
+            return .inSync
         }
         set {
-            self.syncStatusValue = newValue.rawValue
+            self.syncStatus = String(newValue.rawValue)
         }
     }
 
@@ -1340,12 +1353,15 @@ extension Trip: Synchronizable {
 
 extension Memory: Synchronizable {
 
-    var syncStatus: SyncStatus {
+    var syncStatusEnum: SyncStatus {
         get {
-            return SyncStatus(rawValue: self.syncStatusValue) ?? .inSync
+            if let statusString = self.syncStatus, let statusValue = Int16(statusString) {
+                return SyncStatus(rawValue: statusValue) ?? .inSync
+            }
+            return .inSync
         }
         set {
-            self.syncStatusValue = newValue.rawValue
+            self.syncStatus = String(newValue.rawValue)
         }
     }
 
@@ -1379,6 +1395,24 @@ extension Memory: Synchronizable {
                 tripId: self.trip?.serverId ?? ""
             )
         }
+    }
+}
+
+/// Actor zur Thread-sicheren Synchronisation - verhindert parallele Sync-Operationen
+actor SyncActor {
+    private var isSyncing = false
+    
+    func performSync(_ operation: () async -> Void) async {
+        // Verhindere parallele Sync-Operationen
+        guard !isSyncing else {
+            print("🔄 SyncActor: Sync bereits in Bearbeitung, überspringe parallelen Aufruf")
+            return
+        }
+        
+        isSyncing = true
+        defer { isSyncing = false }
+        
+        await operation()
     }
 }
 
@@ -2086,7 +2120,7 @@ extension SyncManager {
             )
             
             // Setze Sync-Status
-            resolvedEntity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+            resolvedEntity.setValue(String(SyncStatus.inSync.rawValue), forKey: "syncStatus")
             
             return resolvedEntity
         } else {
@@ -2100,7 +2134,7 @@ extension SyncManager {
             updateLocalEntity(newEntity, with: remoteData)
             
             // Setze Sync-Status für neue Entität
-            newEntity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+            newEntity.setValue(String(SyncStatus.inSync.rawValue), forKey: "syncStatus")
             
             print("📥 Neue Entität erstellt: \(entityName) - ServerId: \(remoteData["id"] as? String ?? "unknown")")
             
@@ -2368,7 +2402,7 @@ extension SyncManager {
     private func fetchPendingEntities(type: String, context: NSManagedObjectContext) async throws -> [NSManagedObject] {
         return try await context.perform {
             let request = NSFetchRequest<NSManagedObject>(entityName: type)
-            request.predicate = NSPredicate(format: "syncStatus == %@", SyncStatus.needsUpload.rawValue)
+            request.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
             return try context.fetch(request)
         }
     }
@@ -2738,7 +2772,7 @@ extension SyncManager {
             
             for entityType in entityTypes {
                 let request = NSFetchRequest<NSManagedObject>(entityName: entityType)
-                request.predicate = NSPredicate(format: "syncStatus != %@", SyncStatus.inSync.rawValue)
+                request.predicate = NSPredicate(format: "syncStatus != %@", String(SyncStatus.inSync.rawValue))
                 request.fetchLimit = 1
                 
                 do {
@@ -2767,7 +2801,7 @@ extension SyncManager {
     private func fetchPendingEntitiesForStrategySync(type: String, context: NSManagedObjectContext) async throws -> [NSManagedObject] {
         return await context.perform {
             let request = NSFetchRequest<NSManagedObject>(entityName: type)
-            request.predicate = NSPredicate(format: "syncStatus == %@", SyncStatus.needsUpload.rawValue)
+            request.predicate = NSPredicate(format: "syncStatus == %@", String(SyncStatus.needsUpload.rawValue))
             request.sortDescriptors = [NSSortDescriptor(key: "createdAt", ascending: true)]
             
             do {
@@ -2793,7 +2827,7 @@ extension SyncManager {
         
         await context.perform {
             for entity in entities {
-                entity.setValue(SyncStatus.inSync.rawValue, forKey: "syncStatus")
+                entity.setValue(String(SyncStatus.inSync.rawValue), forKey: "syncStatus")
                 entity.setValue(Date(), forKey: "lastSyncedAt")
             }
             

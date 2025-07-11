@@ -1768,7 +1768,7 @@ struct AddMemoryView: View {
         memory.trip = activeTrip
         
         // WICHTIG: Sync-Status für Upload setzen
-        memory.syncStatus = .needsUpload
+        memory.syncStatusEnum = .needsUpload
         memory.createdAt = Date()
         memory.updatedAt = Date()
         

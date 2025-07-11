@@ -69,10 +69,7 @@ class AuthService: ObservableObject {
         saveToken(token)
         print("Login nach Registrierung erfolgreich. Token gespeichert.")
         
-        // Synchronisation nach erfolgreichem Login auslösen
-        Task {
-            await SyncManager.shared.sync(reason: "Nach Registrierung")
-        }
+        // Hinweis: Sync wird automatisch durch JourniaryApp.onChange(authService.isAuthenticated) ausgelöst
     }
     
     func login(user: JourniaryAPI.UserInput) async throws {
@@ -87,10 +84,7 @@ class AuthService: ObservableObject {
         saveToken(token)
         print("Login erfolgreich. Token gespeichert.")
         
-        // Synchronisation nach erfolgreichem Login auslösen
-        Task {
-            await SyncManager.shared.sync(reason: "Nach Login")
-        }
+        // Hinweis: Sync wird automatisch durch JourniaryApp.onChange(authService.isAuthenticated) ausgelöst
     }
 
     func logout() {

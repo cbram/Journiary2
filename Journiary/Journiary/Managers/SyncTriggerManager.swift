@@ -340,15 +340,18 @@ final class SyncTriggerManager: ObservableObject {
     
     /// Prüft Netzwerkverbindungsqualität
     private func hasStrongNetworkConnection() async -> Bool {
-        guard let monitor = networkMonitor else { return false }
-        
-        return await withCheckedContinuation { continuation in
-            monitor.pathUpdateHandler = { path in
-                let isStrong = path.status == .satisfied && 
-                              (path.usesInterfaceType(.wifi) || path.usesInterfaceType(.cellular))
-                continuation.resume(returning: isStrong)
-            }
+        guard let monitor = networkMonitor else { 
+            logger.warning("NetworkMonitor nicht verfügbar, assume starke Verbindung")
+            return true // Optimistisch annehmen, dass Netzwerk verfügbar ist
         }
+        
+        // Direkter Zugriff auf currentPath ohne Continuation
+        let currentPath = monitor.currentPath
+        let isStrong = currentPath.status == .satisfied && 
+                      (currentPath.usesInterfaceType(.wifi) || currentPath.usesInterfaceType(.cellular))
+        
+        logger.debug("Netzwerkstatus: \(isStrong ? "stark" : "schwach")")
+        return isStrong
     }
     
     /// Hilfsmethoden für Trigger-Konfiguration
@@ -561,17 +564,26 @@ final class SyncTriggerManager: ObservableObject {
     
     /// Richtet Netzwerküberwachung ein
     private func setupNetworkMonitoring() {
-        networkMonitor = NWPathMonitor()
-        monitorQueue = DispatchQueue(label: "NetworkMonitor")
-        
-        networkMonitor?.pathUpdateHandler = { [weak self] path in
-            Task { @MainActor in
-                self?.handleNetworkChange(path)
+        do {
+            networkMonitor = NWPathMonitor()
+            monitorQueue = DispatchQueue(label: "NetworkMonitor")
+            
+            guard let monitor = networkMonitor, let queue = monitorQueue else {
+                logger.error("Fehler beim Erstellen des NetworkMonitors")
+                return
             }
+            
+            monitor.pathUpdateHandler = { [weak self] path in
+                Task { @MainActor in
+                    self?.handleNetworkChange(path)
+                }
+            }
+            
+            monitor.start(queue: queue)
+            logger.info("Netzwerküberwachung wurde erfolgreich eingerichtet")
+        } catch {
+            logger.error("Fehler beim Einrichten der Netzwerküberwachung: \(error)")
         }
-        
-        networkMonitor?.start(queue: monitorQueue!)
-        logger.info("Netzwerküberwachung wurde eingerichtet")
     }
     
     /// Behandelt Netzwerkänderungen (erweitert)

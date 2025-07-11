@@ -136,9 +136,12 @@ struct JourniaryApp: App {
                         }
                     }
                     .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
-                        // Phase 5.2: Sync nach erfolgreicher Authentifizierung
+                        // Phase 5.2: Sync-Management bei Authentifizierungsänderung
                         if isAuthenticated {
-                            syncTriggerManager.triggerAuthenticationSync()
+                            // Kurze Verzögerung um Race Conditions mit Startup-Sync zu vermeiden
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                                syncTriggerManager.triggerAuthenticationSync()
+                            }
                         } else {
                             syncTriggerManager.stopPeriodicSync()
                         }
