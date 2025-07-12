@@ -12,7 +12,6 @@ struct BucketListMemoriesView: View {
     let bucketListItem: BucketListItem
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     
     @State private var selectedMemoryID: NSManagedObjectID?
     @State private var showingMemoryDetail = false
@@ -29,9 +28,6 @@ struct BucketListMemoriesView: View {
                     memoriesSection
                 }
                 .padding()
-            }
-            .refreshable {
-                await syncData()
             }
             .navigationTitle("Erinnerungen")
             .navigationBarTitleDisplayMode(.inline)
@@ -259,7 +255,7 @@ struct BucketListMemoriesView: View {
             if let firstMemory = bucketListItem.sortedMemories.first,
                let trip = firstMemory.trip {
                 NavigationView {
-                    MemoriesView(trip: trip, focusedMemory: firstMemory)
+                    MemoriesView(trip: trip, focusedMemory: firstMemory, oldestFirst: true)
                         .navigationTitle("Timeline")
                         .navigationBarTitleDisplayMode(.inline)
                 }
@@ -267,15 +263,6 @@ struct BucketListMemoriesView: View {
                 .presentationDragIndicator(.visible)
             }
         }
-    }
-    
-    // MARK: - Sync Functions
-    
-    private func syncData() async {
-        print("BucketListMemoriesView: Initiating sync...")
-        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
-        await syncTriggerManager.triggerManualSync()
-        print("BucketListMemoriesView: Sync completed.")
     }
     
     // MARK: - Timeline Button

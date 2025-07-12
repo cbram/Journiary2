@@ -70,8 +70,7 @@ struct MapView: View {
     // Kartenwahl (wird jetzt aus UserDefaults gelesen)
     @State private var selectedMapType: MapType = UserDefaults.standard.selectedMapType
     
-    // Trip to edit (for track editing mode)
-    var tripToEdit: Trip?
+    var tripToEdit: Trip? = nil
     
     var body: some View {
         ZStack {
@@ -173,14 +172,6 @@ struct MapView: View {
             
             performStartupDiagnostic()
         }
-        // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-        .autoRefreshOnSync(
-            refreshAction: {
-                updateRouteData()
-                print("🗺️ MapView: Route-Daten automatisch aktualisiert")
-            },
-            showIndicator: false // Karten brauchen keinen separaten Indikator
-        )
         .onDisappear {
             // Beim Verlassen des Views den Cache leeren, um bei der Rückkehr frische Daten zu laden
             sortedRoutePoints = []

@@ -14,7 +14,6 @@ import AVKit
 struct MemoriesView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     
     // Optionaler Trip für die Filterung
     var trip: Trip?
@@ -127,8 +126,6 @@ struct MemoriesView: View {
         .onAppear {
             // MemoriesView ist aktiv
         }
-        // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-        .autoRefreshList()
         .sheet(isPresented: $showingShareSheet) {
             if let image = shareImage {
                 ActivityViewController(activityItems: [image])
@@ -183,7 +180,7 @@ struct MemoriesView: View {
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(sortedMemories, id: \.objectID) { memory in
+                    ForEach(sortedMemories, id: \ .objectID) { memory in
                         MemoryCard(memory: memory) {
                             // Sicherstellen, dass das Memory-Objekt noch gültig ist
                             guard !memory.isFault && memory.managedObjectContext != nil else {
@@ -206,9 +203,6 @@ struct MemoriesView: View {
                 }
                 .padding()
             }
-            .refreshable {
-                await syncData()
-            }
             .onAppear {
                 // Scroll zur fokussierten Memory, falls vorhanden
                 if let focusedMemory = focusedMemory {
@@ -220,15 +214,6 @@ struct MemoriesView: View {
                 }
             }
         }
-    }
-    
-    // MARK: - Sync Functions
-    
-    private func syncData() async {
-        print("MemoriesView: Initiating sync...")
-        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
-        await syncTriggerManager.triggerManualSync()
-        print("MemoriesView: Sync completed.")
     }
     
     // MARK: - Debug Functions

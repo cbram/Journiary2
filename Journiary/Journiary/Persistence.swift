@@ -8,7 +8,7 @@
 import CoreData
 
 struct PersistenceController {
-    static let shared = PersistenceController()
+    static let shared = PersistenceController(inMemory: true) // Temporär für Supabase-Integration
 
     @MainActor
     static let preview: PersistenceController = {
@@ -52,136 +52,206 @@ struct PersistenceController {
         mediaItem1.filesize = 1024
         mediaItem1.memory = memory1
         
+        // Weitere Beispiel-Erinnerung
         let memory2 = Memory(context: viewContext)
-        memory2.title = "Currywurst Pause"
-        memory2.text = "Die beste Currywurst der Stadt! Ein Muss für jeden Berlin-Besucher."
+        memory2.title = "Reichstag"
+        memory2.text = "Besichtigung des deutschen Bundestags mit toller Aussicht von der Kuppel."
         memory2.timestamp = Date().addingTimeInterval(-2400)
-        memory2.latitude = 52.5200
-        memory2.longitude = 13.4050
-        memory2.locationName = "Berlin Mitte, Deutschland"
+        memory2.latitude = 52.5186
+        memory2.longitude = 13.3762
+        memory2.locationName = "Berlin, Deutschland"
         memory2.trip = trip
-        
-        // Foto für zweite Erinnerung
-        let photo2 = Photo(context: viewContext)
-        photo2.imageData = Data() // Dummy-Daten für Preview
-        photo2.timestamp = Date().addingTimeInterval(-2400)
-        photo2.order = 0
-        photo2.memory = memory2
-        
-        // MediaItems für zweite Erinnerung
-        let mediaItem2 = MediaItem(context: viewContext)
-        mediaItem2.mediaType = MediaType.video.rawValue
-        mediaItem2.timestamp = Date().addingTimeInterval(-2400)
-        mediaItem2.order = 0
-        mediaItem2.filename = "Preview_Video.mov"
-        mediaItem2.filesize = 5 * 1024 * 1024 // 5MB
-        mediaItem2.duration = 30.0 // 30 Sekunden
-        mediaItem2.memory = memory2
-        
-        // Aktive Reise erstellen
-        let activeTrip = Trip(context: viewContext)
-        activeTrip.name = "Spaziergang im Park"
-        activeTrip.startDate = Date().addingTimeInterval(-900) // Vor 15 Minuten
-        activeTrip.isActive = true
-        activeTrip.totalDistance = 1250.0 // 1.25 km
 
-        
-        // Routenpunkte für aktive Reise
+        // Tags erstellen
+        let tagCategory = TagCategory(context: viewContext)
+        tagCategory.name = "Aktivitäten"
+        tagCategory.displayName = "Aktivitäten"
+        tagCategory.emoji = "🎯"
+        tagCategory.color = "blue"
+        tagCategory.isSystemCategory = true
+        tagCategory.sortOrder = 0
+        tagCategory.createdAt = Date()
+
+        let tag1 = Tag(context: viewContext)
+        tag1.name = "sightseeing"
+        tag1.normalizedName = "sightseeing"
+        tag1.displayName = "Sightseeing"
+        tag1.emoji = "🏛️"
+        tag1.color = "blue"
+        tag1.isSystemTag = true
+        tag1.usageCount = 2
+        tag1.createdAt = Date()
+        tag1.lastUsedAt = Date()
+        tag1.category = tagCategory
+
+        // Tags zu Memories hinzufügen
+        memory1.addToTags(tag1)
+        memory2.addToTags(tag1)
+
+        // GPX Track erstellen
+        let gpxTrack = GPXTrack(context: viewContext)
+        gpxTrack.name = "Berlin Tour"
+        gpxTrack.originalFilename = "berlin_tour.gpx"
+        gpxTrack.totalDistance = 5420.0
+        gpxTrack.totalDuration = 7200.0 // 2 Stunden
+        gpxTrack.averageSpeed = 0.75 // km/h
+        gpxTrack.maxSpeed = 1.2
+        gpxTrack.elevationGain = 15.0
+        gpxTrack.elevationLoss = 12.0
+        gpxTrack.totalPoints = 245
+        gpxTrack.startTime = Date().addingTimeInterval(-7200)
+        gpxTrack.endTime = Date()
+        gpxTrack.creator = "Journiary"
+        gpxTrack.trackType = "walking"
+        gpxTrack.importedAt = Date()
+
+        // GPX Points erstellen
         for i in 0..<10 {
             let routePoint = RoutePoint(context: viewContext)
-            routePoint.latitude = 52.5200 + Double(i) * 0.001
-            routePoint.longitude = 13.4050 + Double(i) * 0.001
-            routePoint.timestamp = Date().addingTimeInterval(-900 + Double(i * 90))
-            routePoint.altitude = 50.0 + Double(i) * 2.0
-            routePoint.speed = 1.4 // ~5 km/h Gehgeschwindigkeit
-            routePoint.trip = activeTrip
+            routePoint.latitude = 52.5163 + Double(i) * 0.001
+            routePoint.longitude = 13.3777 + Double(i) * 0.001
+            routePoint.timestamp = Date().addingTimeInterval(-Double(i * 300))
+            routePoint.altitude = 45.0 + Double(i)
+            routePoint.speed = 0.8
+            routePoint.trip = trip
+            routePoint.gpxTrack = gpxTrack
         }
-        
+
         do {
             try viewContext.save()
         } catch {
             // Replace this implementation with code to handle the error appropriately.
-            // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
+            // fatalError() causes the application to terminate with a crash log.
+            // In a shipping application, you should not use this method.
             let nsError = error as NSError
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
         return result
     }()
 
-    let container: NSPersistentCloudKitContainer
+    let container: NSPersistentContainer
 
     init(inMemory: Bool = false) {
-        container = NSPersistentCloudKitContainer(name: "Journiary")
-
+        container = NSPersistentContainer(name: "Journiary")
+        
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
-
-        guard let description = container.persistentStoreDescriptions.first else {
-            fatalError("Failed to retrieve a persistent store description.")
+        
+        // MARK: - Erweiterte CoreData-Konfiguration für Supabase-Sync
+        
+        // CoreData Migration Configuration
+        if let storeDescription = container.persistentStoreDescriptions.first {
+            // Aktiviere automatische Migration
+            storeDescription.shouldMigrateStoreAutomatically = true
+            storeDescription.shouldInferMappingModelAutomatically = true
+            
+            // CloudKit Konfiguration
+            storeDescription.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
+            storeDescription.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+            
+            // Migration Optionen
+            storeDescription.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
+            storeDescription.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
         }
 
-        // Enable lightweight migrations
-        description.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
-        description.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
+        // MARK: - Migration und Error-Handling
         
-        // Enable history tracking for CloudKit
-        description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
-        description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
-
-        container.loadPersistentStores(completionHandler: { (storeDescription, error) in
+        container.loadPersistentStores(completionHandler: { [weak container] (storeDescription, error) in
             if let error = error as NSError? {
-                print("❌ CRITICAL: Core Data Store could not be loaded: \(error)")
-                fatalError("Unresolved error \(error), \(error.userInfo)")
+                // CRITICAL: Besseres Error-Handling für Production
+                print("❌ CRITICAL: Core Data Store konnte nicht geladen werden: \(error)")
+                
+                // Development: Schema-Migration-Fehler
+                if error.code == 134110 { // Schema-Migrationsfehler
+                    print("🔧 Schema-Migration-Fehler erkannt")
+                    print("💡 Lösung: Simulator → Device → Erase All Content and Settings")
+                    print("⚠️ Oder App deinstallieren und neu installieren")
+                }
+                
+                // Für jetzt: Direkter Fehler für klare Diagnose
+                fatalError("CoreData Fehler: \(error.localizedDescription)\nCode: \(error.code)")
             } else {
-                print("✅ Core Data Store loaded for: \(storeDescription.url?.absoluteString ?? "N/A")")
+                print("✅ Core Data Store erfolgreich geladen")
+                
+                // Sync-Setup für bestehende Daten
+                Self.initializeSyncAttributesIfNeeded(container: container)
             }
         })
-
-        // Configure context properties
+        
+        // Automatisches Speichern aktivieren
         container.viewContext.automaticallyMergesChangesFromParent = true
-        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        container.viewContext.undoManager = nil
-        container.viewContext.shouldDeleteInaccessibleFaults = true
+    }
+    
+    // MARK: - Store Reset für Development
+    
+    private static func performStoreReset(container: NSPersistentContainer?) {
+        print("🔄 Führe CoreData Store-Reset durch...")
         
-        setupRemoteChangeHandling()
-    }
-    
-    private func setupRemoteChangeHandling() {
-        // Reagiere auf Remote Changes von CloudKit
-        NotificationCenter.default.addObserver(
-            forName: .NSPersistentStoreRemoteChange,
-            object: container.persistentStoreCoordinator,
-            queue: .main
-        ) { notification in
-            // Forciere Context Update für CloudKit Sync
-            self.container.viewContext.perform {
-                self.container.viewContext.refreshAllObjects()
-            }
-        }
-    }
-    
-    // Hilfsfunktion für sichere Background Context Operations
-    func performBackgroundTask(_ block: @escaping (NSManagedObjectContext) -> Void) {
-        container.performBackgroundTask { context in
-            context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-            context.undoManager = nil
-            block(context)
-        }
-    }
-    
-    // Hilfsfunktion für sichere Save Operations
-    func save(context: NSManagedObjectContext? = nil) {
-        let targetContext = context ?? container.viewContext
-        
-        guard targetContext.hasChanges else {
+        guard let container = container,
+              let storeURL = container.persistentStoreDescriptions.first?.url else {
+            print("⚠️ Store-URL nicht gefunden")
             return
         }
         
         do {
-            try targetContext.save()
+            // Store-Dateien löschen
+            let fileManager = FileManager.default
+            
+            if fileManager.fileExists(atPath: storeURL.path) {
+                try fileManager.removeItem(at: storeURL)
+                print("✅ Store-Datei gelöscht: \(storeURL.path)")
+            }
+            
+            // Zusätzliche SQLite-Dateien löschen
+            let walURL = storeURL.appendingPathExtension("wal")
+            let shmURL = storeURL.appendingPathExtension("shm")
+            
+            if fileManager.fileExists(atPath: walURL.path) {
+                try fileManager.removeItem(at: walURL)
+            }
+            
+            if fileManager.fileExists(atPath: shmURL.path) {
+                try fileManager.removeItem(at: shmURL)
+            }
+            
+            // Store neu laden
+            container.loadPersistentStores { _, error in
+                if let error = error {
+                    print("⚠️ Fehler beim Neu-Laden des Stores: \(error)")
+                } else {
+                    print("✅ Store erfolgreich zurückgesetzt und neu geladen")
+                    Self.initializeSyncAttributesIfNeeded(container: container)
+                }
+            }
+            
         } catch {
-            print("❌ ERROR: Core Data Save fehlgeschlagen: \(error)")
+            print("⚠️ Fehler beim Store-Reset: \(error)")
+        }
+    }
+    
+    // MARK: - Sync-Attribute Initialisierung
+    
+    private static func initializeSyncAttributesIfNeeded(container: NSPersistentContainer?) {
+        guard let container = container else { return }
+        let context = container.viewContext
+        
+        // Prüfe ob bereits Sync-Attribute initialisiert wurden
+        let request: NSFetchRequest<Trip> = Trip.fetchRequest()
+        request.fetchLimit = 1
+        
+        do {
+            let trips = try context.fetch(request)
+            
+            if let firstTrip = trips.first, firstTrip.createdAt == nil {
+                print("🔧 Initialisiere Sync-Attribute für bestehende Daten...")
+                SyncSetupManager.initializeSyncForExistingData(context: context)
+            } else {
+                print("ℹ️ Sync-Attribute bereits initialisiert")
+            }
+            
+        } catch {
+            print("⚠️ Fehler beim Prüfen der Sync-Attribute: \(error)")
         }
     }
 }

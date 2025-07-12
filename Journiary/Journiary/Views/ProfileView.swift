@@ -7,14 +7,11 @@
 
 import SwiftUI
 import CoreData
-import JourniaryAPI
 
 struct ProfileView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject var authService: AuthService
-    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     @StateObject private var mapCache = MapCacheManager.shared
     
     @FetchRequest(
@@ -41,16 +38,6 @@ struct ProfileView: View {
                 }
                 .padding()
             }
-            .refreshable {
-                await syncData()
-            }
-            // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-            .autoRefreshOnSync(
-                refreshAction: {
-                    print("📊 ProfileView: Statistiken automatisch aktualisiert")
-                },
-                showIndicator: true
-            )
             .navigationTitle("Profil")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -68,22 +55,13 @@ struct ProfileView: View {
                 .font(.system(size: 80))
                 .foregroundColor(.blue)
             
-            Text(authService.user?.displayName ?? "Reisender")
+            Text("Reisender")
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Button(action: {
-                authService.logout()
-                dismiss()
-            }) {
-                Text("Abmelden")
-                    .foregroundColor(.red)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 16)
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(Capsule())
-            }
-            .padding(.top, 8)
+            Text("Journiary Explorer")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding()
@@ -146,15 +124,6 @@ struct ProfileView: View {
         }
     }
     
-    // MARK: - Sync Functions
-    
-    private func syncData() async {
-        print("ProfileView: Initiating sync...")
-        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
-        await syncTriggerManager.triggerManualSync()
-        print("ProfileView: Sync completed.")
-    }
-    
     // MARK: - Computed Properties
     
     private var totalDistance: Double {
@@ -196,27 +165,11 @@ struct StatisticCard: View {
     }
 }
 
-struct ProfileView_Previews: PreviewProvider {
-    static var previews: some View {
-        let context = PersistenceController.preview.container.viewContext
-        let locationManager = LocationManager(context: context)
-        let authService = AuthService() // Erstelle eine Dummy-Instanz für die Preview
-        
-        // Simuliere einen eingeloggten Benutzer für die Preview
-        let userData: [String: AnyHashable] = [
-            "__typename": "User",
-            "id": "1",
-            "email": "preview@journiary.com",
-            "username": "PreviewUser",
-            "displayName": "Max Mustermann"
-        ]
-        let user = JourniaryAPI.UserLoginMutation.Data.Login.User(_dataDict: .init(data: userData, fulfilledFragments: .init()))
-        authService.user = user
-        authService.isAuthenticated = true
-        
-        return ProfileView()
-            .environmentObject(locationManager)
-            .environmentObject(authService) // Füge den authService zur Environment hinzu
-            .environment(\.managedObjectContext, context)
-    }
+#Preview {
+    let context = PersistenceController.preview.container.viewContext
+    let locationManager = LocationManager(context: context)
+    
+    ProfileView()
+        .environmentObject(locationManager)
+        .environment(\.managedObjectContext, context)
 } 

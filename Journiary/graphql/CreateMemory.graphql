@@ -1,6 +1,0 @@
-mutation CreateMemory($input: MemoryInput!) {
-  createMemory(input: $input) {
-    id
-    updatedAt
-  }
-} 

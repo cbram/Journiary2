@@ -68,8 +68,6 @@ struct BucketListLinkView: View {
                         }
                     }
                 }
-                // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-                .autoRefreshList()
             }
             .navigationTitle("POI verknüpfen")
             .navigationBarTitleDisplayMode(.inline)

@@ -85,8 +85,6 @@ struct POIView: View {
                     .refreshable {
                         filterManager.loadData()
                     }
-                    // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-                    .autoRefreshList()
                     .onTapGesture {
                         // Dismiss keyboard when tapping on list
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)

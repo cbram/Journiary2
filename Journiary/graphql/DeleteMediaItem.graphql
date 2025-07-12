@@ -1,3 +1,0 @@
-mutation DeleteMediaItem($id: String!) {
-  deleteMediaItem(id: $id)
-} 

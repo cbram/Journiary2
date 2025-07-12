@@ -12,11 +12,15 @@
         <attribute name="isActive" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="totalDistance" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="gpsTrackingEnabled" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
+        
+        <!-- Supabase Sync Attributes -->
+        <attribute name="syncVersion" optional="YES" attributeType="Integer 32" defaultValueString="1" usesScalarValueType="YES"/>
+        <attribute name="lastSyncDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="needsSync" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="supabaseID" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="coverImageUrl" optional="YES" attributeType="String"/>
 
         <relationship name="memories" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Memory" inverseName="trip" inverseEntity="Memory"/>
         <relationship name="routePoints" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RoutePoint" inverseName="trip" inverseEntity="RoutePoint"/>
@@ -30,11 +34,6 @@
         <attribute name="longitude" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="locationName" optional="YES" attributeType="String"/>
         <attribute name="weatherJSON" optional="YES" attributeType="String"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="trip" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Trip" inverseName="memories" inverseEntity="Trip"/>
         <relationship name="photos" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Photo" inverseName="memory" inverseEntity="Photo"/>
         <relationship name="mediaItems" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="MediaItem" inverseName="memory" inverseEntity="MediaItem"/>
@@ -46,11 +45,6 @@
         <attribute name="imageData" optional="YES" attributeType="Binary"/>
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="order" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="memory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Memory" inverseName="photos" inverseEntity="Memory"/>
     </entity>
     <entity name="RoutePoint" representedClassName="RoutePoint" syncable="YES" codeGenerationType="class">
@@ -59,11 +53,6 @@
         <attribute name="timestamp" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="altitude" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="speed" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="trip" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Trip" inverseName="routePoints" inverseEntity="Trip"/>
         <relationship name="trackSegment" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="TrackSegment" inverseName="originalPoints" inverseEntity="TrackSegment"/>
         <relationship name="gpxTrack" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="GPXTrack" inverseName="trackPoints" inverseEntity="GPXTrack"/>
@@ -82,11 +71,6 @@
         <attribute name="originalPointCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="isCompressed" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="qualityLevel" optional="YES" attributeType="String"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="trip" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Trip" inverseName="trackSegments" inverseEntity="Trip"/>
         <relationship name="originalPoints" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RoutePoint" inverseName="trackSegment" inverseEntity="RoutePoint"/>
     </entity>
@@ -103,10 +87,6 @@
         <attribute name="elevationLoss" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="pauseDuration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
     </entity>
     <entity name="MediaItem" representedClassName="MediaItem" syncable="YES" codeGenerationType="class">
         <attribute name="mediaData" optional="YES" attributeType="Binary"/>
@@ -117,11 +97,6 @@
         <attribute name="filesize" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="duration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="thumbnailData" optional="YES" attributeType="Binary"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="memory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Memory" inverseName="mediaItems" inverseEntity="Memory"/>
     </entity>
     <entity name="GPXTrack" representedClassName="GPXTrack" syncable="YES" codeGenerationType="class">
@@ -143,11 +118,6 @@
         <attribute name="creator" optional="YES" attributeType="String"/>
         <attribute name="trackType" optional="YES" attributeType="String"/>
         <attribute name="importedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="memory" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Memory" inverseName="gpxTrack" inverseEntity="Memory"/>
         <relationship name="trackPoints" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="RoutePoint" inverseName="gpxTrack" inverseEntity="RoutePoint"/>
     </entity>
@@ -164,10 +134,6 @@
         <attribute name="lastUsedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="isArchived" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="sortOrder" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="category" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="TagCategory" inverseName="tags" inverseEntity="TagCategory"/>
         <relationship name="memories" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Memory" inverseName="tags" inverseEntity="Memory"/>
         <relationship name="relatedTags" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Tag" inverseName="relatedTags" inverseEntity="Tag"/>
@@ -182,10 +148,6 @@
         <attribute name="sortOrder" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="isExpanded" optional="YES" attributeType="Boolean" defaultValueString="YES" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="tags" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Tag" inverseName="category" inverseEntity="Tag"/>
     </entity>
     <entity name="BucketListItem" representedClassName="BucketListItem" syncable="YES" codeGenerationType="class">
@@ -201,23 +163,19 @@
         <attribute name="isDone" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="completedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="updatedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="syncStatus" optional="YES" attributeType="String"/>
-        <attribute name="serverID" optional="YES" attributeType="String"/>
-        <attribute name="isMarkedForDeletion" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <relationship name="memories" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="Memory" inverseName="bucketListItem" inverseEntity="Memory"/>
     </entity>
     <elements>
-        <element name="Trip" positionX="-63" positionY="-18" width="128" height="221"/>
-        <element name="Memory" positionX="160" positionY="-18" width="128" height="281"/>
-        <element name="Photo" positionX="340" positionY="-18" width="128" height="149"/>
-        <element name="MediaItem" positionX="520" positionY="-18" width="128" height="251"/>
-        <element name="RoutePoint" positionX="-63" positionY="243" width="128" height="211"/>
-        <element name="TrackSegment" positionX="-63" positionY="450" width="128" height="341"/>
-        <element name="TrackMetadata" positionX="160" positionY="450" width="128" height="281"/>
-        <element name="GPXTrack" positionX="340" positionY="450" width="128" height="401"/>
-        <element name="Tag" positionX="700" positionY="-18" width="128" height="341"/>
-        <element name="TagCategory" positionX="880" positionY="-18" width="128" height="251"/>
-        <element name="BucketListItem" positionX="1060" positionY="-18" width="128" height="311"/>
+        <element name="Trip" positionX="-63" positionY="-18" width="128" height="149"/>
+        <element name="Memory" positionX="160" positionY="-18" width="128" height="209"/>
+        <element name="Photo" positionX="340" positionY="-18" width="128" height="89"/>
+        <element name="MediaItem" positionX="520" positionY="-18" width="128" height="179"/>
+        <element name="RoutePoint" positionX="-63" positionY="135" width="128" height="139"/>
+        <element name="TrackSegment" positionX="-63" positionY="270" width="128" height="269"/>
+        <element name="TrackMetadata" positionX="160" positionY="270" width="128" height="209"/>
+        <element name="GPXTrack" positionX="340" positionY="270" width="128" height="329"/>
+        <element name="Tag" positionX="700" positionY="-18" width="128" height="269"/>
+        <element name="TagCategory" positionX="880" positionY="-18" width="128" height="179"/>
+        <element name="BucketListItem" positionX="1060" positionY="-18" width="128" height="239"/>
     </elements>
 </model>

@@ -1767,11 +1767,6 @@ struct AddMemoryView: View {
         // Mit aktiver Reise verknüpfen
         memory.trip = activeTrip
         
-        // WICHTIG: Sync-Status für Upload setzen
-        memory.syncStatusEnum = .needsUpload
-        memory.createdAt = Date()
-        memory.updatedAt = Date()
-        
         // Tags hinzufügen
         for tag in selectedTags {
             memory.addToTags(tag)
@@ -1802,7 +1797,6 @@ struct AddMemoryView: View {
         for (index, mediaItem) in mediaItems.enumerated() {
             // Erstelle eine neue MediaItem-Instanz in diesem Kontext
             let newMediaItem = MediaItem(context: viewContext)
-            newMediaItem.id = UUID()
             newMediaItem.mediaData = mediaItem.mediaData
             newMediaItem.thumbnailData = mediaItem.thumbnailData
             newMediaItem.mediaType = mediaItem.mediaType
@@ -1812,9 +1806,6 @@ struct AddMemoryView: View {
             newMediaItem.timestamp = mediaItem.timestamp ?? Date()
             newMediaItem.order = Int16(photoDataArray.count + index) // Nach Legacy Fotos
             newMediaItem.memory = memory
-            newMediaItem.createdAt = Date()
-            newMediaItem.updatedAt = Date()
-            newMediaItem.syncStatus = "1" // needsUpload
             
             if let mediaData = newMediaItem.mediaData {
                 totalMediaSize += mediaData.count

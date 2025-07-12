@@ -1,6 +1,0 @@
-mutation CreateGPXTrack($input: GPXTrackInput!) {
-  createGpxTrack(input: $input) {
-    id
-    updatedAt
-  }
-} 

@@ -394,20 +394,10 @@ struct CreateTripView: View {
             // Eine neue Reise ist nur dann beendet (isActive = false), wenn ein Enddatum angegeben wurde
             trip.isActive = !hasEndDate
             trip.totalDistance = 0.0
-            
-            // WICHTIG: Sync-Status für Upload setzen
-            trip.syncStatusEnum = .needsUpload
-            trip.createdAt = Date()
         } else {
             // Bei bestehenden Reisen: isActive basierend auf Enddatum aktualisieren
             trip.isActive = !hasEndDate
-            
-            // Bei Bearbeitung: Sync-Status für Upload setzen
-            trip.syncStatusEnum = .needsUpload
         }
-        
-        // Für alle Trips: updatedAt setzen
-        trip.updatedAt = Date()
         
         // Speichern
         do {

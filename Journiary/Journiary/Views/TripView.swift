@@ -12,10 +12,8 @@ import CoreLocation
 struct TripView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @EnvironmentObject var locationManager: LocationManager
-    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     
     @State private var showingCreateTripSheet = false
-    @State private var showingSyncStatusView = false
     @State private var tripToEdit: Trip?
     @State private var currentLocationName = "Standort wird ermittelt..."
     @State private var tripForGPXExport: Trip?
@@ -69,13 +67,6 @@ struct TripView: View {
             .navigationTitle("Reisen")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                // Phase 5.3: Sync-Indikator in der Toolbar
-                ToolbarItem(placement: .navigationBarLeading) {
-                    SyncIndicatorWidget.toolbar {
-                        showingSyncStatusView = true
-                    }
-                }
-                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button("Neue Reise erstellen", systemImage: "plus.circle") {
@@ -91,12 +82,8 @@ struct TripView: View {
                 }
             }
             .refreshable {
-                await syncAndUpdateLocation()
+                await updateCurrentLocation()
             }
-            // Phase 5.3: Conditional Banner für Sync-Fehler
-            .withConditionalSyncBanner(showOnErrors: true, showOnStaleData: false)
-            // Phase 5.4: Automatische UI-Aktualisierung nach Sync-Erfolg
-            .autoRefreshList()
         }
         .id(refreshID)
         .sheet(isPresented: $showingCreateTripSheet) {
@@ -120,10 +107,6 @@ struct TripView: View {
                 uniqueLocationsCount: uniqueLocationsCount,
                 totalTravelDays: totalTravelDays
             )
-        }
-        .sheet(isPresented: $showingSyncStatusView) {
-            SyncStatusView()
-                .environmentObject(syncTriggerManager)
         }
         .task {
             await updateCurrentLocation()
@@ -211,16 +194,6 @@ struct TripView: View {
         } else {
             return String(format: "%dm", minutes)
         }
-    }
-    
-    @MainActor
-    private func syncAndUpdateLocation() async {
-        print("TripView: Initiating sync and location update...")
-        // Phase 5.3: Sync über SyncTriggerManager für besseres Feedback
-        await syncTriggerManager.triggerManualSync()
-        // Dann Location aktualisieren
-        await updateCurrentLocation()
-        print("TripView: Sync and location update completed.")
     }
     
     @MainActor

@@ -7,12 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		760927BE2E199B6800434A41 /* Apollo in Frameworks */ = {isa = PBXBuildFile; productRef = 760927BD2E199B6800434A41 /* Apollo */; };
-		760927C02E199B6800434A41 /* ApolloAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 760927BF2E199B6800434A41 /* ApolloAPI */; };
-		76137E492E1B9EDF003746F3 /* JourniaryAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 762934A92E1AF2840007B6E0 /* JourniaryAPI */; };
-		761D65332E1838B40096E863 /* schema.graphqls in Resources */ = {isa = PBXBuildFile; fileRef = 761D65302E1838B40096E863 /* schema.graphqls */; };
-		761D65352E1838B40096E863 /* UserLogin.graphql in Resources */ = {isa = PBXBuildFile; fileRef = 761D65312E1838B40096E863 /* UserLogin.graphql */; };
-		765555A22E19B6B800434A41 /* KeychainSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 765555A12E19B6B800434A41 /* KeychainSwift */; };
+		7690A2972E229D4500F992AC /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A2962E229D4500F992AC /* Auth */; };
+		7690A2992E229D4500F992AC /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A2982E229D4500F992AC /* Functions */; };
+		7690A29B2E229D4500F992AC /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A29A2E229D4500F992AC /* PostgREST */; };
+		7690A29D2E229D4500F992AC /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A29C2E229D4500F992AC /* Realtime */; };
+		7690A29F2E229D4500F992AC /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A29E2E229D4500F992AC /* Storage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -36,10 +35,6 @@
 		761954D52DF57EB6003E92C7 /* Journiary.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Journiary.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		761954E92DF57EB7003E92C7 /* JourniaryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JourniaryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		761954F32DF57EB7003E92C7 /* JourniaryUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JourniaryUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		761D652F2E1838B40096E863 /* apollo-codegen-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "apollo-codegen-config.json"; sourceTree = "<group>"; };
-		761D65302E1838B40096E863 /* schema.graphqls */ = {isa = PBXFileReference; lastKnownFileType = text; path = schema.graphqls; sourceTree = "<group>"; };
-		761D65312E1838B40096E863 /* UserLogin.graphql */ = {isa = PBXFileReference; lastKnownFileType = text; path = UserLogin.graphql; sourceTree = "<group>"; };
-		762934A72E1AF2830007B6E0 /* JourniaryAPI */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = JourniaryAPI; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -78,10 +73,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				76137E492E1B9EDF003746F3 /* JourniaryAPI in Frameworks */,
-				765555A22E19B6B800434A41 /* KeychainSwift in Frameworks */,
-				760927C02E199B6800434A41 /* ApolloAPI in Frameworks */,
-				760927BE2E199B6800434A41 /* Apollo in Frameworks */,
+				7690A29B2E229D4500F992AC /* PostgREST in Frameworks */,
+				7690A2992E229D4500F992AC /* Functions in Frameworks */,
+				7690A2972E229D4500F992AC /* Auth in Frameworks */,
+				7690A29F2E229D4500F992AC /* Storage in Frameworks */,
+				7690A29D2E229D4500F992AC /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -109,8 +105,6 @@
 				761954EC2DF57EB7003E92C7 /* JourniaryTests */,
 				761954F62DF57EB7003E92C7 /* JourniaryUITests */,
 				761954D62DF57EB6003E92C7 /* Products */,
-				761D65322E1838B40096E863 /* graphql */,
-				762934A62E1AF2830007B6E0 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -124,24 +118,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		761D65322E1838B40096E863 /* graphql */ = {
-			isa = PBXGroup;
-			children = (
-				761D652F2E1838B40096E863 /* apollo-codegen-config.json */,
-				761D65302E1838B40096E863 /* schema.graphqls */,
-				761D65312E1838B40096E863 /* UserLogin.graphql */,
-			);
-			path = graphql;
-			sourceTree = "<group>";
-		};
-		762934A62E1AF2830007B6E0 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				762934A72E1AF2830007B6E0 /* JourniaryAPI */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -149,7 +125,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 761954FC2DF57EB7003E92C7 /* Build configuration list for PBXNativeTarget "Journiary" */;
 			buildPhases = (
-				764717032E199C32006B80E0 /* Apollo Script */,
 				761954D12DF57EB6003E92C7 /* Sources */,
 				761954D22DF57EB6003E92C7 /* Frameworks */,
 				761954D32DF57EB6003E92C7 /* Resources */,
@@ -163,10 +138,11 @@
 			);
 			name = Journiary;
 			packageProductDependencies = (
-				765555A12E19B6B800434A41 /* KeychainSwift */,
-				760927BD2E199B6800434A41 /* Apollo */,
-				760927BF2E199B6800434A41 /* ApolloAPI */,
-				762934A92E1AF2840007B6E0 /* JourniaryAPI */,
+				7690A2962E229D4500F992AC /* Auth */,
+				7690A2982E229D4500F992AC /* Functions */,
+				7690A29A2E229D4500F992AC /* PostgREST */,
+				7690A29C2E229D4500F992AC /* Realtime */,
+				7690A29E2E229D4500F992AC /* Storage */,
 			);
 			productName = Journiary;
 			productReference = 761954D52DF57EB6003E92C7 /* Journiary.app */;
@@ -251,9 +227,7 @@
 			mainGroup = 761954CC2DF57EB6003E92C7;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				765555A02E19B6B800434A41 /* XCRemoteSwiftPackageReference "keychain-swift" */,
-				760927BC2E199B6800434A41 /* XCRemoteSwiftPackageReference "apollo-ios" */,
-				762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */,
+				7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 761954D62DF57EB6003E92C7 /* Products */;
@@ -272,8 +246,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				761D65352E1838B40096E863 /* UserLogin.graphql in Resources */,
-				761D65332E1838B40096E863 /* schema.graphqls in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,28 +264,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		764717032E199C32006B80E0 /* Apollo Script */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/apollo-codegen-config.json",
-			);
-			name = "Apollo Script";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "#\n# Generates the Apollo GraphQL API files\n#\n\n# Go to the folder where the config file is located\ncd \"${SRCROOT}\"\n\n# Generate the files\n\"${SRCROOT}/../apollo-ios-cli\" generate --path ./apollo-codegen-config.json\n\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		761954D12DF57EB6003E92C7 /* Sources */ = {
@@ -378,9 +328,6 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = CHJB.Journiary;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -412,9 +359,6 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = CHJB.Journiary;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
-				SUPPORTS_MACCATALYST = NO;
-				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -459,7 +403,7 @@
 				DEVELOPMENT_TEAM = MA9BMRX8TH;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -655,52 +599,42 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = JourniaryAPI;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
-		760927BC2E199B6800434A41 /* XCRemoteSwiftPackageReference "apollo-ios" */ = {
+		7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/apollographql/apollo-ios";
+			repositoryURL = "https://github.com/supabase/supabase-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.9.1;
-			};
-		};
-		765555A02E19B6B800434A41 /* XCRemoteSwiftPackageReference "keychain-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/evgenyneu/keychain-swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 20.0.0;
+				minimumVersion = 2.5.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		760927BD2E199B6800434A41 /* Apollo */ = {
+		7690A2962E229D4500F992AC /* Auth */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 760927BC2E199B6800434A41 /* XCRemoteSwiftPackageReference "apollo-ios" */;
-			productName = Apollo;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
 		};
-		760927BF2E199B6800434A41 /* ApolloAPI */ = {
+		7690A2982E229D4500F992AC /* Functions */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 760927BC2E199B6800434A41 /* XCRemoteSwiftPackageReference "apollo-ios" */;
-			productName = ApolloAPI;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
 		};
-		762934A92E1AF2840007B6E0 /* JourniaryAPI */ = {
+		7690A29A2E229D4500F992AC /* PostgREST */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 762934A82E1AF2840007B6E0 /* XCLocalSwiftPackageReference "JourniaryAPI" */;
-			productName = JourniaryAPI;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
 		};
-		765555A12E19B6B800434A41 /* KeychainSwift */ = {
+		7690A29C2E229D4500F992AC /* Realtime */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 765555A02E19B6B800434A41 /* XCRemoteSwiftPackageReference "keychain-swift" */;
-			productName = KeychainSwift;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		7690A29E2E229D4500F992AC /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

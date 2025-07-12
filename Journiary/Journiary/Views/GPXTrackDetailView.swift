@@ -324,8 +324,8 @@ struct GPXTrackDetailView: View {
             // GPS-Daten
             GPXStatCard(title: "GPS-Punkte", value: "\(gpxTrack.totalPoints)", icon: "location", color: .purple)
             
-            if let dataSize = gpxTrack.gpxData?.count {
-                GPXStatCard(title: "Dateigröße", value: ByteCountFormatter.string(fromByteCount: Int64(dataSize), countStyle: .file), icon: "doc", color: .gray)
+            if let gpxData = gpxTrack.gpxData {
+                GPXStatCard(title: "Dateigröße", value: ByteCountFormatter.string(fromByteCount: Int64(gpxData.count), countStyle: .file), icon: "doc", color: .gray)
             }
         }
         .padding(.horizontal)

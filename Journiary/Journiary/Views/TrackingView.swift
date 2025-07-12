@@ -11,7 +11,6 @@ import CoreData
 struct TrackingView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @StateObject private var locationManager: LocationManager
-    @EnvironmentObject private var syncTriggerManager: SyncTriggerManager
     @State private var selectedTab = 0
     @Binding var appMode: AppMode
     
@@ -22,78 +21,69 @@ struct TrackingView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Phase 5.3: Sync-Status-Banner für die gesamte App
-            ConditionalSyncStatusBanner(
-                showOnlyDuringSync: false,
-                showOnErrors: true,
-                showOnStaleData: true
-            )
-            
-            TabView(selection: $selectedTab) {
-                MemoriesView()
-                    .tabItem {
-                        Image(systemName: "clock.fill")
-                        Text("Timeline")
-                    }
-                    .tag(0)
-                
-                MapView()
-                    .environmentObject(locationManager)
-                    .tabItem {
-                        Image(systemName: "map.fill")
-                        Text("Karte")
-                    }
-                    .tag(1)
-                
-                AddMemoryView(selectedTab: $selectedTab)
-                    .environmentObject(locationManager)
-                    .tabItem {
-                        Image(systemName: "plus.circle.fill")
-                        Text("Erinnerung")
-                    }
-                    .tag(2)
-                
-                TripView()
-                    .environmentObject(locationManager)
-                    .tabItem {
-                        Image(systemName: "suitcase.fill")
-                        Text("Reisen")
-                    }
-                    .tag(3)
-                
-                // Einfacher Wechsel-Tab für POIs
-                VStack {
-                    Spacer()
-                    VStack(spacing: 20) {
-                        Image(systemName: "mappin.and.ellipse")
-                            .font(.system(size: 60))
-                            .foregroundColor(.blue)
-                        Text("POI Modus")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                        Text("Zu Points of Interest wechseln")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    Spacer()
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    appMode = .planning
-                }
+        TabView(selection: $selectedTab) {
+            MemoriesView()
                 .tabItem {
+                    Image(systemName: "clock.fill")
+                    Text("Timeline")
+                }
+                .tag(0)
+            
+            MapView()
+                .environmentObject(locationManager)
+                .tabItem {
+                    Image(systemName: "map.fill")
+                    Text("Karte")
+                }
+                .tag(1)
+            
+            AddMemoryView(selectedTab: $selectedTab)
+                .environmentObject(locationManager)
+                .tabItem {
+                    Image(systemName: "plus.circle.fill")
+                    Text("Erinnerung")
+                }
+                .tag(2)
+            
+            TripView()
+                .environmentObject(locationManager)
+                .tabItem {
+                    Image(systemName: "suitcase.fill")
+                    Text("Reisen")
+                }
+                .tag(3)
+            
+            // Einfacher Wechsel-Tab für POIs
+            VStack {
+                Spacer()
+                VStack(spacing: 20) {
                     Image(systemName: "mappin.and.ellipse")
-                    Text("POIs")
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue)
+                    Text("POI Modus")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Zu Points of Interest wechseln")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
-                .tag(4)
+                Spacer()
             }
-            .accentColor(.blue)
-            .onChange(of: selectedTab) { oldValue, newValue in
-                if newValue == 4 {
-                    appMode = .planning
-                }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                appMode = .planning
+            }
+            .tabItem {
+                Image(systemName: "mappin.and.ellipse")
+                Text("POIs")
+            }
+            .tag(4)
+        }
+        .accentColor(.blue)
+        .onChange(of: selectedTab) { oldValue, newValue in
+            if newValue == 4 {
+                appMode = .planning
             }
         }
     }
@@ -110,4 +100,4 @@ struct TrackingView_Previews: PreviewProvider {
     static var previews: some View {
         PreviewWrapper()
     }
-}
+} 

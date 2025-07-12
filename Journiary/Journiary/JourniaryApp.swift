@@ -83,75 +83,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 @main
 struct JourniaryApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
-    // Der PersistenceController für Core Data.
     let persistenceController = PersistenceController.shared
-    @StateObject private var locationManager: LocationManager
-    @StateObject private var authService = AuthService.shared
-    @StateObject private var syncTriggerManager = SyncTriggerManager()
-    @StateObject private var syncToastManager = SyncToastManager()
-    
-    // Track app lifecycle changes
-    @Environment(\.scenePhase) private var scenePhase
-
-    init() {
-        let context = persistenceController.container.viewContext
-        // Initialize LocationManager
-        _locationManager = StateObject(wrappedValue: LocationManager(context: context))
-    }
 
     var body: some Scene {
         WindowGroup {
-            // Entscheidet basierend auf dem Authentifizierungsstatus, welche Ansicht gezeigt wird.
-            if authService.isAuthenticated {
-                ZStack {
-                    ContentView()
-                    
-                    // Phase 5.3: Toast-System als separates Overlay
-                    VStack {
-                        SyncToastOverlay()
-                        Spacer()
-                    }
-                }
-                // Stellt den Core Data Context für die Haupt-App bereit.
+            ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                // Stellt den AuthService für untergeordnete Views (z.B. für einen Logout-Button) bereit.
-                .environmentObject(authService)
-                .environmentObject(locationManager)
-                .environmentObject(syncTriggerManager)
-                .environmentObject(syncToastManager)
-                    .onAppear {
-                        // Phase 5.2: Automatischer Sync beim App-Start
-                        if authService.isAuthenticated {
-                            syncTriggerManager.triggerStartupSync()
-                        }
-                        
-                        // Phase 5.3: Toast-Manager an SyncTriggerManager koppeln
-                        syncTriggerManager.toastManager = syncToastManager
-                    }
-                    .onChange(of: scenePhase) { _, newPhase in
-                        // Phase 5.2: Sync-Trigger bei wichtigen Lifecycle-Events
-                        if authService.isAuthenticated {
-                            syncTriggerManager.handleScenePhaseChange(newPhase)
-                        }
-                    }
-                    .onChange(of: authService.isAuthenticated) { _, isAuthenticated in
-                        // Phase 5.2: Sync-Management bei Authentifizierungsänderung
-                        if isAuthenticated {
-                            // Kurze Verzögerung um Race Conditions mit Startup-Sync zu vermeiden
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                syncTriggerManager.triggerAuthenticationSync()
-                            }
-                        } else {
-                            syncTriggerManager.stopPeriodicSync()
-                        }
-                    }
-            } else {
-                // Zeigt die LoginView an, wenn der Benutzer nicht authentifiziert ist.
-                LoginView()
-                    // Stellt den AuthService für die LoginView bereit, damit diese den Status ändern kann.
-                    .environmentObject(authService)
-            }
         }
     }
 }

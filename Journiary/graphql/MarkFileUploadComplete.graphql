@@ -1,3 +1,0 @@
-mutation MarkFileUploadComplete($entityId: ID!, $entityType: String!, $objectName: String!) {
-    markFileUploadComplete(entityId: $entityId, entityType: $entityType, objectName: $objectName)
-} 

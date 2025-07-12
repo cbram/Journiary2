@@ -507,10 +507,6 @@ struct EditMemoryView: View {
         memory.text = text
         memory.timestamp = memory.timestamp // Behalte ursprünglichen Zeitstempel
         
-        // WICHTIG: Sync-Status für Upload setzen bei Bearbeitung
-        memory.syncStatusEnum = .needsUpload
-        memory.updatedAt = Date()
-        
         // Lösche alle alten Fotos (Legacy)
         if let existingPhotos = memory.photos?.allObjects as? [Photo] {
             for photo in existingPhotos {
