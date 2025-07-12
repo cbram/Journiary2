@@ -8,7 +8,7 @@
 import CoreData
 
 struct PersistenceController {
-    static let shared = PersistenceController(inMemory: true) // Temporär für Supabase-Integration
+    static let shared = PersistenceController() // Persistente Speicherung wieder aktiviert - für lokale Daten + Supabase-Sync
 
     @MainActor
     static let preview: PersistenceController = {
