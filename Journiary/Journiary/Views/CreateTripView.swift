@@ -398,6 +398,11 @@ struct CreateTripView: View {
         
         // Neue Reise: zusätzliche Standardwerte
         if existingTrip == nil {
+            // 🔧 WICHTIG: UUID setzen für neue Trips
+            if trip.id == nil {
+                trip.id = UUID()
+            }
+            
             // Eine neue Reise ist nur dann beendet (isActive = false), wenn ein Enddatum angegeben wurde
             trip.isActive = !hasEndDate
             trip.totalDistance = 0.0

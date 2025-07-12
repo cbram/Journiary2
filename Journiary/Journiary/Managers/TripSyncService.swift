@@ -170,6 +170,13 @@ class TripSyncService: ObservableObject {
     
     private func uploadSingleTrip(_ trip: Trip) async {
         do {
+            // 🔧 Stelle sicher, dass der Trip eine UUID hat
+            if trip.id == nil {
+                trip.id = UUID()
+                try context.save()
+                print("🔧 UUID für Trip generiert: \(trip.id!)")
+            }
+            
             let supabaseTrip = try trip.toSupabaseTrip()
             
             // Überprüfe, ob der Trip auf Supabase existiert
@@ -207,8 +214,14 @@ class TripSyncService: ObservableObject {
     
     private func updateTripOnSupabase(_ trip: Trip, supabaseTrip: SupabaseTrip) async {
         do {
+            // 🔧 Sichere UUID-Überprüfung
+            guard let tripId = trip.id else {
+                print("❌ Trip hat keine UUID - kann nicht aktualisiert werden")
+                return
+            }
+            
             // Überprüfe auf Konflikte
-            let remoteMetadata = try await supabaseManager.fetchTripSyncMetadata(id: trip.id!)
+            let remoteMetadata = try await supabaseManager.fetchTripSyncMetadata(id: tripId)
             
             if let conflict = detectConflict(localTrip: trip, remoteMetadata: remoteMetadata) {
                 await resolveConflict(conflict)
@@ -332,12 +345,13 @@ class TripSyncService: ObservableObject {
     // MARK: - Conflict Resolution
     
     private func detectConflict(localTrip: Trip, remoteMetadata: TripSyncMetadata) -> SyncConflict? {
-        guard let localUpdatedAt = localTrip.updatedAt else { return nil }
+        guard let localUpdatedAt = localTrip.updatedAt,
+              let tripId = localTrip.id else { return nil }
         
         // Überprüfe Sync-Version
         if localTrip.syncVersion != remoteMetadata.syncVersion {
             return SyncConflict(
-                tripId: localTrip.id!,
+                tripId: tripId,
                 type: .versionMismatch,
                 localUpdatedAt: localUpdatedAt,
                 remoteUpdatedAt: remoteMetadata.updatedAt
@@ -348,13 +362,14 @@ class TripSyncService: ObservableObject {
     }
     
     private func detectConflict(localTrip: Trip, remoteTrip: SupabaseTrip) -> SyncConflict? {
-        guard let localUpdatedAt = localTrip.updatedAt else { return nil }
+        guard let localUpdatedAt = localTrip.updatedAt,
+              let tripId = localTrip.id else { return nil }
         let remoteUpdatedAt = remoteTrip.updatedAt
         
         // Überprüfe Sync-Version
         if localTrip.syncVersion != remoteTrip.syncVersion {
             return SyncConflict(
-                tripId: localTrip.id!,
+                tripId: tripId,
                 type: .versionMismatch,
                 localUpdatedAt: localUpdatedAt,
                 remoteUpdatedAt: remoteUpdatedAt
