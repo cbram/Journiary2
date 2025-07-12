@@ -15,6 +15,9 @@ struct CreateTripView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var locationManager: LocationManager
     
+    // 🔄 SYNC-SERVICE für automatische Synchronisation
+    @StateObject private var syncService: TripSyncService
+    
     // Bestehende Reise zum Editieren (optional)
     let existingTrip: Trip?
     
@@ -49,6 +52,10 @@ struct CreateTripView: View {
     
     init(existingTrip: Trip? = nil) {
         self.existingTrip = existingTrip
+        
+        // 🔄 SYNC-SERVICE initialisieren
+        let context = PersistenceController.shared.container.viewContext
+        self._syncService = StateObject(wrappedValue: TripSyncService(context: context))
         
         // Bei Bearbeitung die bestehenden Werte laden
         if let trip = existingTrip {
@@ -394,15 +401,33 @@ struct CreateTripView: View {
             // Eine neue Reise ist nur dann beendet (isActive = false), wenn ein Enddatum angegeben wurde
             trip.isActive = !hasEndDate
             trip.totalDistance = 0.0
+            
+            // 🔄 SYNC-ATTRIBUTE für neue Reisen setzen
+            trip.needsSync = true
+            trip.createdAt = Date()
+            trip.updatedAt = Date()
+            trip.syncVersion = 1
+            trip.supabaseID = nil // Wird beim Upload gesetzt
         } else {
             // Bei bestehenden Reisen: isActive basierend auf Enddatum aktualisieren
             trip.isActive = !hasEndDate
+            
+            // 🔄 SYNC-ATTRIBUTE für bearbeitete Reisen aktualisieren
+            trip.needsSync = true
+            trip.updatedAt = Date()
+            trip.syncVersion = (trip.syncVersion > 0) ? trip.syncVersion + 1 : 1
         }
         
         // Speichern
         do {
             try viewContext.save()
             print("Reise '\(trip.name ?? "")' erfolgreich \(isEditing ? "bearbeitet" : "erstellt")")
+            
+            // 🔄 AUTOMATISCHE SYNCHRONISATION nach dem Speichern
+            Task {
+                await syncService.performIncrementalSync()
+            }
+            
             dismiss()
         } catch {
             print("Fehler beim Speichern der Reise: \(error)")
