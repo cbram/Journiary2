@@ -76,12 +76,19 @@ class TripSyncService: ObservableObject {
         syncProgress = SyncProgress()
         syncErrors.removeAll()
         
+        // 🔧 Tracking für bereits verarbeitete Trips
+        var processedTripIds = Set<UUID>()
+        
         do {
             // Schritt 1: Upload lokaler Änderungen seit letztem Sync
             await uploadLocalChangesSince(lastSync)
             
-            // Schritt 2: Download Remote-Änderungen seit letztem Sync
-            await downloadRemoteChangesSince(lastSync)
+            // Sammle IDs der gerade hochgeladenen Trips
+            let uploadedTripIds = await getUploadedTripIds()
+            processedTripIds.formUnion(uploadedTripIds)
+            
+            // Schritt 2: Download Remote-Änderungen seit letztem Sync (ohne gerade hochgeladene)
+            await downloadRemoteChangesSince(lastSync, excluding: processedTripIds)
             
             // Schritt 3: Sync-Datum aktualisieren
             updateLastSyncDate()
@@ -177,6 +184,9 @@ class TripSyncService: ObservableObject {
                 print("🔧 UUID für Trip generiert: \(trip.id!)")
             }
             
+            // 🖼️ Titelfoto-Upload prüfen und durchführen
+            await uploadCoverImageIfNeeded(trip)
+            
             let supabaseTrip = try trip.toSupabaseTrip()
             
             // Überprüfe, ob der Trip auf Supabase existiert
@@ -204,7 +214,11 @@ class TripSyncService: ObservableObject {
             trip.needsSync = false
             trip.lastSyncDate = Date()
             
+            // 🔧 Speichere sofort und aktualisiere Kontext
             try context.save()
+            context.refreshAllObjects()
+            
+            print("✅ Trip erfolgreich zu Supabase hochgeladen: \(trip.name ?? "Unnamed")")
             
         } catch {
             print("❌ Fehler beim Erstellen des Trips auf Supabase: \(error.localizedDescription)")
@@ -236,7 +250,11 @@ class TripSyncService: ObservableObject {
             trip.needsSync = false
             trip.lastSyncDate = Date()
             
+            // 🔧 Speichere sofort und aktualisiere Kontext
             try context.save()
+            context.refreshAllObjects()
+            
+            print("✅ Trip erfolgreich auf Supabase aktualisiert: \(trip.name ?? "Unnamed")")
             
         } catch {
             print("❌ Fehler beim Aktualisieren des Trips auf Supabase: \(error.localizedDescription)")
@@ -264,17 +282,22 @@ class TripSyncService: ObservableObject {
         }
     }
     
-    private func downloadRemoteChangesSince(_ date: Date) async {
+    private func downloadRemoteChangesSince(_ date: Date, excluding processedTripIds: Set<UUID> = []) async {
         print("📥 Lade Remote-Änderungen seit \(date) herunter...")
         
         do {
             let remoteTrips = try await supabaseManager.fetchTripsModifiedAfter(date)
             
-            for remoteTrip in remoteTrips {
+            // 🔧 Filtere bereits verarbeitete Trips aus
+            let newRemoteTrips = remoteTrips.filter { !processedTripIds.contains($0.id) }
+            
+            print("ℹ️ \(remoteTrips.count) Remote-Trips gefunden, \(newRemoteTrips.count) davon sind neu (gefiltert: \(remoteTrips.count - newRemoteTrips.count))")
+            
+            for remoteTrip in newRemoteTrips {
                 await processSingleRemoteTrip(remoteTrip)
             }
             
-            print("✅ \(remoteTrips.count) Remote-Trips seit \(date) verarbeitet")
+            print("✅ \(newRemoteTrips.count) Remote-Trips seit \(date) verarbeitet")
             
         } catch {
             print("❌ Fehler beim Laden der Remote-Trips seit \(date): \(error.localizedDescription)")
@@ -285,9 +308,9 @@ class TripSyncService: ObservableObject {
     private func processSingleRemoteTrip(_ remoteTrip: SupabaseTrip) async {
         let remoteTripId = remoteTrip.id
         
-        // Suche lokalen Trip
+        // 🔧 Suche lokalen Trip sowohl nach UUID als auch nach supabaseID
         let request: NSFetchRequest<Trip> = Trip.fetchRequest()
-        request.predicate = NSPredicate(format: "id == %@", remoteTripId as CVarArg)
+        request.predicate = NSPredicate(format: "id == %@ OR supabaseID == %@", remoteTripId as CVarArg, remoteTripId as CVarArg)
         request.fetchLimit = 1
         
         do {
@@ -295,9 +318,11 @@ class TripSyncService: ObservableObject {
             
             if let localTrip = localTrips.first {
                 // Lokaler Trip existiert - Update oder Konflikt
+                print("🔄 Lokaler Trip gefunden für Remote-Trip: \(remoteTrip.name ?? "Unnamed") (ID: \(remoteTripId), LocalID: \(localTrip.id?.uuidString ?? "nil"), LocalSupabaseID: \(localTrip.supabaseID?.uuidString ?? "nil"))")
                 await updateLocalTrip(localTrip, with: remoteTrip)
             } else {
                 // Lokaler Trip existiert nicht - Erstelle neuen
+                print("➕ Erstelle neuen lokalen Trip: \(remoteTrip.name ?? "Unnamed") (RemoteID: \(remoteTripId))")
                 await createLocalTrip(from: remoteTrip)
             }
             
@@ -319,6 +344,9 @@ class TripSyncService: ObservableObject {
             try localTrip.updateFromSupabase(remoteTrip)
             try context.save()
             
+            // 🖼️ Titelfoto herunterladen falls nötig
+            await downloadCoverImageIfNeeded(localTrip)
+            
             print("✅ Lokaler Trip aktualisiert: \(localTrip.name ?? "Unnamed")")
             
         } catch {
@@ -333,6 +361,9 @@ class TripSyncService: ObservableObject {
             try localTrip.updateFromSupabase(remoteTrip)
             
             try context.save()
+            
+            // 🖼️ Titelfoto herunterladen falls nötig
+            await downloadCoverImageIfNeeded(localTrip)
             
             print("✅ Lokaler Trip erstellt: \(localTrip.name ?? "Unnamed")")
             
@@ -416,12 +447,105 @@ class TripSyncService: ObservableObject {
         }
     }
     
+    // MARK: - Cover Image Upload
+    
+    private func uploadCoverImageIfNeeded(_ trip: Trip) async {
+        // Prüfe, ob ein Titelfoto vorhanden ist und hochgeladen werden muss
+        guard let coverImageData = trip.coverImageData,
+              !coverImageData.isEmpty else {
+            return
+        }
+        
+        // Prüfe, ob bereits eine URL vorhanden ist (vermeidet doppelte Uploads)
+        if let existingURL = trip.coverImageUrl, !existingURL.isEmpty {
+            print("ℹ️ Titelfoto bereits hochgeladen: \(existingURL)")
+            return
+        }
+        
+        do {
+            guard let tripId = trip.id else {
+                print("❌ Trip hat keine UUID - Titelfoto kann nicht hochgeladen werden")
+                return
+            }
+            
+            print("🖼️ Lade Titelfoto hoch für Trip: \(trip.name ?? "Unnamed")")
+            
+            // Bild zu Supabase Storage hochladen (mit Retry-Mechanismus)
+            let imageURL = try await supabaseManager.uploadCoverImageWithRetry(coverImageData, tripId: tripId)
+            
+            // URL in Trip speichern
+            trip.coverImageUrl = imageURL
+            trip.needsSync = true // Markiere für erneute Synchronisation
+            
+            try context.save()
+            
+            print("✅ Titelfoto erfolgreich hochgeladen: \(imageURL)")
+            
+        } catch {
+            print("❌ Fehler beim Hochladen des Titelfotos: \(error.localizedDescription)")
+            addSyncError(error, operation: "Cover Image Upload")
+        }
+    }
+    
+    // MARK: - Cover Image Download
+    
+    private func downloadCoverImageIfNeeded(_ trip: Trip) async {
+        // Prüfe, ob eine URL vorhanden ist, aber keine lokalen Bilddaten
+        guard let coverImageURL = trip.coverImageUrl,
+              !coverImageURL.isEmpty,
+              trip.coverImageData == nil else {
+            return
+        }
+        
+        do {
+            print("🖼️ Lade Titelfoto herunter für Trip: \(trip.name ?? "Unnamed")")
+            
+            let imageData = try await supabaseManager.downloadCoverImage(from: coverImageURL)
+            
+            // Bilddaten in Trip speichern
+            trip.coverImageData = imageData
+            
+            try context.save()
+            
+            print("✅ Titelfoto erfolgreich heruntergeladen")
+            
+        } catch {
+            print("❌ Fehler beim Herunterladen des Titelfotos: \(error.localizedDescription)")
+            addSyncError(error, operation: "Cover Image Download")
+        }
+    }
+    
     // MARK: - Helper Methods
     
     private func updateLastSyncDate() {
         let now = Date()
         lastSyncDate = now
         UserDefaults.standard.set(now, forKey: "lastTripSyncDate")
+    }
+    
+    /// Sammelt die IDs der Trips, die gerade hochgeladen wurden
+    private func getUploadedTripIds() async -> Set<UUID> {
+        let request: NSFetchRequest<Trip> = Trip.fetchRequest()
+        request.predicate = NSPredicate(format: "supabaseID != nil AND lastSyncDate != nil")
+        
+        do {
+            let syncedTrips = try context.fetch(request)
+            let recentTripIds = syncedTrips.compactMap { trip -> UUID? in
+                // Nur Trips die in den letzten 30 Sekunden synchronisiert wurden
+                // (verhindert false positives bei älteren Trips)
+                guard let tripId = trip.id,
+                      let lastSync = trip.lastSyncDate else { return nil }
+                
+                if Date().timeIntervalSince(lastSync) < 30 {
+                    return tripId
+                }
+                return nil
+            }
+            return Set(recentTripIds)
+        } catch {
+            print("❌ Fehler beim Sammeln der Upload-IDs: \(error.localizedDescription)")
+            return []
+        }
     }
     
     private func addSyncError(_ error: Error, operation: String) {

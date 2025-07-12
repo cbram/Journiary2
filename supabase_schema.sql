@@ -65,5 +65,98 @@ VALUES
     ('Aktuelle Reise', 'Laufende Reise für Tests', NOW(), true, 0.0)
 ON CONFLICT (id) DO NOTHING;
 
--- 7. Erfolgsmeldung
+-- 7. Storage-Bucket für Medien-Dateien
+-- Diese Konfiguration muss im Supabase Dashboard unter "Storage" durchgeführt werden
+
+-- WICHTIG: Diese Schritte müssen manuell im Supabase Dashboard durchgeführt werden!
+
+-- Schritt 1: Storage-Bucket erstellen
+-- Gehe zu Storage > Buckets im Supabase Dashboard
+-- Erstelle neuen Bucket mit Name: 'trip-media'
+-- Eigenschaften:
+--   - Public: true (für öffentliche URLs)
+--   - File size limit: 10MB
+--   - Allowed MIME types: image/jpeg, image/png, image/heif, image/webp
+
+-- Schritt 2: Row-Level Security TEMPORÄR deaktivieren (für Tests)
+-- Gehe zu Storage > Policies im Supabase Dashboard
+-- Klicke auf "Disable RLS" für den trip-media Bucket
+-- ACHTUNG: Das macht den Bucket öffentlich zugänglich!
+
+-- Schritt 3: Für Production - Sichere Policies erstellen
+-- Gehe zu Storage > Policies im Supabase Dashboard
+-- Erstelle folgende Policies für den 'trip-media' Bucket:
+
+-- Policy 1: "Allow uploads to trip cover images"
+--   Operation: INSERT
+--   Target roles: public
+--   Policy definition: bucket_id = 'trip-media' AND (storage.foldername(name))[1] = 'cover_images'
+
+-- Policy 2: "Allow public access to trip cover images"  
+--   Operation: SELECT
+--   Target roles: public
+--   Policy definition: bucket_id = 'trip-media' AND (storage.foldername(name))[1] = 'cover_images'
+
+-- Policy 3: "Allow updates to trip cover images"
+--   Operation: UPDATE
+--   Target roles: public  
+--   Policy definition: bucket_id = 'trip-media' AND (storage.foldername(name))[1] = 'cover_images'
+
+-- Policy 4: "Allow deletes of trip cover images"
+--   Operation: DELETE
+--   Target roles: public
+--   Policy definition: bucket_id = 'trip-media' AND (storage.foldername(name))[1] = 'cover_images'
+
+-- ====================
+-- PRODUCTION-READY POLICIES (SQL-Befehle)
+-- ====================
+
+-- 1. RLS wieder aktivieren
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- 2. Alte Policies löschen (falls vorhanden)
+DROP POLICY IF EXISTS "Allow all operations on trip-media bucket" ON storage.objects;
+
+-- 3. Sichere Policies erstellen
+CREATE POLICY "Allow public upload of trip cover images" ON storage.objects
+    FOR INSERT 
+    TO public
+    WITH CHECK (
+        bucket_id = 'trip-media' 
+        AND (storage.foldername(name))[1] = 'cover_images'
+        AND (storage.foldername(name))[2] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    );
+
+CREATE POLICY "Allow public access to trip cover images" ON storage.objects
+    FOR SELECT 
+    TO public
+    USING (
+        bucket_id = 'trip-media' 
+        AND (storage.foldername(name))[1] = 'cover_images'
+    );
+
+CREATE POLICY "Allow public update of trip cover images" ON storage.objects
+    FOR UPDATE 
+    TO public
+    USING (
+        bucket_id = 'trip-media' 
+        AND (storage.foldername(name))[1] = 'cover_images'
+    )
+    WITH CHECK (
+        bucket_id = 'trip-media' 
+        AND (storage.foldername(name))[1] = 'cover_images'
+    );
+
+CREATE POLICY "Allow public delete of trip cover images" ON storage.objects
+    FOR DELETE 
+    TO public
+    USING (
+        bucket_id = 'trip-media' 
+        AND (storage.foldername(name))[1] = 'cover_images'
+    );
+
+-- 4. Erfolgsmeldung
+SELECT 'Storage-Policies erfolgreich konfiguriert!' as result;
+
+-- 8. Erfolgsmeldung
 SELECT 'Trip-Tabelle erfolgreich erstellt! Anzahl Einträge: ' || COUNT(*) as result FROM trips; 

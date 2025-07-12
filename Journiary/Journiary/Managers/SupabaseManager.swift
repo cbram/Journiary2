@@ -239,7 +239,96 @@ class SupabaseManager: ObservableObject {
         return try await fetchTripsSince(date)
     }
     
+    // MARK: - Storage Management
+    
+    /// Lädt ein Bild zu Supabase Storage hoch und gibt die öffentliche URL zurück
+    func uploadCoverImage(_ imageData: Data, tripId: UUID) async throws -> String {
+        guard isConnected else {
+            throw SyncError.networkUnavailable
+        }
+        
+        // Eindeutiger Dateiname für das Titelfoto
+        let fileName = "cover_images/\(tripId.uuidString).jpg"
+        
+        do {
+            // Datei zu Supabase Storage hochladen
+            let _ = try await supabase.storage
+                .from("trip-media")
+                .upload(
+                    fileName,
+                    data: imageData,
+                    options: FileOptions(
+                        cacheControl: "3600",
+                        upsert: true
+                    )
+                )
+            
+            // Öffentliche URL für das hochgeladene Bild abrufen
+            let publicURL = try supabase.storage
+                .from("trip-media")
+                .getPublicURL(path: fileName)
+            
+            return publicURL.absoluteString
+            
+        } catch {
+            print("⚠️ Storage-Upload fehlgeschlagen: \(error)")
+            throw SyncError.serverError("Fehler beim Hochladen des Titelfotos: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Upload-Methode mit verbesserter Fehlerbehandlung
+    func uploadCoverImageWithRetry(_ imageData: Data, tripId: UUID) async throws -> String {
+        return try await uploadCoverImage(imageData, tripId: tripId)
+    }
+    
+    /// Lädt ein Bild von Supabase Storage herunter
+    func downloadCoverImage(from url: String) async throws -> Data {
+        guard isConnected else {
+            throw SyncError.networkUnavailable
+        }
+        
+        do {
+            let imageData = try await supabase.storage
+                .from("trip-media")
+                .download(path: extractPathFromURL(url))
+            
+            return imageData
+            
+        } catch {
+            throw SyncError.serverError("Fehler beim Herunterladen des Titelfotos: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Löscht ein Bild von Supabase Storage
+    func deleteCoverImage(url: String) async throws {
+        guard isConnected else {
+            throw SyncError.networkUnavailable
+        }
+        
+        do {
+            try await supabase.storage
+                .from("trip-media")
+                .remove(paths: [extractPathFromURL(url)])
+            
+        } catch {
+            throw SyncError.serverError("Fehler beim Löschen des Titelfotos: \(error.localizedDescription)")
+        }
+    }
+    
     // MARK: - Helper Methods
+    
+    private func extractPathFromURL(_ url: String) -> String {
+        // Extrahiert den Pfad aus der Supabase Storage URL
+        // z.B. "https://domain.supabase.co/storage/v1/object/public/trip-media/cover_images/uuid.jpg"
+        // -> "cover_images/uuid.jpg"
+        
+        if let range = url.range(of: "/trip-media/") {
+            return String(url[range.upperBound...])
+        }
+        
+        // Fallback: Verwende die URL als Pfad (könnte zu Fehlern führen)
+        return url
+    }
     
     private func formatError(_ error: Error) -> String {
         // Formatiere Fehlermeldungen für bessere Benutzerfreundlichkeit
