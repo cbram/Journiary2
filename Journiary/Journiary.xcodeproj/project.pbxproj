@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		768871F32E22C3A2003472D4 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 768871F22E22C3A2003472D4 /* Supabase */; };
 		7690A2972E229D4500F992AC /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A2962E229D4500F992AC /* Auth */; };
 		7690A2992E229D4500F992AC /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A2982E229D4500F992AC /* Functions */; };
 		7690A29B2E229D4500F992AC /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 7690A29A2E229D4500F992AC /* PostgREST */; };
@@ -75,6 +76,7 @@
 			files = (
 				7690A29B2E229D4500F992AC /* PostgREST in Frameworks */,
 				7690A2992E229D4500F992AC /* Functions in Frameworks */,
+				768871F32E22C3A2003472D4 /* Supabase in Frameworks */,
 				7690A2972E229D4500F992AC /* Auth in Frameworks */,
 				7690A29F2E229D4500F992AC /* Storage in Frameworks */,
 				7690A29D2E229D4500F992AC /* Realtime in Frameworks */,
@@ -104,6 +106,7 @@
 				761954D72DF57EB6003E92C7 /* Journiary */,
 				761954EC2DF57EB7003E92C7 /* JourniaryTests */,
 				761954F62DF57EB7003E92C7 /* JourniaryUITests */,
+				768871F12E22C3A2003472D4 /* Frameworks */,
 				761954D62DF57EB6003E92C7 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -116,6 +119,13 @@
 				761954F32DF57EB7003E92C7 /* JourniaryUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		768871F12E22C3A2003472D4 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -143,6 +153,7 @@
 				7690A29A2E229D4500F992AC /* PostgREST */,
 				7690A29C2E229D4500F992AC /* Realtime */,
 				7690A29E2E229D4500F992AC /* Storage */,
+				768871F22E22C3A2003472D4 /* Supabase */,
 			);
 			productName = Journiary;
 			productReference = 761954D52DF57EB6003E92C7 /* Journiary.app */;
@@ -316,6 +327,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Journiary/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -328,6 +340,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = CHJB.Journiary;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -347,6 +362,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Journiary/Info.plist;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -359,6 +375,9 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = CHJB.Journiary;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -611,6 +630,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		768871F22E22C3A2003472D4 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
 		7690A2962E229D4500F992AC /* Auth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7690A2952E229D4500F992AC /* XCRemoteSwiftPackageReference "supabase-swift" */;

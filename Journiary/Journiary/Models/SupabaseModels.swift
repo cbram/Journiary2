@@ -78,6 +78,24 @@ struct SupabaseTrip: Codable, Identifiable {
         self.syncVersion = syncVersion
         self.userId = userId
     }
+    
+    // MARK: - Conversion Methods
+    
+    func toInsert() -> SupabaseTripInsert {
+        return SupabaseTripInsert(
+            name: name,
+            tripDescription: tripDescription,
+            coverImageUrl: coverImageUrl,
+            travelCompanions: travelCompanions,
+            visitedCountries: visitedCountries,
+            startDate: startDate,
+            endDate: endDate,
+            isActive: isActive,
+            totalDistance: totalDistance,
+            gpsTrackingEnabled: gpsTrackingEnabled,
+            userId: userId
+        )
+    }
 }
 
 // MARK: - SupabaseTrip für Insert/Update

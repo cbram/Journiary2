@@ -3,10 +3,11 @@ import SwiftUI
 struct DebugSettingsSubmenuView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var showingGPSDebugView: Bool
+    @State private var showingSupabaseTestView = false
 
     var body: some View {
         List {
-            // Debug-Modus Schalter
+            // GPS Debug-Modus Schalter
             HStack {
                 Image(systemName: "ladybug.fill")
                     .font(.title3)
@@ -53,6 +54,30 @@ struct DebugSettingsSubmenuView: View {
                         }
                         .padding(.vertical, 8)
                     }
+                }
+            }
+            
+            // Supabase Sync Test Section
+            Section("Supabase Synchronisation") {
+                Button(action: {
+                    showingSupabaseTestView = true
+                }) {
+                    HStack {
+                        Image(systemName: "cloud.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+                        Text("Supabase Sync Test")
+                            .font(.body)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                }
+                .sheet(isPresented: $showingSupabaseTestView) {
+                    SupabaseSyncTestView()
                 }
             }
         }
